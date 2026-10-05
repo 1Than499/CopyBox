@@ -24,6 +24,8 @@ namespace ClipVault.Models
         public bool IsCode => ItemType == "Code";
         public bool IsText => ItemType == "Text";
 
+        public string MenuTooltip => ClipVault.Services.LocalizationService.Instance.Get("MenuTooltip");
+
         public string FormattedTime
         {
             get

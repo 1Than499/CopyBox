@@ -80,7 +80,7 @@ namespace ClipVault
             {
                 if (_settingsService != null && 
                     _settingsService.CurrentSettings.HideOnDeactivate &&
-                    SettingsOverlayCard.Visibility != Visibility.Visible && 
+                    (SettingsOverlayHost == null || SettingsOverlayHost.Visibility != Visibility.Visible) && 
                     this.WindowState != WindowState.Minimized)
                 {
                     this.Hide();
@@ -229,7 +229,7 @@ namespace ClipVault
             _pasteSimulator.RecordTargetWindow();
 
             SearchInputBox.Text = string.Empty;
-            SettingsOverlayCard.Visibility = Visibility.Collapsed;
+            if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Collapsed;
             RefreshCards();
 
             if (this.WindowState == WindowState.Minimized)
@@ -574,8 +574,8 @@ namespace ClipVault
                 // 限制在主窗口客户区边界内 (绝不超出软件窗口边缘)
                 double containerW = MainRootGrid.ActualWidth;
                 double containerH = MainRootGrid.ActualHeight;
-                double cardW = SettingsOverlayCard.ActualWidth > 0 ? SettingsOverlayCard.ActualWidth : 420;
-                double cardH = SettingsOverlayCard.ActualHeight > 0 ? SettingsOverlayCard.ActualHeight : 480;
+                double cardW = (SettingsOverlayHost != null && SettingsOverlayHost.ActualWidth > 0) ? SettingsOverlayHost.ActualWidth : 420;
+                double cardH = (SettingsOverlayHost != null && SettingsOverlayHost.ActualHeight > 0) ? SettingsOverlayHost.ActualHeight : 480;
 
                 if (containerW > 0 && containerH > 0)
                 {
@@ -604,12 +604,12 @@ namespace ClipVault
 
         private void EnsureSettingsInBounds()
         {
-            if (MainRootGrid == null || SettingsOverlayCard == null || SettingsTransform == null) return;
+            if (MainRootGrid == null || SettingsOverlayHost == null || SettingsTransform == null) return;
 
             double containerW = MainRootGrid.ActualWidth;
             double containerH = MainRootGrid.ActualHeight;
-            double cardW = SettingsOverlayCard.ActualWidth > 0 ? SettingsOverlayCard.ActualWidth : 420;
-            double cardH = SettingsOverlayCard.ActualHeight > 0 ? SettingsOverlayCard.ActualHeight : 480;
+            double cardW = (SettingsOverlayHost.ActualWidth > 0) ? SettingsOverlayHost.ActualWidth : 420;
+            double cardH = (SettingsOverlayHost.ActualHeight > 0) ? SettingsOverlayHost.ActualHeight : 480;
 
             if (containerW > 0 && containerH > 0)
             {

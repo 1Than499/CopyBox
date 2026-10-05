@@ -460,7 +460,7 @@
                                         </Border>
 
                                         <!-- 概念图右上角经典三点交互 ··· -->
-                                        <Button Content="···" Tag="{Binding Id}" Click="ItemMenu_Click" Background="Transparent" Foreground="{DynamicResource SubTextBrush}" BorderThickness="0" FontSize="12" Cursor="Hand" ToolTip="快捷菜单 (置顶/复制/删除)" Opacity="0.8"/>
+                                        <Button Content="···" Tag="{Binding Id}" Click="ItemMenu_Click" Background="Transparent" Foreground="{DynamicResource SubTextBrush}" BorderThickness="0" FontSize="12" Cursor="Hand" ToolTip="{Binding MenuTooltip}" Opacity="0.8"/>
                                     </StackPanel>
                                 </Grid>
 
