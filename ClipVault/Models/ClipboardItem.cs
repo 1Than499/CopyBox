@@ -37,5 +37,30 @@ namespace ClipVault.Models
         }
 
         public string FullImagePath { get; set; } = string.Empty;
+
+        private System.Windows.Media.ImageSource? _cachedImage;
+        public System.Windows.Media.ImageSource? ImagePreview
+        {
+            get
+            {
+                if (_cachedImage != null) return _cachedImage;
+                if (!IsImage || string.IsNullOrEmpty(FullImagePath) || !File.Exists(FullImagePath)) return null;
+                try
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(FullImagePath, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _cachedImage = bmp;
+                    return _cachedImage;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
     }
 }

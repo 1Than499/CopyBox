@@ -57,7 +57,14 @@ namespace ClipVault.Services
                 vk = (uint)KeyInterop.VirtualKeyFromKey(parsedKey);
             }
 
-            NativeMethods.RegisterHotKey(_hwndSource.Handle, HOTKEY_ID, modifier, vk);
+            bool success = NativeMethods.RegisterHotKey(_hwndSource.Handle, HOTKEY_ID, modifier, vk);
+            if (!success)
+            {
+                // 若用户首选热键被第三方软件占用，自动尝试备用热键 Ctrl + Shift + V
+                uint fallbackMod = NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT;
+                uint fallbackVk = (uint)KeyInterop.VirtualKeyFromKey(Key.V);
+                NativeMethods.RegisterHotKey(_hwndSource.Handle, HOTKEY_ID, fallbackMod, fallbackVk);
+            }
         }
 
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

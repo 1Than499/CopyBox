@@ -19,9 +19,20 @@ namespace ClipVault
         private MainWindow? _mainWindow;
         private TaskbarIcon? _trayIcon;
 
+        private static System.Threading.Mutex? _singleInstanceMutex;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // 进程防多开检测
+            _singleInstanceMutex = new System.Threading.Mutex(true, "ClipVault_SingleInstance_Mutex_98765", out bool isNewInstance);
+            if (!isNewInstance)
+            {
+                MessageBox.Show("ClipVault 已经在后台运行中！\n请按下快捷键 [Alt + V] 唤醒，或在右下角系统托盘查看。", "ClipVault 运行提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
 
             AppDomain.CurrentDomain.UnhandledException += (s, args) =>
             {

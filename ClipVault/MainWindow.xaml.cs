@@ -44,6 +44,15 @@ namespace ClipVault
                     UpdateStorageInfo();
                 });
             };
+
+            // 失去焦点时自动隐藏（设置面板展开时除外，防止修改路径时意外关闭）
+            this.Deactivated += (s, e) =>
+            {
+                if (SettingsOverlayCard.Visibility != Visibility.Visible)
+                {
+                    this.Hide();
+                }
+            };
         }
 
         private void LoadSettingsToUI()

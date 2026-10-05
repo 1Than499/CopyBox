@@ -31,9 +31,9 @@ namespace ClipVault.Services
         {
             var conn = new SqliteConnection($"Data Source={_dbPath};");
             conn.Open();
-            // 开启 WAL 模式：高并发读写、零锁库卡顿
+            // 开启 WAL 模式与 3秒 busy_timeout：高并发读写、零锁库卡顿
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;";
+            cmd.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 3000;";
             cmd.ExecuteNonQuery();
             return conn;
         }

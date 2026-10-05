@@ -280,7 +280,7 @@
                                     <!-- 2. 图片卡片：圆角截图缩略图预览 -->
                                     <Border Background="#11141B" CornerRadius="8" Padding="3" HorizontalAlignment="Center"
                                             Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}">
-                                        <Image Source="{Binding FullImagePath}" MaxHeight="75" MaxWidth="280" Stretch="Uniform"/>
+                                        <Image Source="{Binding ImagePreview}" MaxHeight="75" MaxWidth="280" Stretch="Uniform"/>
                                     </Border>
 
                                     <!-- 3. 纯文本卡片：引语/摘要风格 -->
