@@ -57,10 +57,10 @@ namespace ClipVault
                 });
             };
 
-            // 失去焦点时自动隐藏（设置面板展开时除外，防止修改路径时意外关闭）
+            // 失去焦点时自动隐藏（设置面板展开或窗口最小化到任务栏时除外）
             this.Deactivated += (s, e) =>
             {
-                if (SettingsOverlayCard.Visibility != Visibility.Visible)
+                if (SettingsOverlayCard.Visibility != Visibility.Visible && this.WindowState != WindowState.Minimized)
                 {
                     this.Hide();
                 }
@@ -110,6 +110,10 @@ namespace ClipVault
             SettingsOverlayCard.Visibility = Visibility.Collapsed;
             RefreshCards();
 
+            if (this.WindowState == WindowState.Minimized)
+            {
+                this.WindowState = WindowState.Normal;
+            }
             this.Show();
             this.Activate();
             SearchInputBox.Focus();
@@ -235,9 +239,9 @@ namespace ClipVault
 
         // ================= 窗口控制与退出行为 =================
 
-        private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
+        private void BtnMinimizeWindow_Click(object sender, RoutedEventArgs e)
         {
-            this.Hide();
+            this.WindowState = WindowState.Minimized;
         }
 
         private void BtnCloseWindow_Click(object sender, RoutedEventArgs e)
@@ -248,7 +252,7 @@ namespace ClipVault
             }
             else
             {
-                this.Hide();
+                this.Hide(); // 最小化收起到后台系统托盘
             }
         }
 

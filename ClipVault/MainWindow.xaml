@@ -146,20 +146,20 @@
                     <!-- 纵向分割细线 -->
                     <Rectangle Width="1" Height="14" Fill="{DynamicResource WindowBorderBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
 
-                    <!-- 最小化到托盘 (极简符号) -->
-                    <Button x:Name="BtnMinimizeToTray" 
+                    <!-- 最小化窗口 (缩小界面) -->
+                    <Button x:Name="BtnMinimizeWindow" 
                             Content="─" 
                             Style="{StaticResource TopIconButtonStyle}"
-                            Click="BtnMinimizeToTray_Click" 
-                            ToolTip="最小化到后台系统托盘 (快捷键 Alt+V 随时唤起)"
+                            Click="BtnMinimizeWindow_Click" 
+                            ToolTip="最小化窗口到任务栏 (缩小界面)"
                             Margin="0,0,2,0"/>
 
-                    <!-- 关闭窗口按钮 (极简符号，悬浮红底) -->
+                    <!-- 关闭窗口按钮 (极简符号，悬浮红底，默认收起到后台托盘) -->
                     <Button x:Name="BtnCloseWindow" 
                             Content="✕" 
                             Style="{StaticResource CloseIconButtonStyle}"
                             Click="BtnCloseWindow_Click" 
-                            ToolTip="关闭窗口"/>
+                            ToolTip="关闭窗口 (默认收起到后台系统托盘，Alt+V 随时唤起)"/>
                 </StackPanel>
             </Grid>
 
