@@ -9,6 +9,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <NoWarn>NU1701</NoWarn>
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
+    <AssemblyName>CopyBox</AssemblyName>
+    <Product>CopyBox</Product>
+    <AssemblyTitle>CopyBox</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>

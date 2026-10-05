@@ -26,15 +26,6 @@ namespace ClipVault
         {
             base.OnStartup(e);
 
-            // 进程防多开检测
-            _singleInstanceMutex = new System.Threading.Mutex(true, "ClipVault_SingleInstance_Mutex_98765", out bool isNewInstance);
-            if (!isNewInstance)
-            {
-                MessageBox.Show("ClipVault 已经在后台运行中！\n请按下快捷键 [Alt + V] 唤醒，或在右下角系统托盘查看。", "ClipVault 运行提示", MessageBoxButton.OK, MessageBoxImage.Information);
-                Shutdown();
-                return;
-            }
-
             AppDomain.CurrentDomain.UnhandledException += (s, args) =>
             {
                 File.AppendAllText(@"d:\bank\crash.log", $"[AppDomain Crash] {args.ExceptionObject}\n");
@@ -44,10 +35,21 @@ namespace ClipVault
                 File.AppendAllText(@"d:\bank\crash.log", $"[Dispatcher Crash] {args.Exception}\n");
             };
 
+            // 进程防多开检测
+            _singleInstanceMutex = new System.Threading.Mutex(true, "CopyBox_SingleInstance_Mutex_98765", out bool isNewInstance);
+            if (!isNewInstance)
+            {
+                var loc = LocalizationService.Instance;
+                MessageBox.Show(loc.Get("AlreadyRunningMsg"), loc.Get("AlreadyRunningTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
+
             try
             {
                 // 1. 初始化核心后台服务
                 _settingsService = new SettingsService();
+                LocalizationService.Instance.SetLanguage(_settingsService.CurrentSettings.Language);
                 _dbService = new DatabaseService(_settingsService.CurrentSettings.StorageDirectory);
                 _monitorService = new ClipboardMonitorService(_dbService, _settingsService);
                 _pasteSimulator = new PasteSimulator(_monitorService);
@@ -88,7 +90,7 @@ namespace ClipVault
             catch (Exception ex)
             {
                 File.AppendAllText(@"d:\bank\crash.log", $"[Startup Exception] {ex}\n");
-                MessageBox.Show($"ClipVault 启动失败: {ex.Message}\n{ex.StackTrace}", "启动异常", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"CopyBox 启动失败: {ex.Message}\n{ex.StackTrace}", "启动异常", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown();
             }
         }
@@ -145,6 +147,12 @@ namespace ClipVault
             }
         }
 
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuQuick;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuPause;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuClear;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuSettings;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuExit;
+
         private void InitTrayIcon()
         {
             try
@@ -154,54 +162,61 @@ namespace ClipVault
                 _notifyIcon = new System.Windows.Forms.NotifyIcon
                 {
                     Icon = _appIcon,
-                    Text = "ClipVault - 剪贴板安全保管箱 (Alt+V)",
                     Visible = true
                 };
 
                 // 创建原生上下文右键菜单 (工业级稳定)
                 var contextMenu = new System.Windows.Forms.ContextMenuStrip();
 
-                var menuQuick = new System.Windows.Forms.ToolStripMenuItem("🚀 呼出 ClipVault (Alt + V)");
-                menuQuick.Font = new Font(menuQuick.Font, System.Drawing.FontStyle.Bold);
-                menuQuick.Click += (s, e) => Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
+                _trayMenuQuick = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuQuick.Font = new Font(_trayMenuQuick.Font, System.Drawing.FontStyle.Bold);
+                _trayMenuQuick.Click += (s, e) => Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
 
-                var menuPause = new System.Windows.Forms.ToolStripMenuItem("⏸️ 暂停记录剪贴板");
-                menuPause.Click += (s, e) =>
+                _trayMenuPause = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuPause.Click += (s, e) =>
                 {
                     if (_monitorService != null)
                     {
                         _monitorService.IsPaused = !_monitorService.IsPaused;
-                        menuPause.Checked = _monitorService.IsPaused;
-                        menuPause.Text = _monitorService.IsPaused ? "▶️ 恢复记录剪贴板" : "⏸️ 暂停记录剪贴板";
+                        _trayMenuPause.Checked = _monitorService.IsPaused;
+                        UpdateTrayMenuPauseText();
                     }
                 };
 
-                var menuClear = new System.Windows.Forms.ToolStripMenuItem("🗑️ 清空所有非置顶记录");
-                menuClear.Click += (s, e) =>
+                _trayMenuClear = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuClear.Click += (s, e) =>
                 {
-                    _dbService?.ClearAll();
-                    Dispatcher.Invoke(() => _mainWindow?.RefreshCards());
+                    var loc = LocalizationService.Instance;
+                    var res = MessageBox.Show(loc.Get("ConfirmClearMsg"), loc.Get("ConfirmClearTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (res == MessageBoxResult.Yes)
+                    {
+                        _dbService?.ClearAll();
+                        Dispatcher.Invoke(() => _mainWindow?.RefreshCards());
+                    }
                 };
 
-                var menuSettings = new System.Windows.Forms.ToolStripMenuItem("⚙️ 偏好设置与本地路径");
-                menuSettings.Click += (s, e) => Dispatcher.Invoke(() =>
+                _trayMenuSettings = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuSettings.Click += (s, e) => Dispatcher.Invoke(() =>
                 {
                     _mainWindow?.ShowAndActivate();
                     _mainWindow?.OpenSettings();
                 });
 
-                var menuExit = new System.Windows.Forms.ToolStripMenuItem("🛑 彻底退出 ClipVault");
-                menuExit.Click += (s, e) => Dispatcher.Invoke(() => ExitApplication());
+                _trayMenuExit = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuExit.Click += (s, e) => Dispatcher.Invoke(() => ExitApplication());
 
-                contextMenu.Items.Add(menuQuick);
+                contextMenu.Items.Add(_trayMenuQuick);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-                contextMenu.Items.Add(menuPause);
-                contextMenu.Items.Add(menuClear);
-                contextMenu.Items.Add(menuSettings);
+                contextMenu.Items.Add(_trayMenuPause);
+                contextMenu.Items.Add(_trayMenuClear);
+                contextMenu.Items.Add(_trayMenuSettings);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-                contextMenu.Items.Add(menuExit);
+                contextMenu.Items.Add(_trayMenuExit);
 
                 _notifyIcon.ContextMenuStrip = contextMenu;
+
+                UpdateTrayTexts();
+                LocalizationService.Instance.LanguageChanged += UpdateTrayTexts;
 
                 // 单击或双击托盘图标：快速唤醒主窗口
                 _notifyIcon.MouseClick += (s, e) =>
@@ -222,6 +237,28 @@ namespace ClipVault
             }
         }
 
+        private void UpdateTrayTexts()
+        {
+            if (_notifyIcon == null) return;
+            var loc = LocalizationService.Instance;
+            _notifyIcon.Text = loc.Get("TrayTooltip");
+
+            if (_trayMenuQuick != null) _trayMenuQuick.Text = "🚀 " + loc.Get("TrayShow");
+            if (_trayMenuClear != null) _trayMenuClear.Text = "🗑️ " + loc.Get("TrayClear");
+            if (_trayMenuSettings != null) _trayMenuSettings.Text = "⚙️ " + loc.Get("TraySettings");
+            if (_trayMenuExit != null) _trayMenuExit.Text = "🛑 " + loc.Get("TrayExit");
+            UpdateTrayMenuPauseText();
+        }
+
+        private void UpdateTrayMenuPauseText()
+        {
+            if (_trayMenuPause == null || _monitorService == null) return;
+            var loc = LocalizationService.Instance;
+            _trayMenuPause.Text = _monitorService.IsPaused 
+                ? "▶️ " + loc.Get("TrayResume") 
+                : "⏸️ " + loc.Get("TrayPause");
+        }
+
         public void ExitApplication()
         {
             _monitorService?.Stop();
@@ -238,6 +275,7 @@ namespace ClipVault
 
         protected override void OnExit(ExitEventArgs e)
         {
+            File.AppendAllText(@"d:\bank\app.log", $"[{DateTime.Now}] OnExit called, code: {e.ApplicationExitCode}\n");
             _monitorService?.Stop();
             _hotkeyService?.Stop();
             if (_notifyIcon != null)

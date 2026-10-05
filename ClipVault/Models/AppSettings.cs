@@ -27,6 +27,9 @@ namespace ClipVault.Models
         // 窗口透明度: 0.60 ~ 1.00 (默认 0.92)
         public double WindowOpacity { get; set; } = 0.92;
 
+        // 界面语言偏好: "zh-CN" (简体中文) 或 "en-US" (English)
+        public string Language { get; set; } = "zh-CN";
+
         // 隐私与过滤规则
         public bool IgnorePasswordManagers { get; set; } = true;
         public bool AutoConvertImageToWebP { get; set; } = false; // 是否自动压缩图片
@@ -38,7 +41,7 @@ namespace ClipVault.Models
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ClipVault",
+                "CopyBox",
                 "Data"
             );
         }

@@ -6,7 +6,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:helpers="clr-namespace:ClipVault.Helpers"
         mc:Ignorable="d"
-        Title="ClipVault"
+        Title="CopyBox"
         Width="580" Height="620"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -416,114 +416,133 @@
                         BorderThickness="1" 
                         CornerRadius="14" 
                         Width="450" 
+                        MaxHeight="460"
                         HorizontalAlignment="Right" 
                         VerticalAlignment="Bottom" 
                         Margin="0,0,10,10" 
-                        Padding="16">
+                        Padding="14,12">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270" Opacity="0.6" Color="Black"/>
                     </Border.Effect>
 
-                    <StackPanel>
-                        <!-- 顶栏与关闭设置 -->
-                        <Grid Margin="0,0,0,12">
-                            <TextBlock Text="⚙ Settings" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TitleTextBrush}" VerticalAlignment="Center"/>
-                            <Button Content="✕" Click="BtnCloseSettingsOverlay_Click" Background="Transparent" Foreground="{DynamicResource SubTextBrush}" BorderThickness="0" FontSize="12" HorizontalAlignment="Right" Cursor="Hand"/>
-                        </Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <!-- 顶栏与关闭设置 -->
+                            <Grid Margin="0,0,0,10">
+                                <TextBlock x:Name="TxtSettingsTitle" Text="⚙ 偏好设置" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TitleTextBrush}" VerticalAlignment="Center"/>
+                                <Button Content="✕" Click="BtnCloseSettingsOverlay_Click" Background="Transparent" Foreground="{DynamicResource SubTextBrush}" BorderThickness="0" FontSize="12" HorizontalAlignment="Right" Cursor="Hand"/>
+                            </Grid>
 
-                        <!-- 自选存储路径 (1:1 还原概念图 Local Storage Path) -->
-                        <TextBlock Text="Local Storage Path:" Foreground="{DynamicResource SubTextBrush}" FontSize="11" Margin="0,0,0,5"/>
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,8,0">
-                                <TextBox x:Name="TxtSettingsStoragePath" IsReadOnly="True" Background="Transparent" Foreground="{DynamicResource CardTextBrush}" BorderThickness="0" Padding="8,5" FontSize="11.5"/>
+                            <!-- 0. 语言选择 (中英文) -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtLanguageTitle" Text="🌐 界面语言 / Language：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <RadioButton x:Name="RadioLangZh" Grid.Column="0" GroupName="LanguageGroup" Content="🇨🇳 简体中文" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="LangRadio_Changed"/>
+                                        <RadioButton x:Name="RadioLangEn" Grid.Column="1" GroupName="LanguageGroup" Content="🇺🇸 English" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="LangRadio_Changed"/>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
-                            <Button Grid.Column="1" Content="Browse..." Click="BtnBrowseStorage_Click" Background="#263142" Foreground="White" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="12,5" FontSize="11.5" Cursor="Hand">
-                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8"/></Style></Button.Resources>
-                            </Button>
-                        </Grid>
 
-                        <!-- 本地状态提示卡片 (1:1 还原概念图蓝色圆圈信息提示) -->
-                        <Border Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource InfoBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,12">
-                            <TextBlock x:Name="TxtStorageStatusInfo" 
-                                       Text="ℹ Local SQLite status is active, 100% offline and stored at your local disk." 
-                                       Foreground="{DynamicResource InfoTextBrush}" 
-                                       FontSize="11" 
-                                       TextWrapping="Wrap"/>
-                        </Border>
+                            <!-- 1. 自选存储路径 (1:1 还原概念图 Local Storage Path) -->
+                            <TextBlock x:Name="TxtStoragePathTitle" Text="本地数据存储路径：" Foreground="{DynamicResource SubTextBrush}" FontSize="11" Margin="0,0,0,5"/>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,8,0">
+                                    <TextBox x:Name="TxtSettingsStoragePath" IsReadOnly="True" Background="Transparent" Foreground="{DynamicResource CardTextBrush}" BorderThickness="0" Padding="8,5" FontSize="11.5"/>
+                                </Border>
+                                <Button x:Name="BtnBrowseStorage" Grid.Column="1" Content="浏览..." Click="BtnBrowseStorage_Click" Background="#263142" Foreground="White" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="12,5" FontSize="11.5" Cursor="Hand">
+                                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8"/></Style></Button.Resources>
+                                </Button>
+                            </Grid>
 
-                        <!-- 主题与透明度调节 -->
-                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="🎨 界面外观与背景透明度：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,8"/>
-                                
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <RadioButton x:Name="RadioThemeDark" Grid.Column="0" GroupName="ThemeGroup" Content="🌙 暗黑夜间模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
-                                    <RadioButton x:Name="RadioThemeLight" Grid.Column="1" GroupName="ThemeGroup" Content="☀️ 白天明亮模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
-                                </Grid>
+                            <!-- 本地状态提示卡片 (1:1 还原概念图蓝色圆圈信息提示) -->
+                            <Border Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource InfoBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+                                <TextBlock x:Name="TxtStorageStatusInfo" 
+                                           Text="ℹ 本地 SQLite 状态正常：已记录 0 条 (置顶 0)，图片 0 张，数据 100% 物理留存于本地磁盘。" 
+                                           Foreground="{DynamicResource InfoTextBrush}" 
+                                           FontSize="11" 
+                                           TextWrapping="Wrap"/>
+                            </Border>
 
-                                <Grid Margin="0,4,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="透明度:" Foreground="{DynamicResource SubTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <Slider x:Name="SliderOpacity" Grid.Column="1" Minimum="0.55" Maximum="1.00" Value="0.92" SmallChange="0.05" LargeChange="0.10" ValueChanged="SliderOpacity_ValueChanged" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TxtOpacityValue" Grid.Column="2" Text="92%" Foreground="{DynamicResource CardTextBrush}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                            <!-- 2. 主题与透明度调节 -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtAppearanceTitle" Text="🎨 界面外观与背景透明度：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,8"/>
+                                    
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <RadioButton x:Name="RadioThemeDark" Grid.Column="0" GroupName="ThemeGroup" Content="🌙 暗黑夜间模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeLight" Grid.Column="1" GroupName="ThemeGroup" Content="☀️ 白天明亮模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                    </Grid>
 
-                        <!-- 窗口关闭动作偏好 -->
-                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="点击窗口右上角 [✕ 关闭] 时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
-                                <RadioButton x:Name="RadioCloseMinimize" GroupName="CloseActionGroup" Content="最小化到系统托盘 (继续在后台常驻监听)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="CloseActionRadio_Changed"/>
-                                <RadioButton x:Name="RadioCloseExit" GroupName="CloseActionGroup" Content="直接彻底退出 ClipVault 程序" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="CloseActionRadio_Changed"/>
-                            </StackPanel>
-                        </Border>
+                                    <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="TxtOpacityLabel" Grid.Column="0" Text="透明度:" Foreground="{DynamicResource SubTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Slider x:Name="SliderOpacity" Grid.Column="1" Minimum="0.55" Maximum="1.00" Value="0.92" SmallChange="0.05" LargeChange="0.10" ValueChanged="SliderOpacity_ValueChanged" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TxtOpacityValue" Grid.Column="2" Text="92%" Foreground="{DynamicResource CardTextBrush}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- 卡片双击交互偏好 (彻底规避误退/误缩) -->
-                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="🖱 双击卡片列表时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
-                                <RadioButton x:Name="RadioDoubleClickCopy" GroupName="DoubleClickGroup" Content="仅复制到剪贴板 (保持窗口打开，绝不收起)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="DoubleClickRadio_Changed"/>
-                                <RadioButton x:Name="RadioDoubleClickPaste" GroupName="DoubleClickGroup" Content="直接贴入光标处并自动收起到托盘" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="DoubleClickRadio_Changed"/>
-                            </StackPanel>
-                        </Border>
+                            <!-- 3. 窗口关闭动作偏好 -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtCloseActionTitle" Text="点击窗口右上角 [✕ 关闭] 时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
+                                    <RadioButton x:Name="RadioCloseMinimize" GroupName="CloseActionGroup" Content="最小化到系统托盘 (继续在后台常驻监听)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="CloseActionRadio_Changed"/>
+                                    <RadioButton x:Name="RadioCloseExit" GroupName="CloseActionGroup" Content="直接彻底退出 CopyBox 程序" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="CloseActionRadio_Changed"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- 点击软件外部(失焦)行为偏好 (默认绝不收起，保持常显) -->
-                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
-                            <CheckBox x:Name="ChkHideOnDeactivate" 
-                                      Content="点击软件区域外(失焦)时自动最小化到托盘" 
-                                      Foreground="{DynamicResource CardTextBrush}" 
-                                      FontSize="11" 
-                                      Click="ChkHideOnDeactivate_Click"
-                                      ToolTip="默认不勾选：在外部操作其他软件时保持窗口可见，方便对照查看"/>
-                        </Border>
+                            <!-- 4. 卡片双击交互偏好 (彻底规避误退/误缩) -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtDoubleClickTitle" Text="🖱 双击卡片列表时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
+                                    <RadioButton x:Name="RadioDoubleClickCopy" GroupName="DoubleClickGroup" Content="仅复制到剪贴板 (保持窗口打开，绝不收起)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="DoubleClickRadio_Changed"/>
+                                    <RadioButton x:Name="RadioDoubleClickPaste" GroupName="DoubleClickGroup" Content="直接贴入光标处并自动收起到托盘" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="DoubleClickRadio_Changed"/>
+                                </StackPanel>
+                            </Border>
 
-                        <!-- 底部维护按钮 -->
-                        <Grid>
-                            <Button Content="🛑 彻底退出程序" Click="BtnDirectExit_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" HorizontalAlignment="Left" Cursor="Hand"/>
-                            <Button Content="完成" Click="BtnCloseSettingsOverlay_Click" Background="#FF0078D4" Foreground="White" BorderThickness="0" Padding="16,5" FontSize="11.5" HorizontalAlignment="Right" Cursor="Hand">
-                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
+                            <!-- 5. 点击软件外部(失焦)行为偏好 (默认绝不收起，保持常显) -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <CheckBox x:Name="ChkHideOnDeactivate" 
+                                          Content="点击软件区域外(失焦)时自动最小化到托盘" 
+                                          Foreground="{DynamicResource CardTextBrush}" 
+                                          FontSize="11" 
+                                          Click="ChkHideOnDeactivate_Click"
+                                          ToolTip="默认不勾选：在外部操作其他软件时保持窗口可见，方便对照查看"/>
+                            </Border>
+
+                            <!-- 6. 底部维护按钮 -->
+                            <Grid Margin="0,4,0,0">
+                                <Button x:Name="BtnDirectExit" Content="🛑 彻底退出程序" Click="BtnDirectExit_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" HorizontalAlignment="Left" Cursor="Hand"/>
+                                <Button x:Name="BtnCloseSettingsOverlay" Content="完成" Click="BtnCloseSettingsOverlay_Click" Background="#FF0078D4" Foreground="White" BorderThickness="0" Padding="16,5" FontSize="11.5" HorizontalAlignment="Right" Cursor="Hand">
+                                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Border>
             </Grid>
 
             <!-- 5. 底部快捷键指南 -->
             <Grid Grid.Row="4" Margin="2,6,2,0">
-                <TextBlock Text="[Alt+1~9] 数字秒贴  •  [Enter] 贴入  •  [↑↓] 导航  •  [Del] 删除  •  [Esc] 隐藏" 
+                <TextBlock x:Name="TxtBottomTips" 
+                           Text="[Alt+1~9] 数字秒贴  •  [Enter] 贴入  •  [↑↓] 导航  •  [Del] 删除  •  [Esc] 隐藏" 
                            Foreground="{DynamicResource SubTextBrush}" FontSize="10.5"/>
                 <TextBlock x:Name="ToastText" Text="✓ 已贴入光标位置" Foreground="#34D399" FontSize="10.5" HorizontalAlignment="Right" Visibility="Collapsed"/>
             </Grid>

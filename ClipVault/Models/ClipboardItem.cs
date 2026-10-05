@@ -28,11 +28,12 @@ namespace ClipVault.Models
         {
             get
             {
+                var loc = ClipVault.Services.LocalizationService.Instance;
                 var span = DateTime.Now - CreatedAt;
-                if (span.TotalSeconds < 60) return "刚刚";
-                if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} 分钟前";
-                if (span.TotalHours < 24) return $"{(int)span.TotalHours} 小时前";
-                if (span.TotalDays < 7) return $"{(int)span.TotalDays} 天前";
+                if (span.TotalSeconds < 60) return loc.Get("TimeJustNow");
+                if (span.TotalMinutes < 60) return loc.Get("TimeMinsAgo", (int)span.TotalMinutes);
+                if (span.TotalHours < 24) return loc.Get("TimeHoursAgo", (int)span.TotalHours);
+                if (span.TotalDays < 7) return loc.Get("TimeDaysAgo", (int)span.TotalDays);
                 return CreatedAt.ToString("yyyy-MM-dd HH:mm");
             }
         }

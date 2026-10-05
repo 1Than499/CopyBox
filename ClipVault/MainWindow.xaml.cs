@@ -46,7 +46,19 @@ namespace ClipVault
 
             // 加载配置、主题与卡片
             LoadSettingsToUI();
+            UpdateAllLocalizedTexts();
             RefreshCards();
+
+            // 监听语言变化，毫秒级热刷新全界面文案
+            LocalizationService.Instance.LanguageChanged += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateAllLocalizedTexts();
+                    RefreshCards();
+                    UpdateStorageInfo();
+                });
+            };
 
             // 监听后台新捕获的剪贴板条目
             _monitorService.ItemCaptured += (item) =>
@@ -76,6 +88,16 @@ namespace ClipVault
             var s = _settingsService.CurrentSettings;
             TxtSettingsStoragePath.Text = s.StorageDirectory;
 
+            // 0. 语言选择加载
+            if (s.Language == "en-US")
+            {
+                RadioLangEn.IsChecked = true;
+            }
+            else
+            {
+                RadioLangZh.IsChecked = true;
+            }
+
             // 1. 关闭行为加载
             if (s.CloseAction == "ExitApp")
             {
@@ -99,7 +121,7 @@ namespace ClipVault
             // 3. 点击外部是否收起加载 (默认 false，点击外部不隐藏)
             ChkHideOnDeactivate.IsChecked = s.HideOnDeactivate;
 
-            // 2. 主题与透明度加载
+            // 4. 主题与透明度加载
             bool isDark = s.ThemeMode != "Light";
             if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
 
@@ -112,10 +134,87 @@ namespace ClipVault
             UpdateStorageInfo();
         }
 
+        public void UpdateAllLocalizedTexts()
+        {
+            var loc = LocalizationService.Instance;
+
+            // 窗口标题
+            this.Title = loc.Get("AppTitle");
+
+            // 搜索框占位符
+            if (SearchPlaceholder != null)
+            {
+                SearchPlaceholder.Text = loc.Get("SearchPlaceholder");
+            }
+
+            // 分类药丸
+            if (TabAll != null) TabAll.Content = loc.Get("TabAll");
+            if (TabText != null) TabText.Content = loc.Get("TabText");
+            if (TabImages != null) TabImages.Content = loc.Get("TabImages");
+            if (TabCode != null) TabCode.Content = loc.Get("TabCode");
+            if (TabStarred != null) TabStarred.Content = loc.Get("TabStarred");
+
+            // 顶栏按钮 ToolTip
+            if (BtnToggleSettings != null) BtnToggleSettings.ToolTip = loc.Get("ToolTipSettings");
+            if (BtnMinimizeWindow != null) BtnMinimizeWindow.ToolTip = loc.Get("ToolTipMinimize");
+            if (BtnQuickTheme != null)
+            {
+                bool isDark = _settingsService?.CurrentSettings.ThemeMode != "Light";
+                BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
+            }
+            UpdateCloseButtonToolTip();
+
+            // 设置浮层面板
+            if (TxtSettingsTitle != null) TxtSettingsTitle.Text = loc.Get("SettingsTitle");
+            if (TxtLanguageTitle != null) TxtLanguageTitle.Text = loc.Get("LangSectionTitle");
+            if (RadioLangZh != null) RadioLangZh.Content = loc.Get("LangZh");
+            if (RadioLangEn != null) RadioLangEn.Content = loc.Get("LangEn");
+
+            if (TxtStoragePathTitle != null) TxtStoragePathTitle.Text = loc.Get("StoragePathTitle");
+            if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
+
+            if (TxtAppearanceTitle != null) TxtAppearanceTitle.Text = loc.Get("AppearanceTitle");
+            if (RadioThemeDark != null) RadioThemeDark.Content = loc.Get("ThemeDark");
+            if (RadioThemeLight != null) RadioThemeLight.Content = loc.Get("ThemeLight");
+            if (TxtOpacityLabel != null) TxtOpacityLabel.Text = loc.Get("OpacityLabel");
+
+            if (TxtCloseActionTitle != null) TxtCloseActionTitle.Text = loc.Get("CloseActionTitle");
+            if (RadioCloseMinimize != null) RadioCloseMinimize.Content = loc.Get("CloseActionTray");
+            if (RadioCloseExit != null) RadioCloseExit.Content = loc.Get("CloseActionExit");
+
+            if (TxtDoubleClickTitle != null) TxtDoubleClickTitle.Text = loc.Get("DoubleClickTitle");
+            if (RadioDoubleClickCopy != null) RadioDoubleClickCopy.Content = loc.Get("DoubleClickCopy");
+            if (RadioDoubleClickPaste != null) RadioDoubleClickPaste.Content = loc.Get("DoubleClickPaste");
+
+            if (ChkHideOnDeactivate != null)
+            {
+                ChkHideOnDeactivate.Content = loc.Get("DeactivateTitle");
+                ChkHideOnDeactivate.ToolTip = loc.Get("DeactivateTooltip");
+            }
+
+            if (BtnDirectExit != null) BtnDirectExit.Content = loc.Get("BtnExitApp");
+            if (BtnCloseSettingsOverlay != null) BtnCloseSettingsOverlay.Content = loc.Get("BtnDone");
+
+            // 底部快捷键指南
+            if (TxtBottomTips != null) TxtBottomTips.Text = loc.Get("BottomTips");
+        }
+
+        private void LangRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            string newLang = RadioLangEn.IsChecked == true ? "en-US" : "zh-CN";
+            if (_settingsService.CurrentSettings.Language != newLang)
+            {
+                _settingsService.CurrentSettings.Language = newLang;
+                _settingsService.SaveSettings();
+                LocalizationService.Instance.SetLanguage(newLang);
+            }
+        }
+
         private void UpdateStorageInfo()
         {
             var (dbSize, totalCount, pinnedCount, imgCount, imgSize) = _dbService.GetStats();
-            TxtStorageStatusInfo.Text = $"ℹ 本地 SQLite 状态正常：已记录 {totalCount} 条 (置顶 {pinnedCount})，图片 {imgCount} 张，数据 100% 物理留存于本地磁盘。";
+            TxtStorageStatusInfo.Text = LocalizationService.Instance.Get("StatusInfoFormat", totalCount, pinnedCount, imgCount);
         }
 
         public void ShowAndActivate()
@@ -167,6 +266,7 @@ namespace ClipVault
         private async void TriggerPaste(ClipboardItem item)
         {
             if (item == null) return;
+            ShowToast(LocalizationService.Instance.Get("ToastPasted"));
             await _pasteSimulator.PasteItemAsync(item, () => this.Hide());
         }
 
@@ -177,8 +277,9 @@ namespace ClipVault
             _settingsService.CurrentSettings.ThemeMode = isDark ? "Dark" : "Light";
             _settingsService.SaveSettings();
 
+            var loc = LocalizationService.Instance;
             BtnQuickTheme.Content = isDark ? "☀️" : "🌙";
-            BtnQuickTheme.ToolTip = isDark ? "切换为白天明亮模式" : "切换为暗黑夜间模式";
+            BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
             if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
 
             byte alpha = (byte)(_settingsService.CurrentSettings.WindowOpacity * 255);
@@ -251,9 +352,10 @@ namespace ClipVault
         {
             if (BtnCloseWindow != null && _settingsService != null)
             {
+                var loc = LocalizationService.Instance;
                 BtnCloseWindow.ToolTip = _settingsService.CurrentSettings.CloseAction == "ExitApp"
-                    ? "关闭并彻底退出 ClipVault"
-                    : "关闭窗口 (收起到托盘，快捷键可唤起)";
+                    ? loc.Get("ToolTipCloseExit")
+                    : loc.Get("ToolTipCloseTray");
             }
         }
 
@@ -345,7 +447,8 @@ namespace ClipVault
 
         private void BtnDirectExit_Click(object sender, RoutedEventArgs e)
         {
-            var res = MessageBox.Show("确认要彻底退出 ClipVault 吗？退出后后台将停止监听剪贴板与热键。", "确认退出", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var loc = LocalizationService.Instance;
+            var res = MessageBox.Show(loc.Get("ConfirmExitMsg"), loc.Get("ConfirmExitTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (res == MessageBoxResult.Yes)
             {
                 ExitApplication();
@@ -368,7 +471,7 @@ namespace ClipVault
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (_settingsService.CurrentSettings.CloseAction == "ExitApp")
+            if (_settingsService?.CurrentSettings?.CloseAction == "ExitApp")
             {
                 ExitApplication();
             }
@@ -597,11 +700,11 @@ namespace ClipVault
                     Clipboard.SetText(item.Content ?? string.Empty);
                 }
 
-                ShowToast("✓ 已复制到剪贴板");
+                ShowToast(LocalizationService.Instance.Get("ToastCopied"));
             }
             catch (Exception ex)
             {
-                ShowToast($"复制出错: {ex.Message}");
+                ShowToast($"Error: {ex.Message}");
             }
             finally
             {
@@ -653,9 +756,10 @@ namespace ClipVault
                 var item = DisplayCards.FirstOrDefault(x => x.Id == id);
                 if (item == null) return;
 
+                var loc = LocalizationService.Instance;
                 var menu = new ContextMenu();
 
-                var pinItem = new MenuItem { Header = item.IsPinned ? "⭐ 取消置顶" : "⭐ 置顶此条" };
+                var pinItem = new MenuItem { Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") };
                 pinItem.Click += (s, args) =>
                 {
                     _dbService.TogglePin(id);
@@ -663,13 +767,13 @@ namespace ClipVault
                     UpdateStorageInfo();
                 };
 
-                var copyItem = new MenuItem { Header = "📋 复制到剪贴板" };
+                var copyItem = new MenuItem { Header = loc.Get("MenuCopy") };
                 copyItem.Click += (s, args) =>
                 {
                     CopyItemToClipboard(item);
                 };
 
-                var delItem = new MenuItem { Header = "🗑 删除此条记录" };
+                var delItem = new MenuItem { Header = loc.Get("MenuDelete") };
                 delItem.Click += (s, args) =>
                 {
                     _dbService.DeleteItem(id);
@@ -689,9 +793,10 @@ namespace ClipVault
 
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
+            var loc = LocalizationService.Instance;
             var dialog = new OpenFolderDialog
             {
-                Title = "选择 ClipVault 剪贴板本地数据保存目录",
+                Title = loc.Get("FolderDialogTitle"),
                 InitialDirectory = _settingsService.CurrentSettings.StorageDirectory
             };
 
@@ -705,7 +810,7 @@ namespace ClipVault
                     RefreshCards();
                     UpdateStorageInfo();
 
-                    MessageBox.Show($"存储路径已成功切换为：\n{chosenPath}\n\n现有历史数据与图片已平滑迁移！", "路径切换成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(loc.Get("StorageMigratedMsg", chosenPath), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
         }

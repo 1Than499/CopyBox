@@ -10,7 +10,7 @@ namespace ClipVault.Services
         private static readonly string AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
         private static readonly string ConfigFilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ClipVault",
+            "CopyBox",
             "settings.json"
         );
 
@@ -31,6 +31,12 @@ namespace ClipVault.Services
                 // 便携模式检测：程序同级目录下若有 portable.flag，优先读程序目录配置
                 string localConfig = Path.Combine(AppDirectory, "settings.json");
                 string targetConfigFile = File.Exists(Path.Combine(AppDirectory, "portable.flag")) ? localConfig : ConfigFilePath;
+
+                if (!File.Exists(targetConfigFile))
+                {
+                    string oldConfig = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClipVault", "settings.json");
+                    if (File.Exists(oldConfig)) targetConfigFile = oldConfig;
+                }
 
                 if (File.Exists(targetConfigFile))
                 {
