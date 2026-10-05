@@ -23,6 +23,11 @@ namespace ClipVault
         private string _currentCategory = "all";
         public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
 
+        // 浮层设置卡片在窗口内自由拖拽状态
+        private bool _isDraggingSettings = false;
+        private Point _dragStartMousePos;
+        private Point _dragStartOffset;
+
         public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
             InitializeComponent();
@@ -166,6 +171,7 @@ namespace ClipVault
 
             // 设置浮层面板
             if (TxtSettingsTitle != null) TxtSettingsTitle.Text = loc.Get("SettingsTitle");
+            if (TxtSettingsDragTip != null) TxtSettingsDragTip.Text = loc.Get("SettingsDragTip");
             if (TxtLanguageTitle != null) TxtLanguageTitle.Text = loc.Get("LangSectionTitle");
             if (RadioLangZh != null) RadioLangZh.Content = loc.Get("LangZh");
             if (RadioLangEn != null) RadioLangEn.Content = loc.Get("LangEn");
@@ -482,10 +488,21 @@ namespace ClipVault
             }
         }
 
-        // ================= 鼠标拖拽与分类操作 =================
+        // ================= 鼠标拖拽与设置浮层移动 =================
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            // 如果点击在设置浮层内部，绝对不触发主窗口整体拖拽
+            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            {
+                var pos = e.GetPosition(SettingsOverlayCard);
+                if (pos.X >= 0 && pos.X <= SettingsOverlayCard.ActualWidth &&
+                    pos.Y >= 0 && pos.Y <= SettingsOverlayCard.ActualHeight)
+                {
+                    return;
+                }
+            }
+
             if (e.LeftButton == MouseButtonState.Pressed && 
                 e.OriginalSource is not TextBox && 
                 e.OriginalSource is not Button && 
@@ -500,18 +517,99 @@ namespace ClipVault
         public void OpenSettings()
         {
             SettingsOverlayCard.Visibility = Visibility.Visible;
+            EnsureSettingsInBounds();
         }
 
         private void BtnToggleSettings_Click(object sender, RoutedEventArgs e)
         {
-            SettingsOverlayCard.Visibility = SettingsOverlayCard.Visibility == Visibility.Visible 
-                ? Visibility.Collapsed 
-                : Visibility.Visible;
+            if (SettingsOverlayCard.Visibility == Visibility.Visible)
+            {
+                SettingsOverlayCard.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                SettingsOverlayCard.Visibility = Visibility.Visible;
+                EnsureSettingsInBounds();
+            }
         }
 
         private void BtnCloseSettingsOverlay_Click(object sender, RoutedEventArgs e)
         {
             SettingsOverlayCard.Visibility = Visibility.Collapsed;
+        }
+
+        // 浮层设置卡片在软件窗口内的独立拖拽交互
+        private void SettingsDragBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && MainRootGrid != null && SettingsTransform != null)
+            {
+                _isDraggingSettings = true;
+                _dragStartMousePos = e.GetPosition(MainRootGrid);
+                _dragStartOffset = new Point(SettingsTransform.X, SettingsTransform.Y);
+                SettingsDragBar.CaptureMouse();
+                e.Handled = true;
+            }
+        }
+
+        private void SettingsDragBar_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingSettings && e.LeftButton == MouseButtonState.Pressed && MainRootGrid != null && SettingsTransform != null)
+            {
+                Point currentMousePos = e.GetPosition(MainRootGrid);
+                double deltaX = currentMousePos.X - _dragStartMousePos.X;
+                double deltaY = currentMousePos.Y - _dragStartMousePos.Y;
+
+                double targetX = _dragStartOffset.X + deltaX;
+                double targetY = _dragStartOffset.Y + deltaY;
+
+                // 限制在主窗口客户区边界内 (绝不超出软件窗口边缘)
+                double containerW = MainRootGrid.ActualWidth;
+                double containerH = MainRootGrid.ActualHeight;
+                double cardW = SettingsOverlayCard.ActualWidth > 0 ? SettingsOverlayCard.ActualWidth : 420;
+                double cardH = SettingsOverlayCard.ActualHeight > 0 ? SettingsOverlayCard.ActualHeight : 480;
+
+                if (containerW > 0 && containerH > 0)
+                {
+                    double maxOffsetX = Math.Max(0, (containerW - cardW) / 2);
+                    double maxOffsetY = Math.Max(0, (containerH - cardH) / 2);
+
+                    targetX = Math.Clamp(targetX, -maxOffsetX, maxOffsetX);
+                    targetY = Math.Clamp(targetY, -maxOffsetY, maxOffsetY);
+                }
+
+                SettingsTransform.X = targetX;
+                SettingsTransform.Y = targetY;
+                e.Handled = true;
+            }
+        }
+
+        private void SettingsDragBar_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingSettings)
+            {
+                _isDraggingSettings = false;
+                SettingsDragBar.ReleaseMouseCapture();
+                e.Handled = true;
+            }
+        }
+
+        private void EnsureSettingsInBounds()
+        {
+            if (MainRootGrid == null || SettingsOverlayCard == null || SettingsTransform == null) return;
+
+            double containerW = MainRootGrid.ActualWidth;
+            double containerH = MainRootGrid.ActualHeight;
+            double cardW = SettingsOverlayCard.ActualWidth > 0 ? SettingsOverlayCard.ActualWidth : 420;
+            double cardH = SettingsOverlayCard.ActualHeight > 0 ? SettingsOverlayCard.ActualHeight : 480;
+
+            if (containerW > 0 && containerH > 0)
+            {
+                double maxOffsetX = Math.Max(0, (containerW - cardW) / 2);
+                double maxOffsetY = Math.Max(0, (containerH - cardH) / 2);
+
+                SettingsTransform.X = Math.Clamp(SettingsTransform.X, -maxOffsetX, maxOffsetX);
+                SettingsTransform.Y = Math.Clamp(SettingsTransform.Y, -maxOffsetY, maxOffsetY);
+            }
         }
 
         private void TabCategory_Click(object sender, RoutedEventArgs e)

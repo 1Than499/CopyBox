@@ -44,9 +44,10 @@ namespace ClipVault.Services
 
                 // 偏好设置面板
                 ["SettingsTitle"] = "⚙ 偏好设置",
+                ["SettingsDragTip"] = "· 按住可拖拽移动",
                 ["LangSectionTitle"] = "🌐 界面语言 / Language：",
-                ["LangZh"] = "🇨🇳 简体中文",
-                ["LangEn"] = "🇺🇸 English",
+                ["LangZh"] = "简体中文",
+                ["LangEn"] = "English",
                 ["StoragePathTitle"] = "本地数据存储路径：",
                 ["BrowseButton"] = "浏览...",
                 ["StatusInfoFormat"] = "ℹ 本地 SQLite 状态正常：已记录 {0} 条 (置顶 {1})，图片 {2} 张，数据 100% 物理留存于本地磁盘。",
@@ -123,9 +124,10 @@ namespace ClipVault.Services
 
                 // Preferences Panel
                 ["SettingsTitle"] = "⚙ Settings",
+                ["SettingsDragTip"] = "· Drag to move",
                 ["LangSectionTitle"] = "🌐 Language / 语言：",
-                ["LangZh"] = "🇨🇳 简体中文",
-                ["LangEn"] = "🇺🇸 English",
+                ["LangZh"] = "简体中文",
+                ["LangEn"] = "English",
                 ["StoragePathTitle"] = "Local Storage Path:",
                 ["BrowseButton"] = "Browse...",
                 ["StatusInfoFormat"] = "ℹ Local SQLite status is active: {0} items ({1} pinned), {2} images. 100% stored offline on your local disk.",
