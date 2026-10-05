@@ -116,6 +116,13 @@ namespace ClipVault
             }
             this.Show();
             this.Activate();
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ClipVault.Interop.NativeMethods.SetForegroundWindow(hwnd);
+            }
+
             SearchInputBox.Focus();
         }
 
@@ -420,8 +427,11 @@ namespace ClipVault
                 return;
             }
 
-            // 数字键 1~9 秒贴
-            if (string.IsNullOrEmpty(SearchInputBox.Text))
+            // 快捷秒贴：支持 Alt + 1~9 或 Ctrl + 1~9 (防止阻断用户正常在搜索框输入数字)
+            bool hasModifier = Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt) ||
+                               Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
+
+            if (hasModifier)
             {
                 int index = -1;
                 if (e.Key >= Key.D1 && e.Key <= Key.D9) index = e.Key - Key.D1;
@@ -431,6 +441,7 @@ namespace ClipVault
                 {
                     TriggerPaste(DisplayCards[index]);
                     e.Handled = true;
+                    return;
                 }
             }
         }
@@ -441,8 +452,22 @@ namespace ClipVault
             {
                 this.Hide();
                 e.Handled = true;
+                return;
             }
-            else if (e.Key == Key.Enter && CardsListBox.SelectedItem is ClipboardItem selected)
+
+            // 在列表获得焦点时，直接按数字 1~9 或 Alt+1~9 均可秒贴
+            int numIndex = -1;
+            if (e.Key >= Key.D1 && e.Key <= Key.D9) numIndex = e.Key - Key.D1;
+            else if (e.Key >= Key.NumPad1 && e.Key <= Key.NumPad9) numIndex = e.Key - Key.NumPad1;
+
+            if (numIndex >= 0 && numIndex < DisplayCards.Count)
+            {
+                TriggerPaste(DisplayCards[numIndex]);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter && CardsListBox.SelectedItem is ClipboardItem selected)
             {
                 TriggerPaste(selected);
                 e.Handled = true;

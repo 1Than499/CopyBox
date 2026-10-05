@@ -200,7 +200,7 @@
                     </TextBox>
 
                     <TextBlock x:Name="SearchPlaceholder"
-                               Text="Search history... (支持 1~9 数字键秒贴)" 
+                               Text="Search history... (Alt + 1~9 秒贴，支持关键字搜索)" 
                                Grid.Column="0" 
                                Foreground="{DynamicResource SubTextBrush}" 
                                FontSize="13" 
@@ -460,7 +460,7 @@
 
             <!-- 5. 底部快捷键指南 -->
             <Grid Grid.Row="4" Margin="4,8,4,0">
-                <TextBlock Text="[1~9] 数字秒贴  •  [Enter] 贴入  •  [↑↓] 导航  •  [Del] 删除  •  [Esc] 隐藏" 
+                <TextBlock Text="[Alt+1~9] 数字秒贴  •  [Enter] 贴入  •  [↑↓] 导航  •  [Del] 删除  •  [Esc] 隐藏" 
                            Foreground="{DynamicResource SubTextBrush}" FontSize="11"/>
                 <TextBlock x:Name="ToastText" Text="✓ 已贴入光标位置" Foreground="#34D399" FontSize="11" HorizontalAlignment="Right" Visibility="Collapsed"/>
             </Grid>
