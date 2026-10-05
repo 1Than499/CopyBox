@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CopyBox - 官方产品宣传片与功能动效演示</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #090B10;
+      color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+    
+    /* 顶部操作提示 */
+    .header-bar {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      margin-bottom: 8px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #FFFFFF;
+    }
+    .brand-title span {
+      font-size: 12px;
+      font-weight: 500;
+      background: rgba(0, 120, 212, 0.2);
+      color: #38BDF8;
+      border: 1px solid rgba(0, 120, 212, 0.4);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .record-tip {
+      font-size: 13px;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .record-tip kbd {
+      background: #1E293B;
+      border: 1px solid #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #38BDF8;
+    }
+
+    /* 16:9 电影级视频放映容器 */
+    .video-viewport {
+      width: 100%;
+      max-width: 1100px;
+      aspect-ratio: 16 / 9;
+      background: radial-gradient(circle at 50% 40%, #151C2C 0%, #0A0D14 100%);
+      border: 1px solid #1E293B;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(0, 120, 212, 0.15);
+    }
+
+    /* 背景 Windows 动态流光粒子微光晕 */
+    .bg-bloom {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0, 120, 212, 0.18) 0%, rgba(56, 189, 248, 0.08) 40%, transparent 70%);
+      filter: blur(60px);
+      pointer-events: none;
+      animation: pulseBloom 8s ease-in-out infinite alternate;
+    }
+    @keyframes pulseBloom {
+      0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+      100% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    }
+
+    /* 拟真虚拟鼠标指针 */
+    .virtual-cursor {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFFFFF'%3E%3Cpath d='M3 3l7.5 18 2.5-6.5L20 12z' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 1000;
+      transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
+      top: 50%;
+      left: 50%;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    }
+    .click-ripple {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border: 2px solid #38BDF8;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .click-ripple.animate {
+      animation: rippleEffect 0.5s ease-out forwards;
+    }
+    @keyframes rippleEffect {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+    }
+
+    /* 舞台主场景 */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+    }
+
+    /* 章节开场标题卡片 */
+    .scene-intro-overlay {
+      position: absolute;
+      top: 40px;
+      left: 45px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.5s ease;
+    }
+    .scene-badge {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #38BDF8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 3px 10px;
+      border-radius: 12px;
+      align-self: flex-start;
+    }
+    .scene-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #FFFFFF;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    .scene-subtitle {
+      font-size: 13.5px;
+      color: #94A3B8;
+      font-weight: 500;
+    }
+
+    /* 模拟 CopyBox 主窗口 (1:1 还原界面) */
+    .copybox-window {
+      width: 480px;
+      height: 480px;
+      background: rgba(24, 28, 37, 0.95);
+      backdrop-filter: blur(25px);
+      border: 1px solid #2E384D;
+      border-radius: 16px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      padding: 18px;
+      position: relative;
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 10;
+    }
+    .copybox-window.hidden {
+      transform: scale(0.85) translateY(40px);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .copybox-window.visible {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* 搜索栏与顶栏 */
+    .app-top-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .search-box {
+      flex: 1;
+      height: 38px;
+      background: #13161F;
+      border: 1px solid #262E3D;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      font-size: 13px;
+      color: #718096;
+    }
+    .top-pill-actions {
+      display: flex;
+      gap: 4px;
+      background: rgba(30, 37, 50, 0.9);
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid #404E63;
+    }
+    .action-btn {
+      width: 26px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #E2E8F0;
+    }
+
+    /* 分类胶囊 */
+    .category-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .tab-pill {
+      padding: 5px 12px;
+      font-size: 11.5px;
+      border-radius: 14px;
+      background: #1E2532;
+      border: 1px solid #3A4659;
+      color: #94A3B8;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.3s;
+    }
+    .tab-pill.active {
+      background: #0078D4;
+      border-color: #0078D4;
+      color: white;
+      font-weight: 600;
+    }
+
+    /* 双列卡片网格 */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    .card-item {
+      background: #181C25;
+      border: 1px solid #262F3E;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      height: 140px;
+    }
+    .card-item.selected {
+      border-color: #38A6FF;
+      border-width: 1.5px;
+      box-shadow: 0 0 16px rgba(0, 120, 212, 0.45);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #718096;
+      margin-bottom: 8px;
+    }
+    .badge-key {
+      font-weight: 700;
+      color: #94A3B8;
+    }
+    .card-body {
+      flex: 1;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #CBD5E1;
+      overflow: hidden;
+    }
+    .code-preview {
+      background: #11141B;
+      padding: 8px;
+      border-radius: 6px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      color: #38BDF8;
+      font-size: 10px;
+    }
+    .img-preview {
+      width: 100%;
+      height: 85px;
+      background: #11141B;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748B;
+      font-size: 11px;
+      gap: 6px;
+    }
+
+    /* 右键悬浮菜单 (1:1 还原最新双层无割裂菜单) */
+    .context-menu-popover {
+      position: absolute;
+      top: 155px;
+      left: 170px;
+      background: #1E232F;
+      border: 1px solid #374357;
+      border-radius: 10px;
+      padding: 6px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.65);
+      z-index: 50;
+      width: 155px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      opacity: 0;
+      transform: scale(0.9);
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .context-menu-popover.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .menu-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: #CBD5E1;
+    }
+    .menu-row.hovered {
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+    }
+    .menu-divider {
+      height: 1px;
+      background: #2E384D;
+      margin: 3px 0;
+    }
+
+    /* 独立可拖拽设置面板 (1:1 还原双层抗模糊与规整三层架构) */
+    .settings-overlay {
+      position: absolute;
+      width: 380px;
+      height: 390px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #181C25;
+      border: 1px solid #2E384D;
+      border-radius: 14px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .settings-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .settings-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid #283242;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+    }
+    .settings-header-title {
+      font-weight: 700;
+      font-size: 13px;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .settings-header-title span {
+      font-size: 10px;
+      color: #64748B;
+      font-weight: normal;
+    }
+    .settings-body {
+      flex: 1;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 11.5px;
+    }
+    .settings-item-box {
+      background: #11141B;
+      border: 1px solid #283242;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .settings-item-title {
+      color: #0078D4;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .settings-footer {
+      padding: 10px 14px;
+      border-top: 1px solid #283242;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-done {
+      background: #0078D4;
+      color: white;
+      border: none;
+      padding: 5px 16px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* 底部 Toast 提示 */
+    .toast-pill {
+      position: absolute;
+      bottom: 25px;
+      right: 25px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34D399;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.4s ease;
+      z-index: 120;
+    }
+    .toast-pill.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* 底部字幕提示栏 (电影级双语字幕) */
+    .caption-container {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      text-align: center;
+      z-index: 300;
+      background: rgba(10, 13, 20, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 10px 20px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .caption-zh {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #FFFFFF;
+      letter-spacing: 0.5px;
+    }
+    .caption-en {
+      font-size: 11.5px;
+      color: #94A3B8;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    /* 控制栏面板 */
+    .control-panel {
+      width: 100%;
+      max-width: 1100px;
+      background: #11151F;
+      border: 1px solid #1E293B;
+      border-radius: 14px;
+      padding: 14px 20px;
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: #1E293B;
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0078D4, #38BDF8);
+      border-radius: 3px;
+      transition: width 0.1s linear;
+    }
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .scene-navigator {
+      display: flex;
+      gap: 6px;
+    }
+    .scene-step-btn {
+      background: #1E2532;
+      border: 1px solid #334155;
+      color: #94A3B8;
+      font-size: 11.5px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .scene-step-btn.active {
+      background: #0078D4;
+      border-color: #0078D4;
+      color: white;
+      font-weight: 600;
+    }
+    .playback-buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .play-btn {
+      background: #0078D4;
+      color: white;
+      border: none;
+      padding: 6px 18px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.2s;
+    }
+    .play-btn:hover {
+      background: #0086F0;
+    }
+    .time-code {
+      font-family: monospace;
+      font-size: 12px;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部标题与提示 -->
+  <div class="header-bar">
+    <div class="brand-title">
+      📦 CopyBox 宣传介绍视频 <span>HD 1080P 互动播放器</span>
+    </div>
+    <div class="record-tip">
+      💡 提示：按系统快捷键 <kbd>Win + Alt + R</kbd> 即可全屏内录生成高清宣传视频 MP4
+    </div>
+  </div>
+
+  <!-- 16:9 核心视频舞台 -->
+  <div class="video-viewport" id="viewport">
+    <div class="bg-bloom"></div>
+
+    <!-- 虚拟鼠标 -->
+    <div class="virtual-cursor" id="cursor"></div>
+    <div class="click-ripple" id="ripple"></div>
+
+    <!-- 章节标题指示牌 -->
+    <div class="scene-intro-overlay" id="sceneOverlay">
+      <div class="scene-badge" id="sceneBadge">Scene 01</div>
+      <div class="scene-title" id="sceneTitle">毫秒唤醒，全键盘秒贴</div>
+      <div class="scene-subtitle" id="sceneSubtitle">Sub-millisecond wake up with Alt+V & number keys instant paste</div>
+    </div>
+
+    <!-- 舞台中心：CopyBox 应用程序界面 -->
+    <div class="stage">
+      <div class="copybox-window hidden" id="appWindow">
+        <!-- 顶栏 -->
+        <div class="app-top-row">
+          <div class="search-box">
+            <span>🔍</span>
+            <span id="searchPlaceText">搜索剪贴板历史...</span>
+          </div>
+          <div class="top-pill-actions">
+            <div class="action-btn" id="btnThemeToggle" title="切换明暗主题">🌙</div>
+            <div class="action-btn" id="btnSettingsToggle" title="偏好设置">⚙</div>
+            <div class="action-btn" title="最小化">─</div>
+            <div class="action-btn" title="关闭">✕</div>
+          </div>
+        </div>
+
+        <!-- 分类胶囊 -->
+        <div class="category-tabs">
+          <div class="tab-pill active" id="tabAll">📋 全部 (All)</div>
+          <div class="tab-pill" id="tabText">≡ 文本</div>
+          <div class="tab-pill" id="tabImages">🖼 图片</div>
+          <div class="tab-pill" id="tabCode">&lt;/&gt; 代码</div>
+          <div class="tab-pill" id="tabStarred">⭐ 置顶</div>
+        </div>
+
+        <!-- 双列卡片网格 -->
+        <div class="cards-grid">
+          <!-- 卡片 1 (代码卡片) -->
+          <div class="card-item selected" id="card1">
+            <div class="card-header">
+              <span style="color:#F59E0B; font-weight:bold; font-size:13px;">{ } JSON</span>
+              <span class="badge-key">[1]</span>
+            </div>
+            <div class="card-body">
+              <div class="code-preview">
+                {<br/>
+                &nbsp;&nbsp;"app": "CopyBox",<br/>
+                &nbsp;&nbsp;"offline": true,<br/>
+                &nbsp;&nbsp;"speed": "0.1ms"<br/>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 2 (图片卡片) -->
+          <div class="card-item" id="card2">
+            <div class="card-header">
+              <span>🖼 桌面截图</span>
+              <span class="badge-key">[2]</span>
+            </div>
+            <div class="card-body">
+              <div class="img-preview">
+                <span>🖼</span> 1920x1080 Screenshot.png
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 3 (纯文本卡片) -->
+          <div class="card-item" id="card3">
+            <div class="card-header">
+              <span style="font-weight:bold; font-size:13px;">❝ 纯文本</span>
+              <span class="badge-key">[3]</span>
+            </div>
+            <div class="card-body">
+              100% 本地离线隐私，所有密码 Token 绝不上传云端，数据完全属于用户。
+            </div>
+          </div>
+
+          <!-- 卡片 4 (常用链接/命令) -->
+          <div class="card-item" id="card4">
+            <div class="card-header">
+              <span style="font-weight:bold; font-size:13px;">❝ 终端命令</span>
+              <span class="badge-key">[4]</span>
+            </div>
+            <div class="card-body">
+              git clone https://github.com/1Than499/CopyBox.git
+            </div>
+          </div>
+        </div>
+
+        <!-- 右键呼出悬浮菜单 (1:1 还原) -->
+        <div class="context-menu-popover" id="contextMenu">
+          <div class="menu-row hovered" id="menuPin">
+            <span style="color:#F59E0B; font-weight:bold;">★</span>
+            <span>置顶此条记录</span>
+          </div>
+          <div class="menu-row" id="menuCopy">
+            <span style="color:#0078D4; font-weight:bold;">❐</span>
+            <span>复制到剪贴板</span>
+          </div>
+          <div class="menu-divider"></div>
+          <div class="menu-row" id="menuDelete">
+            <span style="color:#EF4444; font-weight:bold;">✕</span>
+            <span style="color:#EF4444;">删除此条记录</span>
+          </div>
+        </div>
+
+        <!-- 独立可拖拽设置面板 (1:1 还原) -->
+        <div class="settings-overlay" id="settingsPanel">
+          <div class="settings-header" id="settingsDragHandle">
+            <div class="settings-header-title">
+              ⚙ 偏好设置 <span>· 按住可拖拽移动</span>
+            </div>
+            <div style="cursor:pointer; color:#94A3B8;">✕</div>
+          </div>
+          <div class="settings-body">
+            <div class="settings-item-box">
+              <div class="settings-item-title">🌐 界面语言 (Language)</div>
+              <div style="display:flex; gap:16px;">
+                <label style="color:#38BDF8;"><input type="radio" checked name="lang"> 简体中文</label>
+                <label><input type="radio" name="lang"> English</label>
+              </div>
+            </div>
+            <div class="settings-item-box">
+              <div class="settings-item-title">📁 本地数据存储路径</div>
+              <div style="font-size:10px; color:#94A3B8; background:#0B0E14; padding:6px; border-radius:4px; font-family:monospace;">
+                D:\CopyBoxData\
+              </div>
+            </div>
+            <div class="settings-item-box">
+              <div class="settings-item-title">🎨 外观主题与清晰度</div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>ClearType 亚像素超清模式</span>
+                <span style="color:#34D399; font-weight:bold;">已开启 (Active)</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-footer">
+            <span style="color:#F87171; cursor:pointer;">🛑 彻底退出程序</span>
+            <button class="btn-done" id="btnSettingsDone">完成</button>
+          </div>
+        </div>
+
+        <!-- 成功 Toast -->
+        <div class="toast-pill" id="toastPill">✓ 已贴入光标位置</div>
+      </div>
+    </div>
+
+    <!-- 底部电影字幕 -->
+    <div class="caption-container">
+      <div class="caption-zh" id="captionZh">按下 Alt+V 瞬间唤醒 CopyBox，告别自带剪贴板卡顿与云端隐私泄露风险</div>
+      <div class="caption-en" id="captionEn">Press Alt+V to wake up CopyBox instantly — 100% offline, privacy-first, zero cloud risks.</div>
+    </div>
+  </div>
+
+  <!-- 控制播放面板 -->
+  <div class="control-panel">
+    <div class="progress-bar-container" id="progressBarContainer">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="controls-row">
+      <div class="playback-buttons">
+        <button class="play-btn" id="btnPlayPause">⏸ 暂停</button>
+        <span class="time-code" id="timeCode">00:00 / 00:30</span>
+      </div>
+      <div class="scene-navigator">
+        <button class="scene-step-btn active" onclick="jumpToScene(0)">1. 毫秒唤醒</button>
+        <button class="scene-step-btn" onclick="jumpToScene(1)">2. 双列卡片</button>
+        <button class="scene-step-btn" onclick="jumpToScene(2)">3. 右键菜单</button>
+        <button class="scene-step-btn" onclick="jumpToScene(3)">4. 独立拖拽</button>
+        <button class="scene-step-btn" onclick="jumpToScene(4)">5. 双语国际化</button>
+        <button class="scene-step-btn" onclick="jumpToScene(5)">6. 离线开源</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 场景时间线规划 (总长 30 秒)
+    const SCENES = [
+      {
+        startTime: 0,
+        endTime: 5,
+        badge: "Scene 01",
+        title: "毫秒唤醒，全键盘秒贴",
+        subtitle: "Instant Wake-up & Keyboard-Driven Flow",
+        captionZh: "按下 Alt+V 瞬间唤醒 CopyBox，按数字键 1~9 直接秒贴对应内容！",
+        captionEn: "Press Alt+V for instant wakeup; hit number keys 1~9 to paste items directly into active window.",
+        run: (t) => {
+          hideSettings();
+          hideContextMenu();
+          showAppWindow();
+          moveCursor(240, 240);
+          highlightCard(1);
+          if (t > 3 && t < 4.8) {
+            triggerClick(240, 240);
+            showToast("✓ 已贴入光标位置 [1]");
+          }
+        }
+      },
+      {
+        startTime: 5,
+        endTime: 10,
+        badge: "Scene 02",
+        title: "1:1 现代双列卡片布局",
+        subtitle: "1:1 Two-Column Card Grid with Code Highlight",
+        captionZh: "代码语法高亮、高清图片缩略图、纯文本优雅段落排版，一目了然。",
+        captionEn: "Syntax highlighted code snippets, image previews, and elegant typography for plain text.",
+        run: (t) => {
+          showAppWindow();
+          hideContextMenu();
+          hideSettings();
+          if (t < 7.5) {
+            moveCursor(150, 190);
+            highlightCard(1);
+          } else {
+            moveCursor(330, 190);
+            highlightCard(2);
+          }
+        }
+      },
+      {
+        startTime: 10,
+        endTime: 16,
+        badge: "Scene 03",
+        title: "右键菜单与快捷操作",
+        subtitle: "Right-Click Context Menu & Quick Pinning",
+        captionZh: "在任意卡片单击右键即刻高亮呼出菜单：暖金星号置顶、经典蓝复制、警示红删除。",
+        captionEn: "Right-click any card for instant contextual actions: ★ Pin to top, ❐ Copy, ✕ Delete.",
+        run: (t) => {
+          showAppWindow();
+          highlightCard(1);
+          moveCursor(240, 230);
+          if (t > 11) {
+            showContextMenu();
+            moveCursor(260, 270);
+            if (t > 13.5) {
+              triggerClick(260, 270);
+              showToast("⭐ 已置顶此条记录至最顶部");
+            }
+          }
+        }
+      },
+      {
+        startTime: 16,
+        endTime: 22,
+        badge: "Scene 04",
+        title: "独立设置面板，窗口内自由拖拽",
+        subtitle: "Draggable Settings Panel with Boundary Protection",
+        captionZh: "设置面板支持在主窗口内任意拖拽移动，内置智能边界算法，绝不超出边缘。",
+        captionEn: "Drag the settings panel anywhere inside the client area with zero boundary overflowing.",
+        run: (t) => {
+          hideContextMenu();
+          showAppWindow();
+          showSettings();
+          // 模拟拖拽移动设置面板
+          if (t > 17 && t < 21) {
+            const dragProgress = (t - 17) / 4;
+            const offsetX = Math.sin(dragProgress * Math.PI * 2) * 45;
+            const offsetY = Math.cos(dragProgress * Math.PI * 2) * 25 - 25;
+            moveSettingsPanel(offsetX, offsetY);
+            moveCursor(240 + offsetX, 160 + offsetY);
+          }
+        }
+      },
+      {
+        startTime: 22,
+        endTime: 26,
+        badge: "Scene 05",
+        title: "原生中英双语与超清 ClearType",
+        subtitle: "Full Bilingual Support & Razor-Sharp Font Rendering",
+        captionZh: "完美支持简体中文与 English 即时切换，分离阴影与文字，字迹刀锋般锐利清晰。",
+        captionEn: "Seamless i18n switching with decoupled shadow layer for razor-sharp ClearType text rendering.",
+        run: (t) => {
+          showAppWindow();
+          showSettings();
+          resetSettingsPanelPos();
+          moveCursor(210, 250);
+          if (t > 24) {
+            setSearchPlaceholder("Search clipboard history...");
+          } else {
+            setSearchPlaceholder("搜索剪贴板历史...");
+          }
+        }
+      },
+      {
+        startTime: 26,
+        endTime: 30,
+        badge: "Scene 06",
+        title: "100% 物理离线，完全开源",
+        subtitle: "100% Offline, Privacy-First, MIT Open Source",
+        captionZh: "所有数据物理留存本地 SQLite，支持私有云同步，GitHub 开源欢迎体验！",
+        captionEn: "All data safely saved in local SQLite. Zero cloud tracking. Proudly open source on GitHub!",
+        run: (t) => {
+          hideSettings();
+          hideContextMenu();
+          showAppWindow();
+          moveCursor(440, 60);
+          showToast("🎉 GitHub: 1Than499/CopyBox");
+        }
+      }
+    ];
+
+    const TOTAL_DURATION = 30; // 30 秒
+    let currentTime = 0;
+    let isPlaying = true;
+    let lastTimestamp = null;
+
+    // DOM 元素引用
+    const cursor = document.getElementById("cursor");
+    const ripple = document.getElementById("ripple");
+    const appWindow = document.getElementById("appWindow");
+    const contextMenu = document.getElementById("contextMenu");
+    const settingsPanel = document.getElementById("settingsPanel");
+    const toastPill = document.getElementById("toastPill");
+    const sceneBadge = document.getElementById("sceneBadge");
+    const sceneTitle = document.getElementById("sceneTitle");
+    const sceneSubtitle = document.getElementById("sceneSubtitle");
+    const captionZh = document.getElementById("captionZh");
+    const captionEn = document.getElementById("captionEn");
+    const progressFill = document.getElementById("progressFill");
+    const timeCode = document.getElementById("timeCode");
+    const btnPlayPause = document.getElementById("btnPlayPause");
+    const searchPlaceText = document.getElementById("searchPlaceText");
+
+    // 交互辅助函数
+    function showAppWindow() { appWindow.className = "copybox-window visible"; }
+    function hideAppWindow() { appWindow.className = "copybox-window hidden"; }
+    function showContextMenu() { contextMenu.classList.add("visible"); }
+    function hideContextMenu() { contextMenu.classList.remove("visible"); }
+    function showSettings() { settingsPanel.classList.add("visible"); }
+    function hideSettings() { settingsPanel.classList.remove("visible"); }
+    
+    function moveCursor(x, y) {
+      cursor.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    function triggerClick(x, y) {
+      ripple.style.left = `${x + 2}px`;
+      ripple.style.top = `${y + 2}px`;
+      ripple.classList.remove("animate");
+      void ripple.offsetWidth;
+      ripple.classList.add("animate");
+    }
+    function highlightCard(num) {
+      [1, 2, 3, 4].forEach(i => {
+        const el = document.getElementById(`card${i}`);
+        if (el) el.classList.toggle("selected", i === num);
+      });
+    }
+    function showToast(text) {
+      toastPill.textContent = text;
+      toastPill.classList.add("visible");
+      setTimeout(() => toastPill.classList.remove("visible"), 2000);
+    }
+    function moveSettingsPanel(x, y) {
+      settingsPanel.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+    }
+    function resetSettingsPanelPos() {
+      settingsPanel.style.transform = `translate(-50%, -50%)`;
+    }
+    function setSearchPlaceholder(str) {
+      searchPlaceText.textContent = str;
+    }
+
+    // 主时间线循环
+    function tick(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const delta = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      if (isPlaying) {
+        currentTime += delta;
+        if (currentTime >= TOTAL_DURATION) {
+          currentTime = 0; // 自动循环播放
+        }
+        updateTimeline(currentTime);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function updateTimeline(time) {
+      // 更新进度条与时间显示
+      const pct = (time / TOTAL_DURATION) * 100;
+      progressFill.style.width = `${pct}%`;
+      const curSec = Math.floor(time).toString().padStart(2, "0");
+      timeCode.textContent = `00:${curSec} / 00:30`;
+
+      // 查找当前场景
+      const currentSceneIndex = SCENES.findIndex(s => time >= s.startTime && time < s.endTime);
+      if (currentSceneIndex !== -1) {
+        const scene = SCENES[currentSceneIndex];
+        sceneBadge.textContent = scene.badge;
+        sceneTitle.textContent = scene.title;
+        sceneSubtitle.textContent = scene.subtitle;
+        captionZh.textContent = scene.captionZh;
+        captionEn.textContent = scene.captionEn;
+
+        // 更新控制按钮高亮
+        document.querySelectorAll(".scene-step-btn").forEach((btn, idx) => {
+          btn.classList.toggle("active", idx === currentSceneIndex);
+        });
+
+        // 执行场景动作
+        scene.run(time);
+      }
+    }
+
+    // 播放/暂停控制
+    btnPlayPause.addEventListener("click", () => {
+      isPlaying = !isPlaying;
+      btnPlayPause.textContent = isPlaying ? "⏸ 暂停" : "▶ 播放";
+    });
+
+    // 点击进度条跳转
+    document.getElementById("progressBarContainer").addEventListener("click", (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickRatio = (e.clientX - rect.left) / rect.width;
+      currentTime = clickRatio * TOTAL_DURATION;
+      updateTimeline(currentTime);
+    });
+
+    // 场景快进跳转
+    window.jumpToScene = function(idx) {
+      if (SCENES[idx]) {
+        currentTime = SCENES[idx].startTime + 0.1;
+        updateTimeline(currentTime);
+      }
+    };
+
+    // 启动动画
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
