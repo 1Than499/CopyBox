@@ -83,6 +83,16 @@ namespace ClipVault
                 RadioCloseMinimize.IsChecked = true;
             }
 
+            // 2. 双击卡片行为加载 (默认仅复制且保持窗口开启)
+            if (s.DoubleClickAction == "PasteAndHide")
+            {
+                RadioDoubleClickPaste.IsChecked = true;
+            }
+            else
+            {
+                RadioDoubleClickCopy.IsChecked = true;
+            }
+
             // 2. 主题与透明度加载
             bool isDark = s.ThemeMode != "Light";
             if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
@@ -280,6 +290,15 @@ namespace ClipVault
             UpdateCloseButtonToolTip();
         }
 
+        private void DoubleClickRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            _settingsService.CurrentSettings.DoubleClickAction = RadioDoubleClickPaste.IsChecked == true
+                ? "PasteAndHide"
+                : "CopyOnly";
+            _settingsService.SaveSettings();
+        }
+
         private void BtnDirectExit_Click(object sender, RoutedEventArgs e)
         {
             var res = MessageBox.Show("确认要彻底退出 ClipVault 吗？退出后后台将停止监听剪贴板与热键。", "确认退出", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -320,7 +339,12 @@ namespace ClipVault
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed && e.OriginalSource is not TextBox && e.OriginalSource is not Button && e.OriginalSource is not Slider)
+            if (e.LeftButton == MouseButtonState.Pressed && 
+                e.OriginalSource is not TextBox && 
+                e.OriginalSource is not Button && 
+                e.OriginalSource is not Slider &&
+                e.OriginalSource is not ListBox &&
+                e.OriginalSource is not ListBoxItem)
             {
                 try { this.DragMove(); } catch { }
             }
@@ -489,11 +513,70 @@ namespace ClipVault
             }
         }
 
+        private System.Windows.Threading.DispatcherTimer? _toastTimer;
+
+        private void ShowToast(string message)
+        {
+            if (ToastText == null) return;
+            ToastText.Text = message;
+            ToastText.Visibility = Visibility.Visible;
+
+            _toastTimer?.Stop();
+            _toastTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1.8)
+            };
+            _toastTimer.Tick += (s, e) =>
+            {
+                _toastTimer.Stop();
+                ToastText.Visibility = Visibility.Collapsed;
+            };
+            _toastTimer.Start();
+        }
+
+        private void CopyItemToClipboard(ClipboardItem item)
+        {
+            if (item == null) return;
+            try
+            {
+                _monitorService.Pause();
+
+                if (item.IsImage && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
+                {
+                    var bmp = new BitmapImage(new Uri(item.FullImagePath, UriKind.Absolute));
+                    Clipboard.SetImage(bmp);
+                }
+                else
+                {
+                    Clipboard.SetText(item.Content ?? string.Empty);
+                }
+
+                ShowToast("✓ 已复制到剪贴板");
+            }
+            catch (Exception ex)
+            {
+                ShowToast($"复制出错: {ex.Message}");
+            }
+            finally
+            {
+                _monitorService.Resume();
+            }
+        }
+
         private void CardsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            e.Handled = true; // 拦截双击事件，避免冒泡
             if (CardsListBox.SelectedItem is ClipboardItem selected)
             {
-                TriggerPaste(selected);
+                if (_settingsService.CurrentSettings.DoubleClickAction == "PasteAndHide")
+                {
+                    TriggerPaste(selected);
+                }
+                else
+                {
+                    // 默认安全交互：仅复制到系统剪贴板，保持窗口打开，绝不收起/最小化到托盘！
+                    CopyItemToClipboard(selected);
+                }
             }
         }
 
@@ -537,7 +620,7 @@ namespace ClipVault
                 var copyItem = new MenuItem { Header = "📋 复制到剪贴板" };
                 copyItem.Click += (s, args) =>
                 {
-                    TriggerPaste(item);
+                    CopyItemToClipboard(item);
                 };
 
                 var delItem = new MenuItem { Header = "🗑 删除此条记录" };

@@ -15,6 +15,9 @@ namespace ClipVault.Models
         // 窗口关闭动作偏好: "MinimizeToTray" (最小化到托盘) 或 "ExitApp" (直接退出)
         public string CloseAction { get; set; } = "MinimizeToTray";
 
+        // 双击卡片动作偏好: "CopyOnly" (仅复制且保持窗口打开，绝不自动隐藏) 或 "PasteAndHide" (贴入并收起)
+        public string DoubleClickAction { get; set; } = "CopyOnly";
+
         // 主题模式: "Dark" (暗黑模式) 或 "Light" (明亮白天模式)
         public string ThemeMode { get; set; } = "Dark";
 

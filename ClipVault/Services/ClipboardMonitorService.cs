@@ -77,6 +77,9 @@ namespace ClipVault.Services
             }
         }
 
+        public void Pause() => IsPaused = true;
+        public void Resume() => IsPaused = false;
+
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg == NativeMethods.WM_CLIPBOARDUPDATE)

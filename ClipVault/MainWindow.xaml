@@ -116,15 +116,16 @@
         </Style>
     </Window.Resources>
 
-    <!-- 主窗口毛玻璃圆角容器 (1:1 还原概念图深邃亚克力外框) -->
+    <!-- 主窗口毛玻璃圆角容器 (1:1 还原概念图深邃亚克力外框，彻底消除粗暴生硬黑影) -->
     <Border x:Name="MainBorder"
             Background="#EB181C24" 
             BorderBrush="{DynamicResource WindowBorderBrush}" 
             BorderThickness="1" 
             CornerRadius="16" 
-            Margin="10">
+            Margin="6">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="40" ShadowDepth="10" Direction="270" Opacity="0.65" Color="Black"/>
+            <!-- 极简自然微弱微阴影：无生硬黑圈、完全在边界内柔和淡出，干净通透 -->
+            <DropShadowEffect BlurRadius="8" ShadowDepth="1.5" Direction="270" Opacity="0.16" Color="Black"/>
         </Border.Effect>
 
         <Grid Margin="16,10,16,14">
@@ -470,6 +471,15 @@
                                 <TextBlock Text="点击窗口右上角 [✕ 关闭] 时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
                                 <RadioButton x:Name="RadioCloseMinimize" GroupName="CloseActionGroup" Content="最小化到系统托盘 (继续在后台常驻监听)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="CloseActionRadio_Changed"/>
                                 <RadioButton x:Name="RadioCloseExit" GroupName="CloseActionGroup" Content="直接彻底退出 ClipVault 程序" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="CloseActionRadio_Changed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 卡片双击交互偏好 (彻底规避误退/误缩) -->
+                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="🖱 双击卡片列表时的动作：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
+                                <RadioButton x:Name="RadioDoubleClickCopy" GroupName="DoubleClickGroup" Content="仅复制到剪贴板 (保持窗口打开，绝不收起)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,4" Checked="DoubleClickRadio_Changed"/>
+                                <RadioButton x:Name="RadioDoubleClickPaste" GroupName="DoubleClickGroup" Content="直接贴入光标处并自动收起到托盘" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="DoubleClickRadio_Changed"/>
                             </StackPanel>
                         </Border>
 
