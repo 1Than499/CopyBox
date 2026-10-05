@@ -834,7 +834,9 @@
   </div>
 
   <script>
-    // 场景时间线规划 (总长 30 秒)
+    // ==================== 场景与动效规划 (总长 30 秒) ====================
+    // 注：SCENES.run(t) 仅处理连续平滑视觉插值（光标移动、拖拽位移、高亮）；
+    // 所有单次点击、音效、弹窗均由下方的 TIMELINE_EVENTS 离散事件精准触发一次，绝不逐帧重叠。
     const SCENES = [
       {
         startTime: 0,
@@ -845,14 +847,12 @@
         captionZh: "按下 Alt+V 瞬间唤醒 CopyBox，按数字键 1~9 直接秒贴对应内容！",
         captionEn: "Press Alt+V for instant wakeup; hit number keys 1~9 to paste items directly into active window.",
         run: (t) => {
-          hideSettings();
-          hideContextMenu();
-          showAppWindow();
-          moveCursor(240, 240);
           highlightCard(1);
-          if (t > 3 && t < 4.8) {
-            triggerClick(240, 240);
-            showToast("✓ 已贴入光标位置 [1]");
+          if (t < 2.5) {
+            const p = t / 2.5;
+            moveCursor(180 + p * 60, 300 - p * 60);
+          } else {
+            moveCursor(240, 240);
           }
         }
       },
@@ -865,9 +865,6 @@
         captionZh: "代码语法高亮、高清图片缩略图、纯文本优雅段落排版，一目了然。",
         captionEn: "Syntax highlighted code snippets, image previews, and elegant typography for plain text.",
         run: (t) => {
-          showAppWindow();
-          hideContextMenu();
-          hideSettings();
           if (t < 7.5) {
             moveCursor(150, 190);
             highlightCard(1);
@@ -886,16 +883,13 @@
         captionZh: "在任意卡片单击右键即刻高亮呼出菜单：暖金星号置顶、经典蓝复制、警示红删除。",
         captionEn: "Right-click any card for instant contextual actions: ★ Pin to top, ❐ Copy, ✕ Delete.",
         run: (t) => {
-          showAppWindow();
           highlightCard(1);
-          moveCursor(240, 230);
-          if (t > 11) {
-            showContextMenu();
+          if (t < 11.2) {
+            moveCursor(240, 230);
+          } else if (t < 13.8) {
             moveCursor(260, 270);
-            if (t > 13.5) {
-              triggerClick(260, 270);
-              showToast("⭐ 已置顶此条记录至最顶部");
-            }
+          } else {
+            moveCursor(260, 270);
           }
         }
       },
@@ -908,16 +902,16 @@
         captionZh: "设置面板支持在主窗口内任意拖拽移动，内置智能边界算法，绝不超出边缘。",
         captionEn: "Drag the settings panel anywhere inside the client area with zero boundary overflowing.",
         run: (t) => {
-          hideContextMenu();
-          showAppWindow();
-          showSettings();
-          // 模拟拖拽移动设置面板
-          if (t > 17 && t < 21) {
+          if (t < 17) {
+            moveCursor(240, 160);
+          } else if (t >= 17 && t < 21) {
             const dragProgress = (t - 17) / 4;
             const offsetX = Math.sin(dragProgress * Math.PI * 2) * 45;
             const offsetY = Math.cos(dragProgress * Math.PI * 2) * 25 - 25;
             moveSettingsPanel(offsetX, offsetY);
             moveCursor(240 + offsetX, 160 + offsetY);
+          } else {
+            moveCursor(400, 320);
           }
         }
       },
@@ -930,14 +924,10 @@
         captionZh: "完美支持简体中文与 English 即时切换，分离阴影与文字，字迹刀锋般锐利清晰。",
         captionEn: "Seamless i18n switching with decoupled shadow layer for razor-sharp ClearType text rendering.",
         run: (t) => {
-          showAppWindow();
-          showSettings();
-          resetSettingsPanelPos();
-          moveCursor(210, 250);
-          if (t > 24) {
-            setSearchPlaceholder("Search clipboard history...");
+          if (t < 23.6) {
+            moveCursor(210, 250);
           } else {
-            setSearchPlaceholder("搜索剪贴板历史...");
+            moveCursor(320, 340);
           }
         }
       },
@@ -950,11 +940,7 @@
         captionZh: "所有数据物理留存本地 SQLite，支持私有云同步，GitHub 开源欢迎体验！",
         captionEn: "All data safely saved in local SQLite. Zero cloud tracking. Proudly open source on GitHub!",
         run: (t) => {
-          hideSettings();
-          hideContextMenu();
-          showAppWindow();
           moveCursor(440, 60);
-          showToast("🎉 GitHub: 1Than499/CopyBox");
         }
       }
     ];
@@ -977,6 +963,8 @@
     const captionZh = document.getElementById("captionZh");
     const captionEn = document.getElementById("captionEn");
     const progressFill = document.getElementById("progressFill");
+    const searchPlaceText = document.getElementById("searchPlaceText");
+
     // ==================== Web Audio 现代科技律动 BGM 引擎 ====================
     class TechBgmSynthesizer {
       constructor() {
@@ -987,7 +975,9 @@
         this.volume = 0.75;
         this.timer = null;
         this.beatIndex = 0;
+        this.nextNoteTime = 0;
         this.customAudio = null;
+        this.noiseBuffer = null;
 
         // 温暖高雅科技和弦进行 (Cmaj7 -> Am7 -> Fmaj7 -> Gsus4)
         this.chords = [
@@ -1005,6 +995,14 @@
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
           this.masterGain.connect(this.ctx.destination);
+
+          // 预生成 Hi-hat 白噪声缓冲（一次性生成，避免实时创建造成 GC 卡顿）
+          const bufferSize = Math.floor(this.ctx.sampleRate * 0.1);
+          this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = this.noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+          }
         }
         if (this.ctx.state === "suspended") {
           this.ctx.resume();
@@ -1056,8 +1054,10 @@
         }
 
         if (this.timer) clearInterval(this.timer);
-        // BPM = 125 律动 (每 240ms 一拍)
-        this.timer = setInterval(() => this.step(), 240);
+        this.nextNoteTime = this.ctx.currentTime + 0.05;
+        // 精密前瞻调度器 (Lookahead Scheduler)，每 30ms 提前调度 150ms 内音频
+        // 彻底根除因主线程 DOM 动画波动导致的节奏颤动或卡顿
+        this.timer = setInterval(() => this.scheduler(), 30);
       }
 
       pause() {
@@ -1071,32 +1071,40 @@
         }
       }
 
-      step() {
+      scheduler() {
         if (!this.ctx || !this.isPlaying || !this.enabled) return;
-        const now = this.ctx.currentTime;
-        const chordIndex = Math.floor((this.beatIndex % 32) / 8);
+        const scheduleAheadTime = 0.15; // 提前 150ms 调度
+        const stepDuration = 0.24;      // 125 BPM: 60 / 125 / 2 = 0.24s (8分音符步长)
+
+        while (this.nextNoteTime < this.ctx.currentTime + scheduleAheadTime) {
+          this.scheduleBeat(this.beatIndex, this.nextNoteTime);
+          this.nextNoteTime += stepDuration;
+          this.beatIndex++;
+        }
+      }
+
+      scheduleBeat(beatIdx, time) {
+        const chordIndex = Math.floor((beatIdx % 32) / 8);
         const chord = this.chords[chordIndex];
-        const beatInBar = this.beatIndex % 8;
+        const beatInBar = beatIdx % 8;
 
         // 1. 每小节第 1 拍弹奏温暖和弦背景 Pad & Sub-Bass
         if (beatInBar === 0) {
-          this.playChordPad(chord.notes, now, 1.8);
-          this.playSubBass(chord.bass, now, 1.6);
+          this.playChordPad(chord.notes, time, 1.8);
+          this.playSubBass(chord.bass, time, 1.6);
         }
 
         // 2. 电子水滴晶莹琶音 Pluck (在偶数拍轻巧跃动)
         if (beatInBar % 2 === 0) {
           const noteIdx = (beatInBar / 2) % chord.notes.length;
           const freq = chord.notes[noteIdx] * 2;
-          this.playPluck(freq, now, 0.35);
+          this.playPluck(freq, time, 0.35);
         }
 
         // 3. 极细微清脆的闭镲节奏 (第 2, 6 拍轻点)
         if (beatInBar === 2 || beatInBar === 6) {
-          this.playHiHat(now);
+          this.playHiHat(time);
         }
-
-        this.beatIndex++;
       }
 
       playChordPad(freqs, time, dur) {
@@ -1112,12 +1120,16 @@
           filter.frequency.setValueAtTime(900, time);
 
           gain.gain.setValueAtTime(0, time);
-          gain.gain.linearRampToValueAtTime(0.05, time + 0.3);
+          gain.gain.linearRampToValueAtTime(0.04, time + 0.3);
           gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
 
           osc.connect(filter);
           filter.connect(gain);
           gain.connect(this.masterGain);
+
+          osc.onended = () => {
+            try { osc.disconnect(); filter.disconnect(); gain.disconnect(); } catch (e) {}
+          };
 
           osc.start(time);
           osc.stop(time + dur);
@@ -1130,11 +1142,15 @@
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, time);
 
-        gain.gain.setValueAtTime(0.12, time);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+        gain.gain.setValueAtTime(0.10, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
 
         osc.connect(gain);
         gain.connect(this.masterGain);
+
+        osc.onended = () => {
+          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+        };
 
         osc.start(time);
         osc.stop(time + dur);
@@ -1146,63 +1162,78 @@
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, time);
 
-        gain.gain.setValueAtTime(0.07, time);
+        gain.gain.setValueAtTime(0.06, time);
         gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
 
         osc.connect(gain);
         gain.connect(this.masterGain);
+
+        osc.onended = () => {
+          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+        };
 
         osc.start(time);
         osc.stop(time + dur);
       }
 
       playHiHat(time) {
-        const bufferSize = this.ctx.sampleRate * 0.03;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const output = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1;
-        }
-
+        if (!this.noiseBuffer) return;
         const whiteNoise = this.ctx.createBufferSource();
-        whiteNoise.buffer = buffer;
+        whiteNoise.buffer = this.noiseBuffer;
 
         const filter = this.ctx.createBiquadFilter();
         filter.type = "highpass";
         filter.frequency.setValueAtTime(7000, time);
 
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.025, time);
-        gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+        gain.gain.setValueAtTime(0.02, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
 
         whiteNoise.connect(filter);
         filter.connect(gain);
         gain.connect(this.masterGain);
 
+        whiteNoise.onended = () => {
+          try { whiteNoise.disconnect(); filter.disconnect(); gain.disconnect(); } catch (e) {}
+        };
+
         whiteNoise.start(time);
+        whiteNoise.stop(time + 0.035);
       }
     }
 
-    // 交互音效系统 (SFX)
+    // ==================== 交互音效系统 (SFX) ====================
     class SfxSystem {
       constructor(bgmEngine) {
         this.bgm = bgmEngine;
+        this.lastSoundTime = 0;
       }
+
       playClick() {
         if (!this.bgm.ctx || !this.bgm.enabled) return;
         const now = this.bgm.ctx.currentTime;
+        // 防高频连发抖动
+        if (now - this.lastSoundTime < 0.05) return;
+        this.lastSoundTime = now;
+
         const osc = this.bgm.ctx.createOscillator();
         const gain = this.bgm.ctx.createGain();
         osc.type = "sine";
         osc.frequency.setValueAtTime(1000, now);
         osc.frequency.exponentialRampToValueAtTime(300, now + 0.06);
         gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
         osc.connect(gain);
         gain.connect(this.bgm.masterGain);
+
+        osc.onended = () => {
+          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+        };
+
         osc.start(now);
         osc.stop(now + 0.06);
       }
+
       playWhoosh() {
         if (!this.bgm.ctx || !this.bgm.enabled) return;
         const now = this.bgm.ctx.currentTime;
@@ -1212,26 +1243,38 @@
         osc.frequency.setValueAtTime(160, now);
         osc.frequency.exponentialRampToValueAtTime(420, now + 0.22);
         gain.gain.setValueAtTime(0.07, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
         osc.connect(gain);
         gain.connect(this.bgm.masterGain);
+
+        osc.onended = () => {
+          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+        };
+
         osc.start(now);
         osc.stop(now + 0.22);
       }
+
       playChime() {
         if (!this.bgm.ctx || !this.bgm.enabled) return;
         const now = this.bgm.ctx.currentTime;
         [1046.50, 1318.51].forEach((f, idx) => {
           const osc = this.bgm.ctx.createOscillator();
           const gain = this.bgm.ctx.createGain();
+          const t = now + idx * 0.05;
           osc.type = "sine";
-          osc.frequency.setValueAtTime(f, now + idx * 0.05);
-          gain.gain.setValueAtTime(0.09, now + idx * 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.3);
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.09, t);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
           osc.connect(gain);
           gain.connect(this.bgm.masterGain);
-          osc.start(now + idx * 0.05);
-          osc.stop(now + idx * 0.05 + 0.3);
+
+          osc.onended = () => {
+            try { osc.disconnect(); gain.disconnect(); } catch (e) {}
+          };
+
+          osc.start(t);
+          osc.stop(t + 0.3);
         });
       }
     }
@@ -1239,11 +1282,11 @@
     const bgm = new TechBgmSynthesizer();
     const sfx = new SfxSystem(bgm);
 
-    // 交互辅助函数
+    // ==================== 交互辅助函数 ====================
     let hasShownAppWindow = false;
-    function showAppWindow() { 
+    function showAppWindow(withSound = true) { 
       if (!hasShownAppWindow) {
-        sfx.playWhoosh();
+        if (withSound) sfx.playWhoosh();
         hasShownAppWindow = true;
       }
       appWindow.className = "copybox-window visible"; 
@@ -1290,28 +1333,72 @@
       searchPlaceText.textContent = str;
     }
 
-    // 主时间线循环
+    // ==================== 精准离散事件时间线 ====================
+    // 每个动作只在时间轴经过对应秒数时严格触发一次，避免任何音效与动画狂闪
+    const TIMELINE_EVENTS = [
+      // Scene 01: 毫秒唤醒
+      { time: 0.1,  id: "s1_init",    action: () => { hideSettings(); hideContextMenu(); showAppWindow(true); } },
+      { time: 3.2,  id: "s1_click",   action: () => { triggerClick(240, 240); showToast("✓ 已贴入光标位置 [1]"); } },
+
+      // Scene 02: 1:1 双列卡片
+      { time: 5.0,  id: "s2_init",    action: () => { showAppWindow(false); hideContextMenu(); hideSettings(); } },
+
+      // Scene 03: 右键菜单与置顶
+      { time: 10.0, id: "s3_init",    action: () => { showAppWindow(false); hideSettings(); hideContextMenu(); } },
+      { time: 11.2, id: "s3_rclick",  action: () => { triggerClick(240, 230); showContextMenu(); } },
+      { time: 13.8, id: "s3_pin",     action: () => { triggerClick(260, 270); hideContextMenu(); showToast("⭐ 已置顶此条记录至最顶部"); } },
+
+      // Scene 04: 拖拽设置面板
+      { time: 16.0, id: "s4_open",    action: () => { hideContextMenu(); showAppWindow(false); showSettings(); resetSettingsPanelPos(); } },
+      { time: 21.3, id: "s4_done",    action: () => { triggerClick(400, 320); hideSettings(); } },
+
+      // Scene 05: 双语与 ClearType
+      { time: 22.0, id: "s5_open",    action: () => { showAppWindow(false); showSettings(); resetSettingsPanelPos(); setSearchPlaceholder("搜索剪贴板历史..."); } },
+      { time: 23.6, id: "s5_en",      action: () => { triggerClick(210, 250); setSearchPlaceholder("Search clipboard history..."); } },
+
+      // Scene 06: 开源致谢
+      { time: 26.0, id: "s6_init",    action: () => { hideSettings(); hideContextMenu(); showAppWindow(false); } },
+      { time: 27.2, id: "s6_toast",   action: () => { triggerClick(440, 60); showToast("🎉 GitHub: 1Than499/CopyBox"); } }
+    ];
+
+    let triggeredEvents = new Set();
+
+    // ==================== 主时间线循环 ====================
     function tick(timestamp) {
       if (!lastTimestamp) lastTimestamp = timestamp;
       const delta = (timestamp - lastTimestamp) / 1000;
       lastTimestamp = timestamp;
 
       if (isPlaying) {
+        const prevTime = currentTime;
         currentTime += delta;
         if (currentTime >= TOTAL_DURATION) {
           currentTime = 0; // 自动循环播放
+          triggeredEvents.clear();
+          hasShownAppWindow = false;
         }
-        updateTimeline(currentTime);
+        updateTimeline(currentTime, prevTime);
       }
       requestAnimationFrame(tick);
     }
 
-    function updateTimeline(time) {
+    function updateTimeline(time, prevTime = null) {
       const pct = (time / TOTAL_DURATION) * 100;
       progressFill.style.width = `${pct}%`;
       const curSec = Math.floor(time).toString().padStart(2, "0");
       timeCode.textContent = `00:${curSec} / 00:30`;
 
+      // 触发离散事件（带时间判定与已触发 Set 去重，杜绝单帧重复触发）
+      if (prevTime !== null) {
+        TIMELINE_EVENTS.forEach(ev => {
+          if (!triggeredEvents.has(ev.id) && prevTime < ev.time && time >= ev.time) {
+            triggeredEvents.add(ev.id);
+            ev.action();
+          }
+        });
+      }
+
+      // 更新场景字幕与连续视觉动效
       const currentSceneIndex = SCENES.findIndex(s => time >= s.startTime && time < s.endTime);
       if (currentSceneIndex !== -1) {
         const scene = SCENES[currentSceneIndex];
@@ -1329,7 +1416,7 @@
       }
     }
 
-    // 播放/暂停控制
+    // ==================== 播放 / 暂停 / 跳转控制 ====================
     btnPlayPause.addEventListener("click", () => {
       isPlaying = !isPlaying;
       btnPlayPause.textContent = isPlaying ? "⏸ 暂停" : "▶ 播放";
@@ -1340,7 +1427,6 @@
       }
     });
 
-    // 音乐开关与音量
     const btnToggleBgm = document.getElementById("btnToggleBgm");
     const volumeSlider = document.getElementById("volumeSlider");
     const btnCustomBgm = document.getElementById("btnCustomBgm");
@@ -1370,26 +1456,57 @@
       }
     });
 
-    // 用户首次任意点击激活音频
+    // 用户首次任意点击激活音频上下文
     document.addEventListener("click", () => {
       if (isPlaying && !bgm.isPlaying) {
         bgm.play();
       }
     }, { once: true });
 
+    // 时间轴点击与快进跳转封装
+    function jumpToTime(targetTime) {
+      currentTime = targetTime;
+      triggeredEvents.clear();
+      hasShownAppWindow = targetTime >= 0.1;
+
+      // 将目标时间之前的事件标记为已发生，防止倒退/快进时集中爆发音效
+      TIMELINE_EVENTS.forEach(ev => {
+        if (ev.time < targetTime) {
+          triggeredEvents.add(ev.id);
+        }
+      });
+
+      // 快速恢复对应时间点的主界面布局
+      if (currentTime < 5) {
+        hideSettings(); hideContextMenu(); showAppWindow(false);
+      } else if (currentTime < 10) {
+        showAppWindow(false); hideContextMenu(); hideSettings();
+      } else if (currentTime < 16) {
+        showAppWindow(false); hideSettings();
+        if (currentTime > 11.2 && currentTime < 13.8) showContextMenu(); else hideContextMenu();
+      } else if (currentTime < 22) {
+        hideContextMenu(); showAppWindow(false);
+        if (currentTime < 21.3) showSettings(); else hideSettings();
+      } else if (currentTime < 26) {
+        showAppWindow(false); showSettings();
+      } else {
+        hideSettings(); hideContextMenu(); showAppWindow(false);
+      }
+
+      updateTimeline(currentTime);
+    }
+
     // 点击进度条跳转
     document.getElementById("progressBarContainer").addEventListener("click", (e) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const clickRatio = (e.clientX - rect.left) / rect.width;
-      currentTime = clickRatio * TOTAL_DURATION;
-      updateTimeline(currentTime);
+      jumpToTime(clickRatio * TOTAL_DURATION);
     });
 
     // 场景快进跳转
     window.jumpToScene = function(idx) {
       if (SCENES[idx]) {
-        currentTime = SCENES[idx].startTime + 0.1;
-        updateTimeline(currentTime);
+        jumpToTime(SCENES[idx].startTime + 0.05);
       }
     };
 
