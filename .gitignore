@@ -18,6 +18,11 @@
 settings.json
 portable.flag
 
+## Logs
+*.log
+crash.log
+app.log
+
 ## OS Generated
 Thumbs.db
 ehthumbs.db
