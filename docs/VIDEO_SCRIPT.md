@@ -3,7 +3,8 @@
 > **视频定位**：高燃、极简、现代感十足的桌面生产力工具宣传短片  
 > **推荐时长**：30秒（短视频快节奏版） / 60秒（精讲版）  
 > **适用平台**：B站 (Bilibili)、抖音、视频号、小红书、YouTube Shorts、X (Twitter)  
-> **配套工具**：已内置交互式全自动放映演示器 [`docs/promo_video.html`](./promo_video.html)（浏览器双击即可全屏 1080P 播放并使用 `Win + Alt + R` 录制导出 MP4）
+> **配套工具**：已内置交互式全自动放映演示器 [`docs/promo_video.html`](./promo_video.html)  
+> **成品视频**：已直接离线渲染生成 1080P 高清成片 [`docs/CopyBox_Promo_1080P.mp4`](./CopyBox_Promo_1080P.mp4)（包含完整 6 幕 1:1 画面、AI 中文旁白配音、科技感 BGM 与立体交互音效）
 
 ---
 
