@@ -230,6 +230,12 @@ namespace ClipVault
 
         private void SearchInputBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (SearchPlaceholder != null)
+            {
+                SearchPlaceholder.Visibility = string.IsNullOrEmpty(SearchInputBox.Text) 
+                    ? Visibility.Visible 
+                    : Visibility.Collapsed;
+            }
             RefreshCards();
         }
 

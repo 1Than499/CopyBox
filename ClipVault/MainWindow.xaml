@@ -139,14 +139,14 @@
                              TextChanged="SearchInputBox_TextChanged"
                              KeyDown="SearchInputBox_KeyDown"/>
 
-                    <TextBlock Text="Search history... (支持 1~9 数字键秒贴)" 
+                    <TextBlock x:Name="SearchPlaceholder"
+                               Text="Search history... (支持 1~9 数字键秒贴)" 
                                Grid.Column="0" 
                                Foreground="#556070" 
                                FontSize="13" 
                                IsHitTestVisible="False" 
                                VerticalAlignment="Center" 
-                               Margin="2,0,0,0"
-                               Visibility="{Binding Text.IsEmpty, ElementName=SearchInputBox, Converter={StaticResource BoolToVis}}"/>
+                               Margin="2,0,0,0"/>
 
                     <TextBlock Grid.Column="1" Text="🔍" FontSize="13" Foreground="#667790" VerticalAlignment="Center" Margin="6,0,2,0"/>
                 </Grid>

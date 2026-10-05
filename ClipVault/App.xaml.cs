@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using ClipVault.Services;
@@ -21,6 +22,15 @@ namespace ClipVault
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+            {
+                File.AppendAllText(@"d:\bank\crash.log", $"[AppDomain Crash] {args.ExceptionObject}\n");
+            };
+            this.DispatcherUnhandledException += (s, args) =>
+            {
+                File.AppendAllText(@"d:\bank\crash.log", $"[Dispatcher Crash] {args.Exception}\n");
+            };
 
             try
             {
@@ -65,6 +75,7 @@ namespace ClipVault
             }
             catch (Exception ex)
             {
+                File.AppendAllText(@"d:\bank\crash.log", $"[Startup Exception] {ex}\n");
                 MessageBox.Show($"ClipVault 启动失败: {ex.Message}\n{ex.StackTrace}", "启动异常", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown();
             }
