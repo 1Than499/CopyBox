@@ -94,11 +94,26 @@ namespace ClipVault
 
         private void InitTrayIcon()
         {
+            Icon? myIcon = null;
+            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "app.ico");
+            if (File.Exists(icoPath))
+            {
+                try { myIcon = new Icon(icoPath); } catch { }
+            }
+            if (myIcon == null)
+            {
+                myIcon = SystemIcons.Application;
+            }
+
             _trayIcon = new TaskbarIcon
             {
-                Icon = SystemIcons.Application,
-                ToolTipText = "ClipVault - 剪贴板安全保管箱 (Alt+V)"
+                Icon = myIcon,
+                ToolTipText = "ClipVault - 剪贴板安全保管箱 (Alt+V)",
+                Visibility = Visibility.Visible
             };
+
+            // 强制注册到 Windows 任务栏通知栏（确保在右下角折叠托盘中绝对可见）
+            _trayIcon.ForceCreate(false);
 
             // 创建托盘右键上下文菜单
             var contextMenu = new ContextMenu();

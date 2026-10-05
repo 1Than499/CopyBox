@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using ClipVault.Models;
 using ClipVault.Services;
 using Microsoft.Win32;
@@ -29,9 +30,20 @@ namespace ClipVault
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
 
+            // 加载应用图标
+            try
+            {
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "app.ico");
+                if (File.Exists(icoPath))
+                {
+                    this.Icon = new BitmapImage(new Uri(icoPath, UriKind.Absolute));
+                }
+            }
+            catch { }
+
             CardsListBox.ItemsSource = DisplayCards;
 
-            // 加载配置
+            // 加载配置、主题与卡片
             LoadSettingsToUI();
             RefreshCards();
 
@@ -60,7 +72,7 @@ namespace ClipVault
             var s = _settingsService.CurrentSettings;
             TxtSettingsStoragePath.Text = s.StorageDirectory;
 
-            // 痛点 1 配置加载
+            // 1. 关闭行为加载
             if (s.CloseAction == "ExitApp")
             {
                 RadioCloseExit.IsChecked = true;
@@ -69,6 +81,16 @@ namespace ClipVault
             {
                 RadioCloseMinimize.IsChecked = true;
             }
+
+            // 2. 主题与透明度加载
+            bool isDark = s.ThemeMode != "Light";
+            if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+
+            SliderOpacity.Value = Math.Clamp(s.WindowOpacity, 0.55, 1.00);
+            TxtOpacityValue.Text = $"{(int)(SliderOpacity.Value * 100)}%";
+
+            ApplyTheme(isDark);
+            ApplyOpacity(SliderOpacity.Value);
 
             UpdateStorageInfo();
         }
@@ -120,17 +142,77 @@ namespace ClipVault
             await _pasteSimulator.PasteItemAsync(item, () => this.Hide());
         }
 
-        // ================= 痛点 1：窗口控制与退出行为 =================
+        // ================= 外观：白天/夜间主题与透明度 =================
+
+        private void ApplyTheme(bool isDark)
+        {
+            _settingsService.CurrentSettings.ThemeMode = isDark ? "Dark" : "Light";
+            _settingsService.SaveSettings();
+
+            BtnQuickTheme.Content = isDark ? "🌙" : "☀️";
+            if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+
+            byte alpha = (byte)(_settingsService.CurrentSettings.WindowOpacity * 255);
+            MainBorder.Background = isDark 
+                ? new SolidColorBrush(Color.FromArgb(alpha, 22, 25, 34)) 
+                : new SolidColorBrush(Color.FromArgb(alpha, 248, 250, 252));
+
+            this.Resources["CardBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(24, 28, 37)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
+            this.Resources["CardBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(226, 232, 240));
+            this.Resources["CardTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) : new SolidColorBrush(Color.FromRgb(15, 23, 42));
+            this.Resources["CodeBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(17, 20, 27)) : new SolidColorBrush(Color.FromRgb(241, 245, 249));
+            this.Resources["CodeTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(52, 211, 153)) : new SolidColorBrush(Color.FromRgb(5, 150, 105));
+            this.Resources["SubTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(113, 128, 150)) : new SolidColorBrush(Color.FromRgb(100, 116, 139));
+            this.Resources["TitleTextBrush"] = isDark ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42));
+            this.Resources["WindowBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(51, 64, 80)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+            this.Resources["SearchBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(19, 22, 31)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
+            this.Resources["SearchBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+        }
+
+        private void ApplyOpacity(double opacity)
+        {
+            _settingsService.CurrentSettings.WindowOpacity = opacity;
+            _settingsService.SaveSettings();
+
+            if (TxtOpacityValue != null)
+            {
+                TxtOpacityValue.Text = $"{(int)(opacity * 100)}%";
+            }
+
+            bool isDark = _settingsService.CurrentSettings.ThemeMode != "Light";
+            byte alpha = (byte)(opacity * 255);
+            MainBorder.Background = isDark 
+                ? new SolidColorBrush(Color.FromArgb(alpha, 22, 25, 34)) 
+                : new SolidColorBrush(Color.FromArgb(alpha, 248, 250, 252));
+        }
+
+        private void BtnQuickTheme_Click(object sender, RoutedEventArgs e)
+        {
+            bool willBeDark = _settingsService.CurrentSettings.ThemeMode == "Light";
+            ApplyTheme(willBeDark);
+        }
+
+        private void ThemeRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            ApplyTheme(RadioThemeDark.IsChecked == true);
+        }
+
+        private void SliderOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_settingsService == null || MainBorder == null) return;
+            ApplyOpacity(e.NewValue);
+        }
+
+        // ================= 窗口控制与退出行为 =================
 
         private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
         {
-            // 显式最小化到托盘
             this.Hide();
         }
 
         private void BtnCloseWindow_Click(object sender, RoutedEventArgs e)
         {
-            // 根据用户的自选偏好决定是退出还是最小化到托盘
             if (_settingsService.CurrentSettings.CloseAction == "ExitApp")
             {
                 ExitApplication();
@@ -185,12 +267,11 @@ namespace ClipVault
             }
         }
 
-        // ================= 痛点 2：UI 交互与双列卡片操作 =================
+        // ================= 鼠标拖拽与分类操作 =================
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // 支持拖拽窗口
-            if (e.LeftButton == MouseButtonState.Pressed && e.OriginalSource is not TextBox && e.OriginalSource is not Button)
+            if (e.LeftButton == MouseButtonState.Pressed && e.OriginalSource is not TextBox && e.OriginalSource is not Button && e.OriginalSource is not Slider)
             {
                 try { this.DragMove(); } catch { }
             }
@@ -214,11 +295,10 @@ namespace ClipVault
             {
                 _currentCategory = cat;
 
-                // 更新高亮胶囊样式
                 var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-                var inactiveBg = new SolidColorBrush(Color.FromRgb(29, 34, 44));
+                var inactiveBg = (Brush)this.Resources["CardBgBrush"];
                 var activeFg = Brushes.White;
-                var inactiveFg = new SolidColorBrush(Color.FromRgb(153, 164, 181));
+                var inactiveFg = (Brush)this.Resources["SubTextBrush"];
 
                 UpdateButtonTab(TabAll, cat == "all", activeBg, inactiveBg, activeFg, inactiveFg);
                 UpdateButtonTab(TabText, cat == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
