@@ -1,0 +1,26 @@
+## Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## ClipVault 本地用户数据与临时测试文件
+**/Data/
+**/images/
+*.db
+*.db-shm
+*.db-wal
+settings.json
+portable.flag
+
+## OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
