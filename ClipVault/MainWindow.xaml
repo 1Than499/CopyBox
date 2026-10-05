@@ -26,6 +26,64 @@
         <SolidColorBrush x:Key="WindowBorderBrush" Color="#334050"/>
         <SolidColorBrush x:Key="SearchBgBrush" Color="#13161F"/>
         <SolidColorBrush x:Key="SearchBorderBrush" Color="#283242"/>
+        <SolidColorBrush x:Key="HoverBgBrush" Color="#20FFFFFF"/>
+        <SolidColorBrush x:Key="PressedBgBrush" Color="#35FFFFFF"/>
+        <SolidColorBrush x:Key="InfoBgBrush" Color="#162234"/>
+        <SolidColorBrush x:Key="InfoBorderBrush" Color="#1E3A8A"/>
+        <SolidColorBrush x:Key="InfoTextBrush" Color="#60A5FA"/>
+
+        <!-- 顶栏极简图标按钮样式 (自适应白天/夜间透明底色，消除深浅色冲突) -->
+        <Style x:Key="TopIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubTextBrush}"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource HoverBgBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource PressedBgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 顶栏关闭按钮专属样式 (悬浮平滑变红) -->
+        <Style x:Key="CloseIconButtonStyle" TargetType="Button" BasedOn="{StaticResource TopIconButtonStyle}">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#C4101E"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 主窗口毛玻璃圆角容器 (支持自选背景透明度) -->
@@ -48,7 +106,7 @@
                 <RowDefinition Height="Auto"/> <!-- 底部状态提示 -->
             </Grid.RowDefinitions>
 
-            <!-- 1. 顶栏：软件标志 + 主题快捷切换 + 显式托盘最小化与关闭按钮 -->
+            <!-- 1. 顶栏：软件标志 + 精简现代 Fluent 控制组 -->
             <Grid Grid.Row="0" Margin="4,0,4,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -67,69 +125,41 @@
                     </Border>
                 </StackPanel>
 
-                <!-- 右侧：快捷主题切换 + 设置 + 最小化到托盘 + 关闭 -->
+                <!-- 右侧：精简 Fluent 控制组 (彻底消除按钮冲突与黑块违和感) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- 白天/黑夜模式快捷切换按钮 -->
+                    <!-- 白天/黑夜模式快捷切换 -->
                     <Button x:Name="BtnQuickTheme" 
                             Content="🌙" 
+                            Style="{StaticResource TopIconButtonStyle}"
                             Click="BtnQuickTheme_Click" 
-                            Background="#1F242E" 
-                            Foreground="#CCC" 
-                            BorderBrush="{DynamicResource WindowBorderBrush}" 
-                            BorderThickness="1" 
-                            Padding="8,4" 
-                            FontSize="12" 
-                            Margin="0,0,6,0" 
-                            ToolTip="一键切换白天明亮 / 夜间暗黑主题"
-                            Cursor="Hand">
-                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
-                    </Button>
+                            ToolTip="切换白天明亮 / 夜间暗黑主题"
+                            Margin="0,0,2,0"/>
 
-                    <!-- 设置切换按钮 -->
+                    <!-- 偏好设置 -->
                     <Button x:Name="BtnToggleSettings" 
-                            Content="⚙️ 设置" 
+                            Content="⚙️" 
+                            Style="{StaticResource TopIconButtonStyle}"
                             Click="BtnToggleSettings_Click" 
-                            Background="#1F242E" 
-                            Foreground="#CCC" 
-                            BorderBrush="{DynamicResource WindowBorderBrush}" 
-                            BorderThickness="1" 
-                            Padding="10,4" 
-                            FontSize="11" 
-                            Margin="0,0,6,0" 
-                            Cursor="Hand">
-                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
-                    </Button>
+                            ToolTip="偏好设置与本地存储路径"
+                            Margin="0,0,6,0"/>
 
-                    <!-- 显式最小化到托盘按钮 -->
+                    <!-- 纵向分割细线 -->
+                    <Rectangle Width="1" Height="14" Fill="{DynamicResource WindowBorderBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+
+                    <!-- 最小化到托盘 (极简符号) -->
                     <Button x:Name="BtnMinimizeToTray" 
-                            Content="🗕 最小化到托盘" 
+                            Content="─" 
+                            Style="{StaticResource TopIconButtonStyle}"
                             Click="BtnMinimizeToTray_Click" 
-                            Background="#1F242E" 
-                            Foreground="#93C5FD" 
-                            BorderBrush="{DynamicResource WindowBorderBrush}" 
-                            BorderThickness="1" 
-                            Padding="10,4" 
-                            FontSize="11" 
-                            Margin="0,0,6,0" 
-                            ToolTip="隐藏并保持在后台系统托盘常驻运行"
-                            Cursor="Hand">
-                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
-                    </Button>
+                            ToolTip="最小化到后台系统托盘 (快捷键 Alt+V 随时唤起)"
+                            Margin="0,0,2,0"/>
 
-                    <!-- 关闭窗口按钮 -->
+                    <!-- 关闭窗口按钮 (极简符号，悬浮红底) -->
                     <Button x:Name="BtnCloseWindow" 
-                            Content="✕ 关闭" 
+                            Content="✕" 
+                            Style="{StaticResource CloseIconButtonStyle}"
                             Click="BtnCloseWindow_Click" 
-                            Background="#2A1B1E" 
-                            Foreground="#F87171" 
-                            BorderBrush="#44252A" 
-                            BorderThickness="1" 
-                            Padding="10,4" 
-                            FontSize="11" 
-                            ToolTip="根据您的设置执行：最小化到托盘或彻底退出"
-                            Cursor="Hand">
-                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
-                    </Button>
+                            ToolTip="关闭窗口"/>
                 </StackPanel>
             </Grid>
 
@@ -398,11 +428,11 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 本地状态提示卡片 (还原设计图) -->
-                        <Border Background="#162234" BorderBrush="#1E3A8A" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="0,0,0,10">
+                        <!-- 本地状态提示卡片 (还原设计图，自适应白天/黑夜主题) -->
+                        <Border Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource InfoBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="0,0,0,10">
                             <TextBlock x:Name="TxtStorageStatusInfo" 
                                        Text="ℹ Local SQLite status is active, 100% offline and stored at your local disk." 
-                                       Foreground="#60A5FA" 
+                                       Foreground="{DynamicResource InfoTextBrush}" 
                                        FontSize="11" 
                                        TextWrapping="Wrap"/>
                         </Border>

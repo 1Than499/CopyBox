@@ -149,7 +149,8 @@ namespace ClipVault
             _settingsService.CurrentSettings.ThemeMode = isDark ? "Dark" : "Light";
             _settingsService.SaveSettings();
 
-            BtnQuickTheme.Content = isDark ? "🌙" : "☀️";
+            BtnQuickTheme.Content = isDark ? "☀️" : "🌙";
+            BtnQuickTheme.ToolTip = isDark ? "切换为白天明亮模式" : "切换为暗黑夜间模式";
             if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
 
             byte alpha = (byte)(_settingsService.CurrentSettings.WindowOpacity * 255);
@@ -167,6 +168,34 @@ namespace ClipVault
             this.Resources["WindowBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(51, 64, 80)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
             this.Resources["SearchBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(19, 22, 31)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
             this.Resources["SearchBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+            this.Resources["HoverBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)) 
+                : new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
+            this.Resources["PressedBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromArgb(48, 255, 255, 255)) 
+                : new SolidColorBrush(Color.FromArgb(35, 0, 0, 0));
+            this.Resources["InfoBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(22, 34, 52)) 
+                : new SolidColorBrush(Color.FromRgb(239, 246, 255));
+            this.Resources["InfoBorderBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(30, 58, 138)) 
+                : new SolidColorBrush(Color.FromRgb(191, 219, 254));
+            this.Resources["InfoTextBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(96, 165, 250)) 
+                : new SolidColorBrush(Color.FromRgb(29, 78, 216));
+
+            UpdateCloseButtonToolTip();
+            UpdateCategoryTabsAppearance();
+        }
+
+        private void UpdateCloseButtonToolTip()
+        {
+            if (BtnCloseWindow != null && _settingsService != null)
+            {
+                BtnCloseWindow.ToolTip = _settingsService.CurrentSettings.CloseAction == "ExitApp"
+                    ? "关闭并彻底退出 ClipVault"
+                    : "关闭窗口 (收起到托盘，快捷键可唤起)";
+            }
         }
 
         private void ApplyOpacity(double opacity)
@@ -236,6 +265,7 @@ namespace ClipVault
                 _settingsService.CurrentSettings.CloseAction = "MinimizeToTray";
             }
             _settingsService.SaveSettings();
+            UpdateCloseButtonToolTip();
         }
 
         private void BtnDirectExit_Click(object sender, RoutedEventArgs e)
@@ -294,24 +324,29 @@ namespace ClipVault
             if (sender is Button btn && btn.Tag is string cat)
             {
                 _currentCategory = cat;
-
-                var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-                var inactiveBg = (Brush)this.Resources["CardBgBrush"];
-                var activeFg = Brushes.White;
-                var inactiveFg = (Brush)this.Resources["SubTextBrush"];
-
-                UpdateButtonTab(TabAll, cat == "all", activeBg, inactiveBg, activeFg, inactiveFg);
-                UpdateButtonTab(TabText, cat == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
-                UpdateButtonTab(TabImages, cat == "Image", activeBg, inactiveBg, activeFg, inactiveFg);
-                UpdateButtonTab(TabCode, cat == "Code", activeBg, inactiveBg, activeFg, inactiveFg);
-                UpdateButtonTab(TabStarred, cat == "pinned", activeBg, inactiveBg, activeFg, inactiveFg);
-
+                UpdateCategoryTabsAppearance();
                 RefreshCards();
             }
         }
 
+        private void UpdateCategoryTabsAppearance()
+        {
+            if (TabAll == null) return;
+            var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
+            var inactiveBg = (Brush)this.Resources["CardBgBrush"];
+            var activeFg = Brushes.White;
+            var inactiveFg = (Brush)this.Resources["SubTextBrush"];
+
+            UpdateButtonTab(TabAll, _currentCategory == "all", activeBg, inactiveBg, activeFg, inactiveFg);
+            UpdateButtonTab(TabText, _currentCategory == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
+            UpdateButtonTab(TabImages, _currentCategory == "Image", activeBg, inactiveBg, activeFg, inactiveFg);
+            UpdateButtonTab(TabCode, _currentCategory == "Code", activeBg, inactiveBg, activeFg, inactiveFg);
+            UpdateButtonTab(TabStarred, _currentCategory == "pinned", activeBg, inactiveBg, activeFg, inactiveFg);
+        }
+
         private void UpdateButtonTab(Button btn, bool isActive, Brush activeBg, Brush inactiveBg, Brush activeFg, Brush inactiveFg)
         {
+            if (btn == null) return;
             btn.Background = isActive ? activeBg : inactiveBg;
             btn.Foreground = isActive ? activeFg : inactiveFg;
             btn.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
