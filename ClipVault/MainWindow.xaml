@@ -180,25 +180,35 @@
 
                     <TextBox x:Name="SearchInputBox" 
                              Grid.Column="0" 
+                             Style="{x:Null}"
                              Background="Transparent" 
                              BorderThickness="0" 
                              Foreground="{DynamicResource TitleTextBrush}" 
+                             CaretBrush="{DynamicResource TitleTextBrush}"
                              FontSize="13" 
                              VerticalAlignment="Center"
-                             Padding="0,4"
+                             Padding="0,2"
                              TextChanged="SearchInputBox_TextChanged"
-                             KeyDown="SearchInputBox_KeyDown"/>
+                             KeyDown="SearchInputBox_KeyDown">
+                        <TextBox.Template>
+                            <ControlTemplate TargetType="TextBox">
+                                <Border Background="Transparent" BorderThickness="0">
+                                    <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                                </Border>
+                            </ControlTemplate>
+                        </TextBox.Template>
+                    </TextBox>
 
                     <TextBlock x:Name="SearchPlaceholder"
                                Text="Search history... (支持 1~9 数字键秒贴)" 
                                Grid.Column="0" 
-                               Foreground="#667790" 
+                               Foreground="{DynamicResource SubTextBrush}" 
                                FontSize="13" 
                                IsHitTestVisible="False" 
                                VerticalAlignment="Center" 
                                Margin="2,0,0,0"/>
 
-                    <TextBlock Grid.Column="1" Text="🔍" FontSize="13" Foreground="#667790" VerticalAlignment="Center" Margin="6,0,2,0"/>
+                    <TextBlock Grid.Column="1" Text="🔍" FontSize="13" Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center" Margin="6,0,2,0"/>
                 </Grid>
             </Border>
 

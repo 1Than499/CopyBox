@@ -1,10 +1,8 @@
 using System;
-using System.Drawing;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using ClipVault.Services;
-using H.NotifyIcon;
 
 namespace ClipVault
 {
@@ -15,10 +13,9 @@ namespace ClipVault
         private ClipboardMonitorService? _monitorService;
         private PasteSimulator? _pasteSimulator;
         private HotkeyService? _hotkeyService;
+        private TrayIconService? _trayService;
 
         private MainWindow? _mainWindow;
-        private TaskbarIcon? _trayIcon;
-
         private static System.Threading.Mutex? _singleInstanceMutex;
 
         protected override void OnStartup(StartupEventArgs e)
@@ -78,8 +75,14 @@ namespace ClipVault
                     });
                 };
 
-                // 5. 初始化 Windows 通知栏托盘图标
-                InitTrayIcon();
+                // 5. 初始化 Windows 原生系统托盘服务
+                _trayService = new TrayIconService();
+                var trayMenu = CreateTrayContextMenu();
+                _trayService.Initialize(_mainWindow, trayMenu);
+                _trayService.TrayClicked += () =>
+                {
+                    Dispatcher.Invoke(() => _mainWindow.ShowAndActivate());
+                };
 
                 // 6. 启动后直接呼出主窗口
                 _mainWindow.ShowAndActivate();
@@ -92,78 +95,56 @@ namespace ClipVault
             }
         }
 
-        private void InitTrayIcon()
+        private ContextMenu CreateTrayContextMenu()
         {
-            try
+            var menu = new ContextMenu();
+
+            var menuQuick = new MenuItem { Header = "🚀 呼出 ClipVault (Alt + V)", FontWeight = FontWeights.Bold };
+            menuQuick.Click += (s, e) => _mainWindow?.ShowAndActivate();
+
+            var menuPause = new MenuItem { Header = "⏸️ 暂停记录剪贴板", IsCheckable = true };
+            menuPause.Click += (s, e) =>
             {
-                Icon? myIcon = null;
-                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "app.ico");
-                if (File.Exists(icoPath))
+                if (_monitorService != null)
                 {
-                    try { myIcon = new Icon(icoPath); } catch { }
+                    _monitorService.IsPaused = menuPause.IsChecked;
+                    menuPause.Header = _monitorService.IsPaused ? "▶️ 恢复记录剪贴板" : "⏸️ 暂停记录剪贴板";
                 }
-                if (myIcon == null)
-                {
-                    myIcon = SystemIcons.Application;
-                }
+            };
 
-                _trayIcon = new TaskbarIcon
-                {
-                    Icon = myIcon,
-                    ToolTipText = "ClipVault - 剪贴板安全保管箱 (Alt+V)",
-                    Visibility = Visibility.Visible
-                };
-
-                // 创建托盘右键上下文菜单
-                var contextMenu = new ContextMenu();
-
-                var menuQuick = new MenuItem { Header = "🚀 呼出 ClipVault (Alt + V)" };
-                menuQuick.Click += (s, e) => _mainWindow?.ShowAndActivate();
-
-                var menuPause = new MenuItem { Header = "⏸️ 暂停记录剪贴板", IsCheckable = true };
-                menuPause.Click += (s, e) =>
-                {
-                    if (_monitorService != null)
-                    {
-                        _monitorService.IsPaused = menuPause.IsChecked;
-                        menuPause.Header = _monitorService.IsPaused ? "▶️ 恢复记录剪贴板" : "⏸️ 暂停记录剪贴板";
-                    }
-                };
-
-                var menuClear = new MenuItem { Header = "🗑️ 清空所有非置顶记录" };
-                menuClear.Click += (s, e) =>
-                {
-                    _dbService?.ClearAll();
-                    _mainWindow?.RefreshCards();
-                };
-
-                var menuExit = new MenuItem { Header = "🛑 彻底退出 ClipVault" };
-                menuExit.Click += (s, e) => ExitApplication();
-
-                contextMenu.Items.Add(menuQuick);
-                contextMenu.Items.Add(new Separator());
-                contextMenu.Items.Add(menuPause);
-                contextMenu.Items.Add(menuClear);
-                contextMenu.Items.Add(new Separator());
-                contextMenu.Items.Add(menuExit);
-
-                _trayIcon.ContextMenu = contextMenu;
-
-                // 单击或双击托盘图标：快速唤醒主窗口
-                _trayIcon.TrayLeftMouseDown += (s, e) => _mainWindow?.ShowAndActivate();
-                _trayIcon.TrayMouseDoubleClick += (s, e) => _mainWindow?.ShowAndActivate();
-            }
-            catch (Exception ex)
+            var menuClear = new MenuItem { Header = "🗑️ 清空所有非置顶记录" };
+            menuClear.Click += (s, e) =>
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[TrayIcon Warning] {ex.Message}\n");
-            }
+                _dbService?.ClearAll();
+                _mainWindow?.RefreshCards();
+            };
+
+            var menuSettings = new MenuItem { Header = "⚙️ 偏好设置与本地路径" };
+            menuSettings.Click += (s, e) =>
+            {
+                _mainWindow?.ShowAndActivate();
+                _mainWindow?.OpenSettings();
+            };
+
+            var menuExit = new MenuItem { Header = "🛑 彻底退出 ClipVault" };
+            menuExit.Click += (s, e) => ExitApplication();
+
+            menu.Items.Add(menuQuick);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(menuPause);
+            menu.Items.Add(menuClear);
+            menu.Items.Add(menuSettings);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(menuExit);
+
+            return menu;
         }
 
         public void ExitApplication()
         {
             _monitorService?.Stop();
             _hotkeyService?.Stop();
-            _trayIcon?.Dispose();
+            _trayService?.Dispose();
             _dbService?.Dispose();
             Current.Shutdown();
         }
@@ -172,7 +153,7 @@ namespace ClipVault
         {
             _monitorService?.Stop();
             _hotkeyService?.Stop();
-            _trayIcon?.Dispose();
+            _trayService?.Dispose();
             _dbService?.Dispose();
             base.OnExit(e);
         }

@@ -279,9 +279,16 @@ namespace ClipVault
 
         private void ExitApplication()
         {
-            _monitorService?.Stop();
-            _dbService?.Dispose();
-            Application.Current.Shutdown();
+            if (Application.Current is App app)
+            {
+                app.ExitApplication();
+            }
+            else
+            {
+                _monitorService?.Stop();
+                _dbService?.Dispose();
+                Application.Current.Shutdown();
+            }
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -305,6 +312,11 @@ namespace ClipVault
             {
                 try { this.DragMove(); } catch { }
             }
+        }
+
+        public void OpenSettings()
+        {
+            SettingsOverlayCard.Visibility = Visibility.Visible;
         }
 
         private void BtnToggleSettings_Click(object sender, RoutedEventArgs e)
