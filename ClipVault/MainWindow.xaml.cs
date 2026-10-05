@@ -350,6 +350,14 @@ namespace ClipVault
                 ? new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, ShadowDepth = 0, Color = Color.FromRgb(0, 120, 212), Opacity = 0.38 }
                 : new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Direction = 270, Color = Color.FromRgb(0, 120, 212), Opacity = 0.18 };
 
+            // 悬浮微质感菜单资源 (防止纯白压纯白导致的边框割裂)
+            this.Resources["MenuBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(30, 36, 48)) 
+                : new SolidColorBrush(Color.FromRgb(255, 255, 255));
+            this.Resources["MenuBorderBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(55, 68, 88)) 
+                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+
             UpdateCloseButtonToolTip();
             UpdateCategoryTabsAppearance();
         }
@@ -493,11 +501,11 @@ namespace ClipVault
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
             // 如果点击在设置浮层内部，绝对不触发主窗口整体拖拽
-            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            if (SettingsOverlayHost != null && SettingsOverlayHost.Visibility == Visibility.Visible)
             {
-                var pos = e.GetPosition(SettingsOverlayCard);
-                if (pos.X >= 0 && pos.X <= SettingsOverlayCard.ActualWidth &&
-                    pos.Y >= 0 && pos.Y <= SettingsOverlayCard.ActualHeight)
+                var pos = e.GetPosition(SettingsOverlayHost);
+                if (pos.X >= 0 && pos.X <= SettingsOverlayHost.ActualWidth &&
+                    pos.Y >= 0 && pos.Y <= SettingsOverlayHost.ActualHeight)
                 {
                     return;
                 }
@@ -516,26 +524,27 @@ namespace ClipVault
 
         public void OpenSettings()
         {
-            SettingsOverlayCard.Visibility = Visibility.Visible;
+            if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Visible;
             EnsureSettingsInBounds();
         }
 
         private void BtnToggleSettings_Click(object sender, RoutedEventArgs e)
         {
-            if (SettingsOverlayCard.Visibility == Visibility.Visible)
+            if (SettingsOverlayHost == null) return;
+            if (SettingsOverlayHost.Visibility == Visibility.Visible)
             {
-                SettingsOverlayCard.Visibility = Visibility.Collapsed;
+                SettingsOverlayHost.Visibility = Visibility.Collapsed;
             }
             else
             {
-                SettingsOverlayCard.Visibility = Visibility.Visible;
+                SettingsOverlayHost.Visibility = Visibility.Visible;
                 EnsureSettingsInBounds();
             }
         }
 
         private void BtnCloseSettingsOverlay_Click(object sender, RoutedEventArgs e)
         {
-            SettingsOverlayCard.Visibility = Visibility.Collapsed;
+            if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Collapsed;
         }
 
         // 浮层设置卡片在软件窗口内的独立拖拽交互
@@ -857,7 +866,7 @@ namespace ClipVault
         // 卡片右键交互与上下文菜单
         private void ListBoxItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            if (SettingsOverlayHost != null && SettingsOverlayHost.Visibility == Visibility.Visible)
             {
                 return;
             }
@@ -872,7 +881,7 @@ namespace ClipVault
 
         private void ListBoxItem_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            if (SettingsOverlayHost != null && SettingsOverlayHost.Visibility == Visibility.Visible)
             {
                 return;
             }
@@ -910,9 +919,19 @@ namespace ClipVault
 
             Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
 
-            // 1. 置顶 / 取消置顶
+            // 1. 置顶 / 取消置顶 (高雅暖金实心星号 ★)
+            var pinIcon = new TextBlock 
+            { 
+                Text = "★", 
+                Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
             var pinItem = new MenuItem 
             { 
+                Icon = pinIcon,
                 Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") 
             };
             if (itemStyle != null) pinItem.Style = itemStyle;
@@ -923,9 +942,19 @@ namespace ClipVault
                 UpdateStorageInfo();
             };
 
-            // 2. 复制到剪贴板
+            // 2. 复制到剪贴板 (现代天蓝双矩形符号 ❐)
+            var copyIcon = new TextBlock 
+            { 
+                Text = "❐", 
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 212)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
             var copyItem = new MenuItem 
             { 
+                Icon = copyIcon,
                 Header = loc.Get("MenuCopy") 
             };
             if (itemStyle != null) copyItem.Style = itemStyle;
@@ -934,9 +963,19 @@ namespace ClipVault
                 CopyItemToClipboard(item);
             };
 
-            // 3. 删除此条记录
+            // 3. 删除此条记录 (警示珊瑚红删除符号 ✕)
+            var delIcon = new TextBlock 
+            { 
+                Text = "✕", 
+                Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
             var delItem = new MenuItem 
             { 
+                Icon = delIcon,
                 Header = loc.Get("MenuDelete") 
             };
             if (itemStyle != null) delItem.Style = itemStyle;
@@ -958,8 +997,11 @@ namespace ClipVault
             }
             else
             {
+                // 三点按钮位于卡片右上角：向左内收展开，完美收纳在当前卡片内部，绝不横跨相邻卡片产生边框割裂！
                 menu.PlacementTarget = placementTarget;
                 menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                menu.HorizontalOffset = -140;
+                menu.VerticalOffset = 2;
             }
 
             menu.IsOpen = true;

@@ -13,7 +13,12 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="CanResizeWithGrip"
-        MouseDown="Window_MouseDown">
+        MouseDown="Window_MouseDown"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
 
     <Window.Resources>
         <!-- 动态主题色板初始资源（深色/浅色模式动态覆盖） -->
@@ -46,6 +51,10 @@
         <!-- 选中卡片自适应柔和光晕与边框 (彻底消除生硬平切僵死感) -->
         <SolidColorBrush x:Key="SelectedBorderBrush" Color="#38A6FF"/>
         <DropShadowEffect x:Key="SelectedCardEffect" BlurRadius="10" ShadowDepth="0" Color="#0078D4" Opacity="0.40"/>
+
+        <!-- 悬浮微质感菜单资源 (防止纯白压纯白导致的边框割裂) -->
+        <SolidColorBrush x:Key="MenuBgBrush" Color="#1E232F"/>
+        <SolidColorBrush x:Key="MenuBorderBrush" Color="#374357"/>
 
         <!-- 极简 4px 现代细线胶囊滚动条 (1:1 还原概念图右侧细滚动条) -->
         <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
@@ -129,44 +138,61 @@
             </Setter>
         </Style>
 
-        <!-- 现代自适应卡片右键菜单样式 (Fluent 风格、圆角、自适应暗黑/明亮主题) -->
+        <!-- 现代自适应卡片悬浮菜单样式 (Fluent 风格、双层抗截断阴影、精致圆角与清晰边框) -->
         <Style x:Key="ModernContextMenuStyle" TargetType="{x:Type ContextMenu}">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Grid.IsSharedSizeScope" Value="True"/>
+            <Setter Property="HasDropShadow" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ContextMenu}">
-                        <Border Background="{DynamicResource CardBgBrush}" 
-                                BorderBrush="{DynamicResource WindowBorderBrush}" 
-                                BorderThickness="1" 
-                                CornerRadius="8" 
-                                Padding="4,4">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270" Opacity="0.45" Color="Black"/>
-                            </Border.Effect>
-                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        <!-- 外层透明隔离边距 (留出 12px 充分空间让 DropShadow 柔和晕染，严防任何切边割裂) -->
+                        <Border Padding="10" Background="Transparent" SnapsToDevicePixels="True">
+                            <!-- 实体菜单卡片：带饱满微立体柔和阴影与 10px 现代圆角 -->
+                            <Border Background="{DynamicResource MenuBgBrush}" 
+                                    BorderBrush="{DynamicResource MenuBorderBrush}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="10" 
+                                    Padding="5,6"
+                                    MinWidth="150"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="270" Opacity="0.30" Color="#000000"/>
+                                </Border.Effect>
+                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                            </Border>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
+        <!-- 现代精细菜单项样式 (固定左列矢量纯色图标，右列清晰文字) -->
         <Style x:Key="ModernMenuItemStyle" TargetType="{x:Type MenuItem}">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource CardTextBrush}"/>
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type MenuItem}">
                         <Border x:Name="Bd" 
                                 Background="{TemplateBinding Background}" 
                                 CornerRadius="6" 
-                                Padding="12,7" 
+                                Padding="10,0" 
                                 Margin="1,1" 
                                 SnapsToDevicePixels="True">
-                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                            <Grid VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="IconHost" Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="6,0,8,0"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
@@ -187,7 +213,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Separator}">
-                        <Border Background="{DynamicResource CardBorderBrush}" Height="1" Margin="6,3" SnapsToDevicePixels="True"/>
+                        <Border Background="{DynamicResource CardBorderBrush}" Height="1" Margin="6,4" SnapsToDevicePixels="True"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -483,29 +509,42 @@
                 <TextBlock x:Name="ToastText" Text="✓ 已贴入光标位置" Foreground="#34D399" FontSize="10.5" HorizontalAlignment="Right" Visibility="Collapsed"/>
             </Grid>
 
-            <!-- 6. 浮层设置面板 (可在主窗口内自由独立拖拽，规整三层固定架构) -->
-            <Border x:Name="SettingsOverlayCard" 
-                    Grid.Row="0"
-                    Grid.RowSpan="5"
-                    Visibility="Collapsed" 
-                    Background="{DynamicResource CardBgBrush}" 
-                    BorderBrush="{DynamicResource WindowBorderBrush}" 
-                    BorderThickness="1" 
-                    CornerRadius="14" 
-                    Width="420" 
-                    MaxHeight="485"
-                    HorizontalAlignment="Center" 
-                    VerticalAlignment="Center" 
-                    Padding="0"
-                    SnapsToDevicePixels="True">
-                <Border.RenderTransform>
+            <!-- 6. 浮层设置面板 (可在主窗口内自由独立拖拽，双层防文字模糊架构) -->
+            <Grid x:Name="SettingsOverlayHost" 
+                  Grid.Row="0"
+                  Grid.RowSpan="5"
+                  Visibility="Collapsed" 
+                  Width="420" 
+                  MaxHeight="485"
+                  HorizontalAlignment="Center" 
+                  VerticalAlignment="Center"
+                  TextOptions.TextFormattingMode="Display"
+                  TextOptions.TextRenderingMode="ClearType"
+                  TextOptions.TextHintingMode="Fixed"
+                  UseLayoutRounding="True"
+                  SnapsToDevicePixels="True">
+                <Grid.RenderTransform>
                     <TranslateTransform x:Name="SettingsTransform" X="0" Y="0"/>
-                </Border.RenderTransform>
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" ShadowDepth="4" Direction="270" Opacity="0.55" Color="Black"/>
-                </Border.Effect>
+                </Grid.RenderTransform>
 
-                <Grid>
+                <!-- 底层独立纯阴影层 (只投射柔和深邃阴影，绝不包含文字，彻底根除 WPF Effect 导致的文字模糊) -->
+                <Border Background="{DynamicResource CardBgBrush}" 
+                        CornerRadius="14" 
+                        Margin="1">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="30" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black"/>
+                    </Border.Effect>
+                </Border>
+
+                <!-- 顶层无特效实体内容卡片 (享有 100% 硬件加速与 ClearType 亚像素超清文字渲染) -->
+                <Border x:Name="SettingsOverlayCard" 
+                        Background="{DynamicResource CardBgBrush}" 
+                        BorderBrush="{DynamicResource WindowBorderBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="14" 
+                        Padding="0"
+                        SnapsToDevicePixels="True">
+                    <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- 固定可拖拽顶栏 -->
                         <RowDefinition Height="*"/>    <!-- 滚动主体内容 -->
@@ -661,6 +700,7 @@
                     </Border>
                 </Grid>
             </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>

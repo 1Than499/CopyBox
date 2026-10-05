@@ -36,10 +36,10 @@ namespace ClipVault.Services
                 ["ToolTipCloseExit"] = "关闭并彻底退出 CopyBox",
 
                 // 卡片三点菜单
-                ["MenuPin"] = "⭐ 置顶此条",
-                ["MenuUnpin"] = "⭐ 取消置顶",
-                ["MenuCopy"] = "📋 复制到剪贴板",
-                ["MenuDelete"] = "🗑 删除此条记录",
+                ["MenuPin"] = "置顶此条",
+                ["MenuUnpin"] = "取消置顶",
+                ["MenuCopy"] = "复制到剪贴板",
+                ["MenuDelete"] = "删除此条记录",
                 ["MenuTooltip"] = "快捷菜单 (置顶/复制/删除)",
 
                 // 偏好设置面板
@@ -116,10 +116,10 @@ namespace ClipVault.Services
                 ["ToolTipCloseExit"] = "Close and completely exit CopyBox",
 
                 // Card Context Menu
-                ["MenuPin"] = "⭐ Pin Item",
-                ["MenuUnpin"] = "⭐ Unpin Item",
-                ["MenuCopy"] = "📋 Copy to Clipboard",
-                ["MenuDelete"] = "🗑 Delete This Item",
+                ["MenuPin"] = "Pin Item",
+                ["MenuUnpin"] = "Unpin Item",
+                ["MenuCopy"] = "Copy to Clipboard",
+                ["MenuDelete"] = "Delete This Item",
                 ["MenuTooltip"] = "Quick Menu (Pin / Copy / Delete)",
 
                 // Preferences Panel
