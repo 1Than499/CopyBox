@@ -12,6 +12,9 @@ namespace ClipVault.Models
         public string HotkeyModifiers { get; set; } = "Alt"; // Alt, Ctrl, Shift, Win
         public string HotkeyKey { get; set; } = "V";
 
+        // 窗口关闭动作偏好: "MinimizeToTray" (最小化到托盘) 或 "ExitApp" (直接退出)
+        public string CloseAction { get; set; } = "MinimizeToTray";
+
         // 隐私与过滤规则
         public bool IgnorePasswordManagers { get; set; } = true;
         public bool AutoConvertImageToWebP { get; set; } = false; // 是否自动压缩图片

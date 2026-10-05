@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
 using ClipVault.Services;
-using ClipVault.Views;
 using H.NotifyIcon;
 
 namespace ClipVault
@@ -16,7 +15,6 @@ namespace ClipVault
         private PasteSimulator? _pasteSimulator;
         private HotkeyService? _hotkeyService;
 
-        private QuickPasteWindow? _quickPasteWindow;
         private MainWindow? _mainWindow;
         private TaskbarIcon? _trayIcon;
 
@@ -33,28 +31,27 @@ namespace ClipVault
                 _pasteSimulator = new PasteSimulator(_monitorService);
                 _hotkeyService = new HotkeyService(_settingsService);
 
-                // 2. 启动 Win32 消息泵监听与快捷键
+                // 2. 启动剪贴板与热键监听
                 _monitorService.Start();
                 _hotkeyService.Start();
 
-                // 3. 初始化双窗口（快捷悬浮窗 + 独立管理主窗口）
-                _quickPasteWindow = new QuickPasteWindow(_dbService, _pasteSimulator);
-                _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService);
+                // 3. 初始化统一的现代 Fluent 双列卡片主窗口 (完全还原设计图)
+                _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
 
                 // 4. 绑定全局热键 Alt + V
                 _hotkeyService.HotkeyPressed += () =>
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        if (_quickPasteWindow != null)
+                        if (_mainWindow != null)
                         {
-                            if (_quickPasteWindow.IsVisible)
+                            if (_mainWindow.IsVisible)
                             {
-                                _quickPasteWindow.Hide();
+                                _mainWindow.Hide();
                             }
                             else
                             {
-                                _quickPasteWindow.ShowAndRefresh();
+                                _mainWindow.ShowAndActivate();
                             }
                         }
                     });
@@ -63,9 +60,8 @@ namespace ClipVault
                 // 5. 初始化 Windows 通知栏托盘图标
                 InitTrayIcon();
 
-                // 6. 首次启动打开独立主界面，让用户直观看到效果和自选存储路径
-                _mainWindow.Show();
-                _mainWindow.Activate();
+                // 6. 启动后直接呼出主窗口
+                _mainWindow.ShowAndActivate();
             }
             catch (Exception ex)
             {
@@ -85,18 +81,8 @@ namespace ClipVault
             // 创建托盘右键上下文菜单
             var contextMenu = new ContextMenu();
 
-            var menuQuick = new MenuItem { Header = "🚀 呼出快捷剪贴板 (Alt + V)" };
-            menuQuick.Click += (s, e) => _quickPasteWindow?.ShowAndRefresh();
-
-            var menuMain = new MenuItem { Header = "⚙️ 独立管理与本地存储设置" };
-            menuMain.Click += (s, e) =>
-            {
-                if (_mainWindow != null)
-                {
-                    _mainWindow.Show();
-                    _mainWindow.Activate();
-                }
-            };
+            var menuQuick = new MenuItem { Header = "🚀 呼出 ClipVault (Alt + V)" };
+            menuQuick.Click += (s, e) => _mainWindow?.ShowAndActivate();
 
             var menuPause = new MenuItem { Header = "⏸️ 暂停记录剪贴板", IsCheckable = true };
             menuPause.Click += (s, e) =>
@@ -112,14 +98,13 @@ namespace ClipVault
             menuClear.Click += (s, e) =>
             {
                 _dbService?.ClearAll();
-                _mainWindow?.RefreshHistoryList();
+                _mainWindow?.RefreshCards();
             };
 
-            var menuExit = new MenuItem { Header = "❌ 退出 ClipVault" };
+            var menuExit = new MenuItem { Header = "🛑 彻底退出 ClipVault" };
             menuExit.Click += (s, e) => ExitApplication();
 
             contextMenu.Items.Add(menuQuick);
-            contextMenu.Items.Add(menuMain);
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(menuPause);
             contextMenu.Items.Add(menuClear);
@@ -128,21 +113,12 @@ namespace ClipVault
 
             _trayIcon.ContextMenu = contextMenu;
 
-            // 左键单机托盘：快速呼出悬浮窗
-            _trayIcon.TrayLeftMouseDown += (s, e) => _quickPasteWindow?.ShowAndRefresh();
-
-            // 双击托盘：打开主管理设置窗口
-            _trayIcon.TrayMouseDoubleClick += (s, e) =>
-            {
-                if (_mainWindow != null)
-                {
-                    _mainWindow.Show();
-                    _mainWindow.Activate();
-                }
-            };
+            // 单击或双击托盘图标：快速唤醒主窗口
+            _trayIcon.TrayLeftMouseDown += (s, e) => _mainWindow?.ShowAndActivate();
+            _trayIcon.TrayMouseDoubleClick += (s, e) => _mainWindow?.ShowAndActivate();
         }
 
-        private void ExitApplication()
+        public void ExitApplication()
         {
             _monitorService?.Stop();
             _hotkeyService?.Stop();

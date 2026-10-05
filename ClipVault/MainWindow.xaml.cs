@@ -3,40 +3,45 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
+using System.Windows.Input;
+using System.Windows.Media;
 using ClipVault.Models;
 using ClipVault.Services;
 using Microsoft.Win32;
 
 namespace ClipVault
 {
-    public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
+    public partial class MainWindow : Window
     {
         private readonly DatabaseService _dbService;
         private readonly SettingsService _settingsService;
         private readonly ClipboardMonitorService _monitorService;
-        public ObservableCollection<ClipboardItem> HistoryItems { get; } = new();
+        private readonly PasteSimulator _pasteSimulator;
 
-        public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService)
+        private string _currentCategory = "all";
+        public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
+
+        public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
             InitializeComponent();
             _dbService = dbService;
             _settingsService = settingsService;
             _monitorService = monitorService;
+            _pasteSimulator = pasteSimulator;
 
-            MainHistoryList.ItemsSource = HistoryItems;
+            CardsListBox.ItemsSource = DisplayCards;
 
+            // 加载配置
             LoadSettingsToUI();
-            RefreshHistoryList();
-            UpdateStorageStats();
+            RefreshCards();
 
-            // 监听数据变动，自动更新统计
+            // 监听后台新捕获的剪贴板条目
             _monitorService.ItemCaptured += (item) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    RefreshHistoryList();
-                    UpdateStorageStats();
+                    RefreshCards();
+                    UpdateStorageInfo();
                 });
             };
         }
@@ -44,114 +49,303 @@ namespace ClipVault
         private void LoadSettingsToUI()
         {
             var s = _settingsService.CurrentSettings;
-            StoragePathTextBox.Text = s.StorageDirectory;
-            ChkIgnorePassword.IsChecked = s.IgnorePasswordManagers;
-            ChkStartWithWindows.IsChecked = s.StartWithWindows;
-        }
+            TxtSettingsStoragePath.Text = s.StorageDirectory;
 
-        public void RefreshHistoryList()
-        {
-            HistoryItems.Clear();
-            string keyword = MainSearchBox.Text.Trim();
-            var items = _dbService.GetRecentItems(keyword, null, 200);
-            foreach (var it in items)
+            // 痛点 1 配置加载
+            if (s.CloseAction == "ExitApp")
             {
-                HistoryItems.Add(it);
+                RadioCloseExit.IsChecked = true;
             }
+            else
+            {
+                RadioCloseMinimize.IsChecked = true;
+            }
+
+            UpdateStorageInfo();
         }
 
-        private void UpdateStorageStats()
+        private void UpdateStorageInfo()
         {
             var (dbSize, totalCount, pinnedCount, imgCount, imgSize) = _dbService.GetStats();
-            TxtDbSize.Text = $"{(dbSize / 1024.0 / 1024.0):F2} MB";
-            TxtDbCounts.Text = $"{totalCount} 条 (置顶 {pinnedCount} 条)";
-            TxtImgSize.Text = $"{(imgSize / 1024.0 / 1024.0):F2} MB";
-            TxtImgCounts.Text = $"{imgCount} 张图片";
+            TxtStorageStatusInfo.Text = $"ℹ 本地 SQLite 状态正常：已记录 {totalCount} 条 (置顶 {pinnedCount})，图片 {imgCount} 张，数据 100% 物理留存于本地磁盘。";
         }
 
-        private void MainSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        public void ShowAndActivate()
         {
-            RefreshHistoryList();
+            // 记录当前活跃的工作窗口句柄，供选定后自动模拟粘贴
+            _pasteSimulator.RecordTargetWindow();
+
+            SearchInputBox.Text = string.Empty;
+            SettingsOverlayCard.Visibility = Visibility.Collapsed;
+            RefreshCards();
+
+            this.Show();
+            this.Activate();
+            SearchInputBox.Focus();
         }
 
-        private void MainHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        public void RefreshCards()
         {
-            if (MainHistoryList.SelectedItem is ClipboardItem item)
+            DisplayCards.Clear();
+            string keyword = SearchInputBox.Text.Trim();
+            var items = _dbService.GetRecentItems(keyword, _currentCategory, 60);
+
+            for (int i = 0; i < items.Count; i++)
             {
-                DetailHeaderTitle.Text = item.Summary;
-                DetailMetaApp.Text = $"来源应用: {item.SourceApp} ({item.SourceProcess})";
-                DetailMetaTime.Text = $"捕获时间: {item.CreatedAt:yyyy-MM-dd HH:mm:ss}";
-                DetailMetaChars.Text = item.IsImage ? $"大小: {item.CharCount / 1024} KB" : $"字符数: {item.CharCount}";
-
-                if (item.IsImage && File.Exists(item.FullImagePath))
+                if (i < 9)
                 {
-                    DetailContentText.Visibility = Visibility.Collapsed;
-                    DetailContentImage.Visibility = Visibility.Visible;
-                    try
-                    {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.UriSource = new Uri(item.FullImagePath, UriKind.Absolute);
-                        bmp.EndInit();
-                        DetailContentImage.Source = bmp;
-                    }
-                    catch
-                    {
-                        DetailContentImage.Source = null;
-                    }
+                    items[i].DisplayBadge = (i + 1).ToString();
                 }
-                else
+                DisplayCards.Add(items[i]);
+            }
+
+            if (DisplayCards.Count > 0)
+            {
+                CardsListBox.SelectedIndex = 0;
+            }
+        }
+
+        private async void TriggerPaste(ClipboardItem item)
+        {
+            if (item == null) return;
+            await _pasteSimulator.PasteItemAsync(item, () => this.Hide());
+        }
+
+        // ================= 痛点 1：窗口控制与退出行为 =================
+
+        private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
+        {
+            // 显式最小化到托盘
+            this.Hide();
+        }
+
+        private void BtnCloseWindow_Click(object sender, RoutedEventArgs e)
+        {
+            // 根据用户的自选偏好决定是退出还是最小化到托盘
+            if (_settingsService.CurrentSettings.CloseAction == "ExitApp")
+            {
+                ExitApplication();
+            }
+            else
+            {
+                this.Hide();
+            }
+        }
+
+        private void CloseActionRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+
+            if (RadioCloseExit.IsChecked == true)
+            {
+                _settingsService.CurrentSettings.CloseAction = "ExitApp";
+            }
+            else
+            {
+                _settingsService.CurrentSettings.CloseAction = "MinimizeToTray";
+            }
+            _settingsService.SaveSettings();
+        }
+
+        private void BtnDirectExit_Click(object sender, RoutedEventArgs e)
+        {
+            var res = MessageBox.Show("确认要彻底退出 ClipVault 吗？退出后后台将停止监听剪贴板与热键。", "确认退出", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (res == MessageBoxResult.Yes)
+            {
+                ExitApplication();
+            }
+        }
+
+        private void ExitApplication()
+        {
+            _monitorService?.Stop();
+            _dbService?.Dispose();
+            Application.Current.Shutdown();
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (_settingsService.CurrentSettings.CloseAction == "ExitApp")
+            {
+                ExitApplication();
+            }
+            else
+            {
+                e.Cancel = true;
+                this.Hide();
+            }
+        }
+
+        // ================= 痛点 2：UI 交互与双列卡片操作 =================
+
+        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // 支持拖拽窗口
+            if (e.LeftButton == MouseButtonState.Pressed && e.OriginalSource is not TextBox && e.OriginalSource is not Button)
+            {
+                try { this.DragMove(); } catch { }
+            }
+        }
+
+        private void BtnToggleSettings_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsOverlayCard.Visibility = SettingsOverlayCard.Visibility == Visibility.Visible 
+                ? Visibility.Collapsed 
+                : Visibility.Visible;
+        }
+
+        private void BtnCloseSettingsOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsOverlayCard.Visibility = Visibility.Collapsed;
+        }
+
+        private void TabCategory_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string cat)
+            {
+                _currentCategory = cat;
+
+                // 更新高亮胶囊样式
+                var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
+                var inactiveBg = new SolidColorBrush(Color.FromRgb(29, 34, 44));
+                var activeFg = Brushes.White;
+                var inactiveFg = new SolidColorBrush(Color.FromRgb(153, 164, 181));
+
+                UpdateButtonTab(TabAll, cat == "all", activeBg, inactiveBg, activeFg, inactiveFg);
+                UpdateButtonTab(TabText, cat == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
+                UpdateButtonTab(TabImages, cat == "Image", activeBg, inactiveBg, activeFg, inactiveFg);
+                UpdateButtonTab(TabCode, cat == "Code", activeBg, inactiveBg, activeFg, inactiveFg);
+                UpdateButtonTab(TabStarred, cat == "pinned", activeBg, inactiveBg, activeFg, inactiveFg);
+
+                RefreshCards();
+            }
+        }
+
+        private void UpdateButtonTab(Button btn, bool isActive, Brush activeBg, Brush inactiveBg, Brush activeFg, Brush inactiveFg)
+        {
+            btn.Background = isActive ? activeBg : inactiveBg;
+            btn.Foreground = isActive ? activeFg : inactiveFg;
+            btn.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+
+        private void SearchInputBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshCards();
+        }
+
+        private void SearchInputBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                this.Hide();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter)
+            {
+                if (CardsListBox.SelectedItem is ClipboardItem selected)
                 {
-                    DetailContentImage.Visibility = Visibility.Collapsed;
-                    DetailContentText.Visibility = Visibility.Visible;
-                    DetailContentText.Text = item.Content;
+                    TriggerPaste(selected);
+                }
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Down)
+            {
+                if (CardsListBox.SelectedIndex < DisplayCards.Count - 1)
+                {
+                    CardsListBox.SelectedIndex++;
+                    CardsListBox.ScrollIntoView(CardsListBox.SelectedItem);
+                }
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Up)
+            {
+                if (CardsListBox.SelectedIndex > 0)
+                {
+                    CardsListBox.SelectedIndex--;
+                    CardsListBox.ScrollIntoView(CardsListBox.SelectedItem);
+                }
+                e.Handled = true;
+                return;
+            }
+
+            // 数字键 1~9 秒贴
+            if (string.IsNullOrEmpty(SearchInputBox.Text))
+            {
+                int index = -1;
+                if (e.Key >= Key.D1 && e.Key <= Key.D9) index = e.Key - Key.D1;
+                else if (e.Key >= Key.NumPad1 && e.Key <= Key.NumPad9) index = e.Key - Key.NumPad1;
+
+                if (index >= 0 && index < DisplayCards.Count)
+                {
+                    TriggerPaste(DisplayCards[index]);
+                    e.Handled = true;
                 }
             }
         }
 
-        private void BtnDetailCopy_Click(object sender, RoutedEventArgs e)
+        private void CardsListBox_KeyDown(object sender, KeyEventArgs e)
         {
-            if (MainHistoryList.SelectedItem is ClipboardItem item)
+            if (e.Key == Key.Escape)
             {
-                _monitorService.IsInternalOperation = true;
-                if (item.IsImage && File.Exists(item.FullImagePath))
-                {
-                    var bmp = new BitmapImage(new Uri(item.FullImagePath, UriKind.Absolute));
-                    Clipboard.SetImage(bmp);
-                }
-                else
-                {
-                    Clipboard.SetText(item.Content);
-                }
-                MessageBox.Show("已成功将选定条目复制回系统剪贴板！", "ClipVault", MessageBoxButton.OK, MessageBoxImage.Information);
+                this.Hide();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && CardsListBox.SelectedItem is ClipboardItem selected)
+            {
+                TriggerPaste(selected);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Delete && CardsListBox.SelectedItem is ClipboardItem toDel)
+            {
+                _dbService.DeleteItem(toDel.Id);
+                RefreshCards();
+                UpdateStorageInfo();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.P && CardsListBox.SelectedItem is ClipboardItem toPin)
+            {
+                _dbService.TogglePin(toPin.Id);
+                RefreshCards();
+                UpdateStorageInfo();
+                e.Handled = true;
             }
         }
 
-        private void BtnDetailPin_Click(object sender, RoutedEventArgs e)
+        private void CardsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (MainHistoryList.SelectedItem is ClipboardItem item)
+            if (CardsListBox.SelectedItem is ClipboardItem selected)
             {
-                _dbService.TogglePin(item.Id);
-                RefreshHistoryList();
-                UpdateStorageStats();
+                TriggerPaste(selected);
             }
         }
 
-        private void BtnDetailDelete_Click(object sender, RoutedEventArgs e)
+        private void PinItem_Click(object sender, RoutedEventArgs e)
         {
-            if (MainHistoryList.SelectedItem is ClipboardItem item)
+            if (sender is Button btn && btn.Tag is int id)
             {
-                _dbService.DeleteItem(item.Id);
-                RefreshHistoryList();
-                UpdateStorageStats();
-                DetailHeaderTitle.Text = "请选择左侧条目查看详情";
-                DetailContentText.Text = string.Empty;
-                DetailContentImage.Visibility = Visibility.Collapsed;
+                _dbService.TogglePin(id);
+                RefreshCards();
+                UpdateStorageInfo();
             }
         }
 
-        private void BtnBrowseStoragePath_Click(object sender, RoutedEventArgs e)
+        private void DeleteItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is int id)
+            {
+                _dbService.DeleteItem(id);
+                RefreshCards();
+                UpdateStorageInfo();
+            }
+        }
+
+        private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog
             {
@@ -162,49 +356,16 @@ namespace ClipVault
             if (dialog.ShowDialog() == true)
             {
                 string chosenPath = dialog.FolderName;
-                bool migrate = ChkAutoMigrate.IsChecked == true;
-
-                if (_settingsService.UpdateStorageDirectory(chosenPath, migrate))
+                if (_settingsService.UpdateStorageDirectory(chosenPath, true))
                 {
-                    // 重新连接数据库
                     _dbService.SwitchStorageDirectory(chosenPath);
-                    StoragePathTextBox.Text = chosenPath;
-                    RefreshHistoryList();
-                    UpdateStorageStats();
+                    TxtSettingsStoragePath.Text = chosenPath;
+                    RefreshCards();
+                    UpdateStorageInfo();
 
-                    MessageBox.Show($"存储路径已成功切换为：\n{chosenPath}\n\n{(migrate ? "现有历史数据与图片已完成同步迁移。" : "已在该目录初始化全新数据存储。")}",
-                        "路径切换成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show($"存储路径已成功切换为：\n{chosenPath}\n\n现有历史数据与图片已平滑迁移！", "路径切换成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
-        }
-
-        private void BtnSaveSettings_Click(object sender, RoutedEventArgs e)
-        {
-            var s = _settingsService.CurrentSettings;
-            s.IgnorePasswordManagers = ChkIgnorePassword.IsChecked == true;
-            s.StartWithWindows = ChkStartWithWindows.IsChecked == true;
-            _settingsService.SaveSettings();
-
-            MessageBox.Show("配置已成功保存生效！", "ClipVault", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void BtnClearAll_Click(object sender, RoutedEventArgs e)
-        {
-            var res = MessageBox.Show("确认要清空所有未置顶的本地历史记录吗？此操作无法撤销。", "警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (res == MessageBoxResult.Yes)
-            {
-                _dbService.ClearAll();
-                RefreshHistoryList();
-                UpdateStorageStats();
-                MessageBox.Show("已成功清理！", "ClipVault", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        // 窗口关闭时改为隐藏，避免主进程意外退出
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
-        {
-            e.Cancel = true;
-            this.Hide();
         }
     }
 }
