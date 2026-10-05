@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using ClipVault.Models;
 using ClipVault.Services;
 using Microsoft.Win32;
+using System.Linq;
 
 namespace ClipVault
 {
@@ -136,7 +137,7 @@ namespace ClipVault
             {
                 if (i < 9)
                 {
-                    items[i].DisplayBadge = (i + 1).ToString();
+                    items[i].DisplayBadge = $"[{i + 1}]";
                 }
                 DisplayCards.Add(items[i]);
             }
@@ -513,6 +514,47 @@ namespace ClipVault
                 _dbService.DeleteItem(id);
                 RefreshCards();
                 UpdateStorageInfo();
+            }
+        }
+
+        private void ItemMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is int id)
+            {
+                var item = DisplayCards.FirstOrDefault(x => x.Id == id);
+                if (item == null) return;
+
+                var menu = new ContextMenu();
+
+                var pinItem = new MenuItem { Header = item.IsPinned ? "⭐ 取消置顶" : "⭐ 置顶此条" };
+                pinItem.Click += (s, args) =>
+                {
+                    _dbService.TogglePin(id);
+                    RefreshCards();
+                    UpdateStorageInfo();
+                };
+
+                var copyItem = new MenuItem { Header = "📋 复制到剪贴板" };
+                copyItem.Click += (s, args) =>
+                {
+                    TriggerPaste(item);
+                };
+
+                var delItem = new MenuItem { Header = "🗑 删除此条记录" };
+                delItem.Click += (s, args) =>
+                {
+                    _dbService.DeleteItem(id);
+                    RefreshCards();
+                    UpdateStorageInfo();
+                };
+
+                menu.Items.Add(pinItem);
+                menu.Items.Add(copyItem);
+                menu.Items.Add(new Separator());
+                menu.Items.Add(delItem);
+
+                menu.PlacementTarget = btn;
+                menu.IsOpen = true;
             }
         }
 

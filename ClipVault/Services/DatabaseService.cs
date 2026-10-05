@@ -63,10 +63,124 @@ namespace ClipVault.Services
                     CREATE INDEX IF NOT EXISTS idx_items_pinned ON ClipboardItems(IsPinned);
                 ";
                 cmd.ExecuteNonQuery();
+
+                // 若数据库为空，自动播种 1:1 概念图示例数据与缩略图
+                SeedConceptDataIfNeeded(conn);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to init SQLite: {ex.Message}");
+            }
+        }
+
+        private void SeedConceptDataIfNeeded(SqliteConnection conn)
+        {
+            try
+            {
+                using var checkCmd = conn.CreateCommand();
+                checkCmd.CommandText = "SELECT COUNT(*) FROM ClipboardItems;";
+                var count = Convert.ToInt64(checkCmd.ExecuteScalar());
+                if (count > 0) return;
+
+                // 1. 生成概念图右上角同款精致深色桌面窗口截图缩略图
+                string imgRelPath = EnsureSeedWallpaperImage();
+
+                // 2. 依次插入概念图中的 4 条典型记录 (时间倒序，最新在最上方)
+                // 序号4: 快捷键文本卡片
+                InsertSeedItem(conn, "Text", 
+                    "Quick-paste keyboard badge shortcuts for the same tumg.", 
+                    "Quick-paste shortcuts", "Notepad", "notepad.exe", 
+                    DateTime.Now.AddMinutes(-15));
+
+                // 序号3: 引语文本卡片
+                InsertSeedItem(conn, "Text", 
+                    "\"I Lorem ipsum dolor sit amet, consectetur adipiscing elit. We will lits on the fostrer to poissant your sendenticomrewch and can entrue much more.\"", 
+                    "Typography Quote", "Google Chrome", "chrome.exe", 
+                    DateTime.Now.AddMinutes(-10));
+
+                // 序号2: 图片卡片
+                InsertSeedItem(conn, "Image", 
+                    imgRelPath, 
+                    "Desktop Window Preview", "Snipping Tool", "SnippingTool.exe", 
+                    DateTime.Now.AddMinutes(-5));
+
+                // 序号1 (首项): JSON 代码卡片 (概念图左上角选中项)
+                string jsonCode = "{\n  \"name\": \"context\",\n  \"poie\": \"rg\",\n  \"syntats\": {\n    \"name\": \"Json\",\n    \"message\": \"javascript\"\n  }\n}";
+                InsertSeedItem(conn, "Code", 
+                    jsonCode, 
+                    "JSON Config Schema", "VS Code", "Code.exe", 
+                    DateTime.Now.AddMinutes(-1));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Seed concept data error: {ex.Message}");
+            }
+        }
+
+        private void InsertSeedItem(SqliteConnection conn, string type, string content, string summary, string app, string proc, DateTime dt)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO ClipboardItems (ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256)
+                VALUES ($type, $content, $summary, $app, $process, $created, 0, $chars, $hash);
+            ";
+            cmd.Parameters.AddWithValue("$type", type);
+            cmd.Parameters.AddWithValue("$content", content);
+            cmd.Parameters.AddWithValue("$summary", summary);
+            cmd.Parameters.AddWithValue("$app", app);
+            cmd.Parameters.AddWithValue("$process", proc);
+            cmd.Parameters.AddWithValue("$created", dt.ToString("o"));
+            cmd.Parameters.AddWithValue("$chars", content.Length);
+            cmd.Parameters.AddWithValue("$hash", Guid.NewGuid().ToString("N"));
+            cmd.ExecuteNonQuery();
+        }
+
+        private string EnsureSeedWallpaperImage()
+        {
+            try
+            {
+                string imgDir = Path.Combine(_storageDir, "images");
+                if (!Directory.Exists(imgDir)) Directory.CreateDirectory(imgDir);
+                string imgPath = Path.Combine(imgDir, "seed_concept_preview.png");
+                if (!File.Exists(imgPath))
+                {
+                    using var bmp = new System.Drawing.Bitmap(320, 180, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                    using (var g = System.Drawing.Graphics.FromImage(bmp))
+                    {
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                        using var bgBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                            new System.Drawing.Rectangle(0, 0, 320, 180),
+                            System.Drawing.Color.FromArgb(22, 27, 38),
+                            System.Drawing.Color.FromArgb(10, 13, 19),
+                            45f);
+                        g.FillRectangle(bgBrush, 0, 0, 320, 180);
+
+                        // 绘制居中深色浮动小窗口模拟截图 (1:1 概念图右上角图片)
+                        using var winBg = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(235, 24, 30, 42));
+                        g.FillRectangle(winBg, 45, 22, 230, 136);
+
+                        using var winBorder = new System.Drawing.Pen(System.Drawing.Color.FromArgb(80, 120, 180), 1.5f);
+                        g.DrawRectangle(winBorder, 45, 22, 230, 136);
+
+                        // 窗口内两张深蓝卡片
+                        using var innerCard = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(210, 16, 21, 29));
+                        g.FillRectangle(innerCard, 58, 42, 98, 96);
+                        g.FillRectangle(innerCard, 164, 42, 98, 96);
+
+                        // 装饰微线条
+                        using var linePen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(80, 140, 220), 1.2f);
+                        g.DrawLine(linePen, 68, 60, 130, 60);
+                        g.DrawLine(linePen, 68, 76, 145, 76);
+                        g.DrawLine(linePen, 174, 60, 236, 60);
+                        g.DrawLine(linePen, 174, 76, 250, 76);
+                    }
+                    bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
+                return "images/seed_concept_preview.png";
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 

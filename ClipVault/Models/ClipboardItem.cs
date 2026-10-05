@@ -18,6 +18,7 @@ namespace ClipVault.Models
 
         // UI 绑定展示辅助属性
         public string DisplayBadge { get; set; } = string.Empty; // [1], [2] 等数字快捷键
+        public bool HasBadge => !string.IsNullOrEmpty(DisplayBadge);
 
         public bool IsImage => ItemType == "Image";
         public bool IsCode => ItemType == "Code";
