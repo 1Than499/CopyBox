@@ -58,10 +58,13 @@ namespace ClipVault
                 });
             };
 
-            // 失去焦点时自动隐藏（设置面板展开或窗口最小化到任务栏时除外）
+            // 失去焦点时交互逻辑（默认关闭，点击外部绝不自动收起/绝不最小化到托盘！）
             this.Deactivated += (s, e) =>
             {
-                if (SettingsOverlayCard.Visibility != Visibility.Visible && this.WindowState != WindowState.Minimized)
+                if (_settingsService != null && 
+                    _settingsService.CurrentSettings.HideOnDeactivate &&
+                    SettingsOverlayCard.Visibility != Visibility.Visible && 
+                    this.WindowState != WindowState.Minimized)
                 {
                     this.Hide();
                 }
@@ -92,6 +95,9 @@ namespace ClipVault
             {
                 RadioDoubleClickCopy.IsChecked = true;
             }
+
+            // 3. 点击外部是否收起加载 (默认 false，点击外部不隐藏)
+            ChkHideOnDeactivate.IsChecked = s.HideOnDeactivate;
 
             // 2. 主题与透明度加载
             bool isDark = s.ThemeMode != "Light";
@@ -296,6 +302,13 @@ namespace ClipVault
             _settingsService.CurrentSettings.DoubleClickAction = RadioDoubleClickPaste.IsChecked == true
                 ? "PasteAndHide"
                 : "CopyOnly";
+            _settingsService.SaveSettings();
+        }
+
+        private void ChkHideOnDeactivate_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            _settingsService.CurrentSettings.HideOnDeactivate = ChkHideOnDeactivate.IsChecked == true;
             _settingsService.SaveSettings();
         }
 

@@ -483,6 +483,16 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- 点击软件外部(失焦)行为偏好 (默认绝不收起，保持常显) -->
+                        <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
+                            <CheckBox x:Name="ChkHideOnDeactivate" 
+                                      Content="点击软件区域外(失焦)时自动最小化到托盘" 
+                                      Foreground="{DynamicResource CardTextBrush}" 
+                                      FontSize="11" 
+                                      Click="ChkHideOnDeactivate_Click"
+                                      ToolTip="默认不勾选：在外部操作其他软件时保持窗口可见，方便对照查看"/>
+                        </Border>
+
                         <!-- 底部维护按钮 -->
                         <Grid>
                             <Button Content="🛑 彻底退出程序" Click="BtnDirectExit_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" HorizontalAlignment="Left" Cursor="Hand"/>

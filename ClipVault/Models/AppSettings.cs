@@ -18,6 +18,9 @@ namespace ClipVault.Models
         // 双击卡片动作偏好: "CopyOnly" (仅复制且保持窗口打开，绝不自动隐藏) 或 "PasteAndHide" (贴入并收起)
         public string DoubleClickAction { get; set; } = "CopyOnly";
 
+        // 点击软件外部(失去焦点)时是否自动隐藏: 默认 false (点击外部绝不自动隐藏/绝不最小化到托盘)
+        public bool HideOnDeactivate { get; set; } = false;
+
         // 主题模式: "Dark" (暗黑模式) 或 "Light" (明亮白天模式)
         public string ThemeMode { get; set; } = "Dark";
 
