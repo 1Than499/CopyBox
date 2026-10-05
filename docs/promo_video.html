@@ -590,6 +590,44 @@
       font-size: 12px;
       color: #64748B;
     }
+    .audio-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #182030;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid #28364F;
+    }
+    .audio-btn {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #E2E8F0;
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .audio-btn:hover {
+      background: #2E3E58;
+      color: #FFFFFF;
+    }
+    .audio-btn.active {
+      background: rgba(0, 120, 212, 0.3);
+      border-color: #0078D4;
+      color: #38BDF8;
+    }
+    .volume-slider-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #94A3B8;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -775,6 +813,15 @@
         <button class="play-btn" id="btnPlayPause">⏸ 暂停</button>
         <span class="time-code" id="timeCode">00:00 / 00:30</span>
       </div>
+      <div class="audio-controls">
+        <button class="audio-btn active" id="btnToggleBgm" title="开启/关闭背景音乐">🎵 科技律动 BGM: 开启</button>
+        <div class="volume-slider-box" title="调节背景音乐与音效音量">
+          <span>🔊</span>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.75" style="width:75px; accent-color:#0078D4;">
+        </div>
+        <button class="audio-btn" id="btnCustomBgm" title="载入本地 MP3/WAV 作为背景音乐">📁 自选音乐</button>
+        <input type="file" id="fileBgmInput" accept="audio/*" style="display:none;">
+      </div>
       <div class="scene-navigator">
         <button class="scene-step-btn active" onclick="jumpToScene(0)">1. 毫秒唤醒</button>
         <button class="scene-step-btn" onclick="jumpToScene(1)">2. 双列卡片</button>
@@ -930,13 +977,281 @@
     const captionZh = document.getElementById("captionZh");
     const captionEn = document.getElementById("captionEn");
     const progressFill = document.getElementById("progressFill");
-    const timeCode = document.getElementById("timeCode");
-    const btnPlayPause = document.getElementById("btnPlayPause");
-    const searchPlaceText = document.getElementById("searchPlaceText");
+    // ==================== Web Audio 现代科技律动 BGM 引擎 ====================
+    class TechBgmSynthesizer {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.isPlaying = false;
+        this.enabled = true;
+        this.volume = 0.75;
+        this.timer = null;
+        this.beatIndex = 0;
+        this.customAudio = null;
+
+        // 温暖高雅科技和弦进行 (Cmaj7 -> Am7 -> Fmaj7 -> Gsus4)
+        this.chords = [
+          { bass: 130.81, notes: [261.63, 329.63, 392.00, 493.88] },
+          { bass: 110.00, notes: [220.00, 261.63, 329.63, 392.00] },
+          { bass: 87.31,  notes: [174.61, 220.00, 261.63, 329.63] },
+          { bass: 98.00,  notes: [196.00, 261.63, 293.66, 392.00] }
+        ];
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+          this.masterGain.connect(this.ctx.destination);
+        }
+        if (this.ctx.state === "suspended") {
+          this.ctx.resume();
+        }
+      }
+
+      setVolume(val) {
+        this.volume = val;
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setTargetAtTime(val, this.ctx.currentTime, 0.05);
+        }
+        if (this.customAudio) {
+          this.customAudio.volume = val;
+        }
+      }
+
+      toggleEnabled() {
+        this.enabled = !this.enabled;
+        if (!this.enabled) {
+          this.pause();
+        } else if (isPlaying) {
+          this.play();
+        }
+        return this.enabled;
+      }
+
+      loadCustomAudio(file) {
+        if (this.customAudio) {
+          this.customAudio.pause();
+          this.customAudio = null;
+        }
+        const url = URL.createObjectURL(file);
+        this.customAudio = new Audio(url);
+        this.customAudio.loop = true;
+        this.customAudio.volume = this.volume;
+        if (this.isPlaying && this.enabled) {
+          this.customAudio.play();
+        }
+      }
+
+      play() {
+        if (!this.enabled) return;
+        this.init();
+        this.isPlaying = true;
+
+        if (this.customAudio) {
+          this.customAudio.play().catch(() => {});
+          return;
+        }
+
+        if (this.timer) clearInterval(this.timer);
+        // BPM = 125 律动 (每 240ms 一拍)
+        this.timer = setInterval(() => this.step(), 240);
+      }
+
+      pause() {
+        this.isPlaying = false;
+        if (this.customAudio) {
+          this.customAudio.pause();
+        }
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
+        }
+      }
+
+      step() {
+        if (!this.ctx || !this.isPlaying || !this.enabled) return;
+        const now = this.ctx.currentTime;
+        const chordIndex = Math.floor((this.beatIndex % 32) / 8);
+        const chord = this.chords[chordIndex];
+        const beatInBar = this.beatIndex % 8;
+
+        // 1. 每小节第 1 拍弹奏温暖和弦背景 Pad & Sub-Bass
+        if (beatInBar === 0) {
+          this.playChordPad(chord.notes, now, 1.8);
+          this.playSubBass(chord.bass, now, 1.6);
+        }
+
+        // 2. 电子水滴晶莹琶音 Pluck (在偶数拍轻巧跃动)
+        if (beatInBar % 2 === 0) {
+          const noteIdx = (beatInBar / 2) % chord.notes.length;
+          const freq = chord.notes[noteIdx] * 2;
+          this.playPluck(freq, now, 0.35);
+        }
+
+        // 3. 极细微清脆的闭镲节奏 (第 2, 6 拍轻点)
+        if (beatInBar === 2 || beatInBar === 6) {
+          this.playHiHat(now);
+        }
+
+        this.beatIndex++;
+      }
+
+      playChordPad(freqs, time, dur) {
+        freqs.forEach(freq => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, time);
+
+          filter.type = "lowpass";
+          filter.frequency.setValueAtTime(900, time);
+
+          gain.gain.setValueAtTime(0, time);
+          gain.gain.linearRampToValueAtTime(0.05, time + 0.3);
+          gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.masterGain);
+
+          osc.start(time);
+          osc.stop(time + dur);
+        });
+      }
+
+      playSubBass(freq, time, dur) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0.12, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(time);
+        osc.stop(time + dur);
+      }
+
+      playPluck(freq, time, dur) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0.07, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(time);
+        osc.stop(time + dur);
+      }
+
+      playHiHat(time) {
+        const bufferSize = this.ctx.sampleRate * 0.03;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "highpass";
+        filter.frequency.setValueAtTime(7000, time);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.025, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        whiteNoise.start(time);
+      }
+    }
+
+    // 交互音效系统 (SFX)
+    class SfxSystem {
+      constructor(bgmEngine) {
+        this.bgm = bgmEngine;
+      }
+      playClick() {
+        if (!this.bgm.ctx || !this.bgm.enabled) return;
+        const now = this.bgm.ctx.currentTime;
+        const osc = this.bgm.ctx.createOscillator();
+        const gain = this.bgm.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1000, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.06);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        osc.connect(gain);
+        gain.connect(this.bgm.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      }
+      playWhoosh() {
+        if (!this.bgm.ctx || !this.bgm.enabled) return;
+        const now = this.bgm.ctx.currentTime;
+        const osc = this.bgm.ctx.createOscillator();
+        const gain = this.bgm.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(420, now + 0.22);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(this.bgm.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+      playChime() {
+        if (!this.bgm.ctx || !this.bgm.enabled) return;
+        const now = this.bgm.ctx.currentTime;
+        [1046.50, 1318.51].forEach((f, idx) => {
+          const osc = this.bgm.ctx.createOscillator();
+          const gain = this.bgm.ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(f, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.09, now + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.3);
+          osc.connect(gain);
+          gain.connect(this.bgm.masterGain);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.3);
+        });
+      }
+    }
+
+    const bgm = new TechBgmSynthesizer();
+    const sfx = new SfxSystem(bgm);
 
     // 交互辅助函数
-    function showAppWindow() { appWindow.className = "copybox-window visible"; }
-    function hideAppWindow() { appWindow.className = "copybox-window hidden"; }
+    let hasShownAppWindow = false;
+    function showAppWindow() { 
+      if (!hasShownAppWindow) {
+        sfx.playWhoosh();
+        hasShownAppWindow = true;
+      }
+      appWindow.className = "copybox-window visible"; 
+    }
+    function hideAppWindow() { 
+      hasShownAppWindow = false;
+      appWindow.className = "copybox-window hidden"; 
+    }
     function showContextMenu() { contextMenu.classList.add("visible"); }
     function hideContextMenu() { contextMenu.classList.remove("visible"); }
     function showSettings() { settingsPanel.classList.add("visible"); }
@@ -946,6 +1261,7 @@
       cursor.style.transform = `translate(${x}px, ${y}px)`;
     }
     function triggerClick(x, y) {
+      sfx.playClick();
       ripple.style.left = `${x + 2}px`;
       ripple.style.top = `${y + 2}px`;
       ripple.classList.remove("animate");
@@ -959,6 +1275,7 @@
       });
     }
     function showToast(text) {
+      sfx.playChime();
       toastPill.textContent = text;
       toastPill.classList.add("visible");
       setTimeout(() => toastPill.classList.remove("visible"), 2000);
@@ -990,13 +1307,11 @@
     }
 
     function updateTimeline(time) {
-      // 更新进度条与时间显示
       const pct = (time / TOTAL_DURATION) * 100;
       progressFill.style.width = `${pct}%`;
       const curSec = Math.floor(time).toString().padStart(2, "0");
       timeCode.textContent = `00:${curSec} / 00:30`;
 
-      // 查找当前场景
       const currentSceneIndex = SCENES.findIndex(s => time >= s.startTime && time < s.endTime);
       if (currentSceneIndex !== -1) {
         const scene = SCENES[currentSceneIndex];
@@ -1006,12 +1321,10 @@
         captionZh.textContent = scene.captionZh;
         captionEn.textContent = scene.captionEn;
 
-        // 更新控制按钮高亮
         document.querySelectorAll(".scene-step-btn").forEach((btn, idx) => {
           btn.classList.toggle("active", idx === currentSceneIndex);
         });
 
-        // 执行场景动作
         scene.run(time);
       }
     }
@@ -1020,7 +1333,49 @@
     btnPlayPause.addEventListener("click", () => {
       isPlaying = !isPlaying;
       btnPlayPause.textContent = isPlaying ? "⏸ 暂停" : "▶ 播放";
+      if (isPlaying) {
+        bgm.play();
+      } else {
+        bgm.pause();
+      }
     });
+
+    // 音乐开关与音量
+    const btnToggleBgm = document.getElementById("btnToggleBgm");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const btnCustomBgm = document.getElementById("btnCustomBgm");
+    const fileBgmInput = document.getElementById("fileBgmInput");
+
+    btnToggleBgm.addEventListener("click", () => {
+      const enabled = bgm.toggleEnabled();
+      btnToggleBgm.textContent = enabled ? "🎵 科技律动 BGM: 开启" : "🔇 BGM: 已静音";
+      btnToggleBgm.classList.toggle("active", enabled);
+    });
+
+    volumeSlider.addEventListener("input", (e) => {
+      bgm.setVolume(parseFloat(e.target.value));
+    });
+
+    btnCustomBgm.addEventListener("click", () => {
+      fileBgmInput.click();
+    });
+
+    fileBgmInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        bgm.loadCustomAudio(file);
+        btnCustomBgm.textContent = `🎵 ${file.name.substring(0, 8)}...`;
+        btnToggleBgm.textContent = "🎵 自定义音乐: 开启";
+        btnToggleBgm.classList.add("active");
+      }
+    });
+
+    // 用户首次任意点击激活音频
+    document.addEventListener("click", () => {
+      if (isPlaying && !bgm.isPlaying) {
+        bgm.play();
+      }
+    }, { once: true });
 
     // 点击进度条跳转
     document.getElementById("progressBarContainer").addEventListener("click", (e) => {
@@ -1038,8 +1393,11 @@
       }
     };
 
-    // 启动动画
+    // 启动动画与音乐
     requestAnimationFrame(tick);
+    setTimeout(() => {
+      if (isPlaying) bgm.play();
+    }, 500);
   </script>
 </body>
 </html>

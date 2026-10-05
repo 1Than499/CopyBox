@@ -33,6 +33,24 @@
    - 点击播放器中央的 **“▶ 播放”**；
    - 放映机将以 60 FPS 电影级平滑帧率自动完成 30 秒全流程高保真动态演示；
    - 再次按 <kbd>Win</kbd> + <kbd>Alt</kbd> + <kbd>R</kbd> 停止录制，录制好的高清 MP4 视频将自动保存在系统的 `Videos\Captures` (捕获) 目录中！
-3. **配音与背景音乐推荐**：
-   - **BGM 风格**：现代电子轻快科技律动（Tech / Minimal Lofi / Ambient Future Bass）；
-   - **音量配比**：BGM 音量控制在 15%~20%，人声旁白清晰居中（80%）。
+3. **内置科技背景音乐与交互音效 (Built-in Web Audio BGM & SFX)**：
+   - **零依赖原生合成引擎**：放映机内置了纯前端 Web Audio 实时合成器，无需联网或下载任何音频文件，点击播放即自动奏响；
+   - **现代科技律动编曲**：
+     - **BPM**：125 节拍，节奏轻快、活力充沛且富有现代生产力工具质感；
+     - **和弦进行**：温暖高级的 `Cmaj7 → Am7 → Fmaj7 → Gsus4` 循环；
+     - **声部织体**：低通 Sine 环境音垫 (Ambient Pad) + 弹性 Sub-Bass + 晶莹水滴琶音 (Pluck Arp) + 细腻轻微闭镲 (Hi-hat) 脉冲；
+   - **三大立体交互音效**：
+     - `Alt + V` 窗口呼出破空音 (`playWhoosh`)；
+     - 鼠标点击与卡片选中微滴答声 (`playClick`)；
+     - Toast 提示与星标收藏晶莹和弦铃音 (`playChime`)；
+   - **自带录音混流**：使用 <kbd>Win</kbd> + <kbd>Alt</kbd> + <kbd>R</kbd> 录制时，系统声卡会自动将此高质量 Web Audio 音乐与音效混流录入 MP4，无需后期手动贴音轨！
+
+4. **音频控制与个性化配乐选项**：
+   - **一键静音/开启**：播放控制栏提供 `🎵 科技律动 BGM: 开启 / 🔇 已静音` 开关；
+   - **音量滑块**：支持 0% ~ 100% 实时平滑音量调节（推荐保持 30%~40%，方便后期叠加人声解说）；
+   - **自选本地音频**：点击控制栏的 `📁 自选音乐` 按钮，可直接选取您本地喜爱的 `.mp3` 或 `.wav` 音频文件，放映机会自动切换为该自选音频循环播放。
+
+5. **外部免版权商业商用音乐推荐渠道 (Royalty-Free Tracks)**：
+   - **Pixabay Music** (`pixabay.com/music`)：搜索关键字 `Technology`、`Future Bass`、`Minimal Lo-Fi`、`Modern Corporate`；
+   - **YouTube Audio Library**：筛选流派 `Dance & Electronic` / `Ambient`，情绪选择 `Bright` / `Calm`；
+   - **推荐配比**：若后期添加真人/AI 语音解说，建议解说旁白音量设为 100%，BGM 响度设为 15%~25%（LUFS -18 至 -22 左右），确保讲解清晰洪亮。
