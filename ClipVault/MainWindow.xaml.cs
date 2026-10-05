@@ -758,6 +758,13 @@ namespace ClipVault
                 UpdateStorageInfo();
                 e.Handled = true;
             }
+            else if ((e.Key == Key.Apps || (e.Key == Key.F10 && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)) && 
+                     CardsListBox.SelectedItem is ClipboardItem toMenu)
+            {
+                var container = CardsListBox.ItemContainerGenerator.ContainerFromItem(toMenu) as FrameworkElement ?? CardsListBox;
+                ShowCardContextMenu(toMenu, container, isFromRightClick: false);
+                e.Handled = true;
+            }
         }
 
         private System.Windows.Threading.DispatcherTimer? _toastTimer;
@@ -847,46 +854,115 @@ namespace ClipVault
             }
         }
 
+        // 卡片右键交互与上下文菜单
+        private void ListBoxItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            {
+                return;
+            }
+
+            if (sender is ListBoxItem lbi && lbi.DataContext is ClipboardItem item)
+            {
+                lbi.IsSelected = true;
+                lbi.Focus();
+                CardsListBox.SelectedItem = item;
+            }
+        }
+
+        private void ListBoxItem_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (SettingsOverlayCard != null && SettingsOverlayCard.Visibility == Visibility.Visible)
+            {
+                return;
+            }
+
+            if (sender is ListBoxItem lbi && lbi.DataContext is ClipboardItem item)
+            {
+                e.Handled = true;
+                ShowCardContextMenu(item, lbi, isFromRightClick: true);
+            }
+        }
+
         private void ItemMenu_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is int id)
             {
                 var item = DisplayCards.FirstOrDefault(x => x.Id == id);
                 if (item == null) return;
-
-                var loc = LocalizationService.Instance;
-                var menu = new ContextMenu();
-
-                var pinItem = new MenuItem { Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") };
-                pinItem.Click += (s, args) =>
-                {
-                    _dbService.TogglePin(id);
-                    RefreshCards();
-                    UpdateStorageInfo();
-                };
-
-                var copyItem = new MenuItem { Header = loc.Get("MenuCopy") };
-                copyItem.Click += (s, args) =>
-                {
-                    CopyItemToClipboard(item);
-                };
-
-                var delItem = new MenuItem { Header = loc.Get("MenuDelete") };
-                delItem.Click += (s, args) =>
-                {
-                    _dbService.DeleteItem(id);
-                    RefreshCards();
-                    UpdateStorageInfo();
-                };
-
-                menu.Items.Add(pinItem);
-                menu.Items.Add(copyItem);
-                menu.Items.Add(new Separator());
-                menu.Items.Add(delItem);
-
-                menu.PlacementTarget = btn;
-                menu.IsOpen = true;
+                ShowCardContextMenu(item, btn, isFromRightClick: false);
             }
+        }
+
+        private void ShowCardContextMenu(ClipboardItem item, FrameworkElement placementTarget, bool isFromRightClick)
+        {
+            if (item == null) return;
+
+            // 保持当前选中项与此卡片同步
+            CardsListBox.SelectedItem = item;
+
+            var loc = LocalizationService.Instance;
+            var menu = new ContextMenu();
+            if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle)
+            {
+                menu.Style = ctxStyle;
+            }
+
+            Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+            // 1. 置顶 / 取消置顶
+            var pinItem = new MenuItem 
+            { 
+                Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") 
+            };
+            if (itemStyle != null) pinItem.Style = itemStyle;
+            pinItem.Click += (s, args) =>
+            {
+                _dbService.TogglePin(item.Id);
+                RefreshCards();
+                UpdateStorageInfo();
+            };
+
+            // 2. 复制到剪贴板
+            var copyItem = new MenuItem 
+            { 
+                Header = loc.Get("MenuCopy") 
+            };
+            if (itemStyle != null) copyItem.Style = itemStyle;
+            copyItem.Click += (s, args) =>
+            {
+                CopyItemToClipboard(item);
+            };
+
+            // 3. 删除此条记录
+            var delItem = new MenuItem 
+            { 
+                Header = loc.Get("MenuDelete") 
+            };
+            if (itemStyle != null) delItem.Style = itemStyle;
+            delItem.Click += (s, args) =>
+            {
+                _dbService.DeleteItem(item.Id);
+                RefreshCards();
+                UpdateStorageInfo();
+            };
+
+            menu.Items.Add(pinItem);
+            menu.Items.Add(copyItem);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(delItem);
+
+            if (isFromRightClick)
+            {
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+            }
+            else
+            {
+                menu.PlacementTarget = placementTarget;
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            }
+
+            menu.IsOpen = true;
         }
 
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)

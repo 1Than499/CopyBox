@@ -128,6 +128,70 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 现代自适应卡片右键菜单样式 (Fluent 风格、圆角、自适应暗黑/明亮主题) -->
+        <Style x:Key="ModernContextMenuStyle" TargetType="{x:Type ContextMenu}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border Background="{DynamicResource CardBgBrush}" 
+                                BorderBrush="{DynamicResource WindowBorderBrush}" 
+                                BorderThickness="1" 
+                                CornerRadius="8" 
+                                Padding="4,4">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270" Opacity="0.45" Color="Black"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernMenuItemStyle" TargetType="{x:Type MenuItem}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource CardTextBrush}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type MenuItem}">
+                        <Border x:Name="Bd" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="6" 
+                                Padding="12,7" 
+                                Margin="1,1" 
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBgBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type Separator}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Separator}">
+                        <Border Background="{DynamicResource CardBorderBrush}" Height="1" Margin="6,3" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 主窗口毛玻璃圆角容器 (1:1 还原概念图深邃亚克力外框，彻底消除粗暴生硬黑影) -->
@@ -291,6 +355,8 @@
                             <Setter Property="Padding" Value="0"/>
                             <Setter Property="Margin" Value="7,7,7,7"/>
                             <Setter Property="Background" Value="Transparent"/>
+                            <EventSetter Event="PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"/>
+                            <EventSetter Event="MouseRightButtonUp" Handler="ListBoxItem_MouseRightButtonUp"/>
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
