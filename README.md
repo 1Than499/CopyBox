@@ -17,7 +17,7 @@
 ---
 
 <p align="center">
-  <img src="assets/preview.jpg" alt="CopyBox Preview" width="850" />
+  <img src="assets/preview.png" alt="CopyBox Preview" width="560" />
 </p>
 
 ---
