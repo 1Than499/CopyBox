@@ -212,6 +212,37 @@ namespace ClipVault
                 ? new SolidColorBrush(Color.FromRgb(96, 165, 250)) 
                 : new SolidColorBrush(Color.FromRgb(29, 78, 216));
 
+            // 顶栏控制岛高对比防透资源 (保证在透明度拉到最低时依然清晰醒目)
+            this.Resources["TopPillBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromArgb(235, 30, 37, 50)) 
+                : new SolidColorBrush(Color.FromArgb(245, 241, 245, 249));
+            this.Resources["TopPillBorderBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(64, 78, 99)) 
+                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+            this.Resources["TopButtonFgBrush"] = isDark 
+                ? Brushes.White 
+                : new SolidColorBrush(Color.FromRgb(15, 23, 42));
+
+            // 分类胶囊防透实体底色与边框 (低透明度防透)
+            this.Resources["TabPillBgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(30, 37, 50)) 
+                : new SolidColorBrush(Color.FromRgb(241, 245, 249));
+            this.Resources["TabPillBorderBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(58, 70, 89)) 
+                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
+            this.Resources["TabPillFgBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) 
+                : new SolidColorBrush(Color.FromRgb(30, 41, 59));
+
+            // 选中卡片自适应柔和光晕 (彻底消除白天/暗夜阴影僵硬平切感)
+            this.Resources["SelectedBorderBrush"] = isDark 
+                ? new SolidColorBrush(Color.FromRgb(56, 189, 248)) 
+                : new SolidColorBrush(Color.FromRgb(0, 120, 212));
+
+            this.Resources["SelectedCardEffect"] = isDark 
+                ? new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, ShadowDepth = 0, Color = Color.FromRgb(0, 120, 212), Opacity = 0.38 }
+                : new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Direction = 270, Color = Color.FromRgb(0, 120, 212), Opacity = 0.18 };
+
             UpdateCloseButtonToolTip();
             UpdateCategoryTabsAppearance();
         }
@@ -394,9 +425,9 @@ namespace ClipVault
         {
             if (TabAll == null) return;
             var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-            var inactiveBg = (Brush)this.Resources["CardBgBrush"];
+            var inactiveBg = (Brush)this.Resources["TabPillBgBrush"];
             var activeFg = Brushes.White;
-            var inactiveFg = (Brush)this.Resources["SubTextBrush"];
+            var inactiveFg = (Brush)this.Resources["TabPillFgBrush"];
 
             UpdateButtonTab(TabAll, _currentCategory == "all", activeBg, inactiveBg, activeFg, inactiveFg);
             UpdateButtonTab(TabText, _currentCategory == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
@@ -410,6 +441,8 @@ namespace ClipVault
             if (btn == null) return;
             btn.Background = isActive ? activeBg : inactiveBg;
             btn.Foreground = isActive ? activeFg : inactiveFg;
+            btn.BorderBrush = isActive ? activeBg : (Brush)this.Resources["TabPillBorderBrush"];
+            btn.BorderThickness = new Thickness(1);
             btn.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
         }
 

@@ -33,6 +33,20 @@
         <SolidColorBrush x:Key="InfoBorderBrush" Color="#1E3A8A"/>
         <SolidColorBrush x:Key="InfoTextBrush" Color="#60A5FA"/>
 
+        <!-- 顶栏控制胶囊防透岛资源 (低透明度下依然清晰醒目) -->
+        <SolidColorBrush x:Key="TopPillBgBrush" Color="#E61E2532"/>
+        <SolidColorBrush x:Key="TopPillBorderBrush" Color="#404E63"/>
+        <SolidColorBrush x:Key="TopButtonFgBrush" Color="#FFFFFF"/>
+
+        <!-- 分类胶囊防透实体底色与边框 -->
+        <SolidColorBrush x:Key="TabPillBgBrush" Color="#1E2532"/>
+        <SolidColorBrush x:Key="TabPillBorderBrush" Color="#3A4659"/>
+        <SolidColorBrush x:Key="TabPillFgBrush" Color="#E2E8F0"/>
+
+        <!-- 选中卡片自适应柔和光晕与边框 (彻底消除生硬平切僵死感) -->
+        <SolidColorBrush x:Key="SelectedBorderBrush" Color="#38A6FF"/>
+        <DropShadowEffect x:Key="SelectedCardEffect" BlurRadius="10" ShadowDepth="0" Color="#0078D4" Opacity="0.40"/>
+
         <!-- 极简 4px 现代细线胶囊滚动条 (1:1 还原概念图右侧细滚动条) -->
         <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
             <Setter Property="OverridesDefaultStyle" Value="true"/>
@@ -62,14 +76,14 @@
             </Setter>
         </Style>
 
-        <!-- 顶栏极简微型图标按钮样式 (自适应白天/夜间透明底色) -->
+        <!-- 顶栏极简微型图标按钮样式 (高对比度防透底色) -->
         <Style x:Key="TopIconButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{DynamicResource SubTextBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TopButtonFgBrush}"/>
             <Setter Property="Width" Value="24"/>
             <Setter Property="Height" Value="22"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -147,35 +161,42 @@
                 <!-- 左侧纯净拖拽区 -->
                 <Rectangle Grid.Column="0" Fill="Transparent"/>
 
-                <!-- 右侧极小幽灵控制组 -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="BtnQuickTheme" 
-                            Content="🌙" 
-                            Style="{StaticResource TopIconButtonStyle}"
-                            Click="BtnQuickTheme_Click" 
-                            ToolTip="切换白天明亮 / 夜间暗黑主题"
-                            Margin="0,0,3,0"/>
+                <!-- 右侧极小幽灵控制组 (实体胶囊岛防透底座，保证低透明度下极其醒目) -->
+                <Border Grid.Column="1" 
+                        Background="{DynamicResource TopPillBgBrush}" 
+                        BorderBrush="{DynamicResource TopPillBorderBrush}" 
+                        BorderThickness="1" 
+                        CornerRadius="7" 
+                        Padding="3,1">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnQuickTheme" 
+                                Content="🌙" 
+                                Style="{StaticResource TopIconButtonStyle}"
+                                Click="BtnQuickTheme_Click" 
+                                ToolTip="切换白天明亮 / 夜间暗黑主题"
+                                Margin="0,0,2,0"/>
 
-                    <Button x:Name="BtnToggleSettings" 
-                            Content="⚙" 
-                            Style="{StaticResource TopIconButtonStyle}"
-                            Click="BtnToggleSettings_Click" 
-                            ToolTip="偏好设置与本地存储路径"
-                            Margin="0,0,4,0"/>
+                        <Button x:Name="BtnToggleSettings" 
+                                Content="⚙" 
+                                Style="{StaticResource TopIconButtonStyle}"
+                                Click="BtnToggleSettings_Click" 
+                                ToolTip="偏好设置与本地存储路径"
+                                Margin="0,0,3,0"/>
 
-                    <Button x:Name="BtnMinimizeWindow" 
-                            Content="─" 
-                            Style="{StaticResource TopIconButtonStyle}"
-                            Click="BtnMinimizeWindow_Click" 
-                            ToolTip="最小化窗口到任务栏 (缩小界面)"
-                            Margin="0,0,3,0"/>
+                        <Button x:Name="BtnMinimizeWindow" 
+                                Content="─" 
+                                Style="{StaticResource TopIconButtonStyle}"
+                                Click="BtnMinimizeWindow_Click" 
+                                ToolTip="最小化窗口到任务栏 (缩小界面)"
+                                Margin="0,0,2,0"/>
 
-                    <Button x:Name="BtnCloseWindow" 
-                            Content="✕" 
-                            Style="{StaticResource CloseIconButtonStyle}"
-                            Click="BtnCloseWindow_Click" 
-                            ToolTip="关闭窗口 (收起到后台系统托盘，Alt+V 随时唤起)"/>
-                </StackPanel>
+                        <Button x:Name="BtnCloseWindow" 
+                                Content="✕" 
+                                Style="{StaticResource CloseIconButtonStyle}"
+                                Click="BtnCloseWindow_Click" 
+                                ToolTip="关闭窗口 (收起到后台系统托盘，Alt+V 随时唤起)"/>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <!-- 1. 居中流线型搜索框 (1:1 还原概念图) -->
@@ -268,7 +289,7 @@
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="5,5,5,5"/>
+                            <Setter Property="Margin" Value="7,7,7,7"/>
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="Template">
                                 <Setter.Value>
@@ -285,18 +306,14 @@
                                             <ContentPresenter />
                                         </Border>
                                         <ControlTemplate.Triggers>
-                                            <!-- 1:1 概念图左上角第一张卡片：Fluent 蓝色外围微发光光晕 -->
+                                            <!-- 1:1 概念图左上角第一张卡片：自适应高雅微光晕 (彻底消除平切僵硬感) -->
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#0078D4"/>
+                                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource SelectedBorderBrush}"/>
                                                 <Setter TargetName="CardBorder" Property="BorderThickness" Value="1.5"/>
-                                                <Setter TargetName="CardBorder" Property="Effect">
-                                                    <Setter.Value>
-                                                        <DropShadowEffect BlurRadius="16" ShadowDepth="0" Color="#0078D4" Opacity="0.55"/>
-                                                    </Setter.Value>
-                                                </Setter>
+                                                <Setter TargetName="CardBorder" Property="Effect" Value="{DynamicResource SelectedCardEffect}"/>
                                             </Trigger>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#0078D4"/>
+                                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource SelectedBorderBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
