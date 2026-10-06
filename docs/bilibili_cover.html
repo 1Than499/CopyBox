@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>CopyBox - Bilibili 视频封面设计</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #07090E;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 电影级科技背景：暗黑深空与深蓝极光流光 */
+    .cover-canvas {
+      width: 1920px;
+      height: 1080px;
+      position: relative;
+      background: radial-gradient(circle at 75% 45%, #142038 0%, #080D18 45%, #05070B 100%);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 100px;
+      justify-content: space-between;
+    }
+
+    /* 极光微光晕 */
+    .bloom-ambient-1 {
+      position: absolute;
+      top: -150px;
+      right: 100px;
+      width: 900px;
+      height: 900px;
+      background: radial-gradient(circle, rgba(0, 120, 212, 0.28) 0%, rgba(56, 189, 248, 0.12) 40%, transparent 70%);
+      filter: blur(90px);
+      pointer-events: none;
+    }
+    .bloom-ambient-2 {
+      position: absolute;
+      bottom: -100px;
+      left: 150px;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(16, 185, 129, 0.08) 45%, transparent 70%);
+      filter: blur(100px);
+      pointer-events: none;
+    }
+    .tech-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      mask-image: radial-gradient(ellipse at 50% 50%, black 40%, transparent 85%);
+    }
+
+    /* ==================== 左侧：大字报爆款文案区 ==================== */
+    .left-content {
+      width: 780px;
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      position: relative;
+    }
+
+    /* 顶部主题胶囊徽章 */
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0, 120, 212, 0.18);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      padding: 8px 18px;
+      border-radius: 30px;
+      width: fit-content;
+      margin-bottom: 28px;
+      box-shadow: 0 0 25px rgba(0, 120, 212, 0.3);
+    }
+    .pill-badge .dot {
+      width: 10px;
+      height: 10px;
+      background: #38BDF8;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #38BDF8;
+    }
+    .pill-badge span {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #E0F2FE;
+      text-transform: uppercase;
+    }
+
+    /* 主标题 1：痛点呼唤（大字冲击） */
+    .headline-hook {
+      font-size: 46px;
+      font-weight: 800;
+      color: #94A3B8;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .headline-hook .tag-red {
+      color: #F87171;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      font-size: 20px;
+      font-weight: 800;
+      padding: 2px 10px;
+      border-radius: 6px;
+    }
+
+    /* 主标题 2：核心爽点（极具视觉张力的荧光渐变与立体字） */
+    .headline-main {
+      font-size: 82px;
+      font-weight: 900;
+      line-height: 1.12;
+      letter-spacing: -1.5px;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #FFFFFF 20%, #38BDF8 60%, #0078D4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 10px 25px rgba(0, 120, 212, 0.4));
+    }
+    .headline-main span.highlight-gold {
+      background: linear-gradient(135deg, #FDE68A 10%, #F59E0B 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 8px 20px rgba(245, 158, 11, 0.45));
+    }
+
+    /* 亮点功能标签网格 */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .feature-item {
+      background: rgba(18, 24, 38, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-left: 4px solid #0078D4;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    }
+    .feature-item.accent-gold {
+      border-left-color: #F59E0B;
+    }
+    .feature-icon {
+      font-size: 26px;
+    }
+    .feature-text-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .feature-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: 0.5px;
+    }
+    .feature-desc {
+      font-size: 13px;
+      color: #94A3B8;
+      font-weight: 500;
+    }
+
+    /* 底部开源与技术背书条 */
+    .trust-bar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: rgba(12, 17, 26, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 14px;
+      padding: 12px 22px;
+      width: fit-content;
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+    }
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #F1F5F9;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .trust-badge svg {
+      fill: #FFFFFF;
+    }
+    .trust-sep {
+      width: 1px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.18);
+    }
+    .trust-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #38BDF8;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* ==================== 右侧：真实 3D 浮空产品界面展示 ==================== */
+    .right-showcase {
+      width: 820px;
+      height: 780px;
+      position: relative;
+      perspective: 1400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    /* 3D 悬浮主窗口卡片 */
+    .window-card {
+      width: 580px;
+      height: 560px;
+      background: rgba(20, 26, 38, 0.96);
+      backdrop-filter: blur(35px);
+      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      border-radius: 20px;
+      box-shadow: 
+        0 40px 90px rgba(0, 0, 0, 0.85),
+        0 0 100px rgba(0, 120, 212, 0.35),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      transform: rotateY(-11deg) rotateX(6deg) rotateZ(1deg);
+      transform-style: preserve-3d;
+      position: relative;
+    }
+
+    /* 搜索栏与顶栏 */
+    .top-search-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .search-mock {
+      flex: 1;
+      height: 42px;
+      background: #10141E;
+      border: 1px solid #283347;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      font-size: 14px;
+      color: #38BDF8;
+      font-weight: 600;
+    }
+    .search-typing {
+      border-right: 2px solid #38BDF8;
+      padding-right: 2px;
+    }
+    .top-icons {
+      display: flex;
+      gap: 6px;
+      background: rgba(30, 40, 58, 0.8);
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #3B4B66;
+      color: #E2E8F0;
+      font-size: 13px;
+    }
+
+    /* 分类药丸胶囊 */
+    .category-pills {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .cat-pill {
+      font-size: 12.5px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      background: #171E2B;
+      color: #94A3B8;
+      border: 1px solid #273449;
+      font-weight: 600;
+    }
+    .cat-pill.active {
+      background: #0078D4;
+      border-color: #38BDF8;
+      color: #FFFFFF;
+      box-shadow: 0 2px 10px rgba(0, 120, 212, 0.4);
+    }
+
+    /* 卡片网格 (双列) */
+    .mini-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+    }
+    .mini-card {
+      background: rgba(14, 19, 29, 0.95);
+      border: 1px solid #28354D;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .mini-card.selected {
+      border: 1.5px solid #0078D4;
+      box-shadow: 0 0 20px rgba(0, 120, 212, 0.35);
+      background: rgba(16, 25, 42, 0.98);
+    }
+    .mini-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .key-badge {
+      background: rgba(0, 120, 212, 0.25);
+      color: #38BDF8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #34D399;
+      background: #090C12;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #1E2838;
+      flex: 1;
+    }
+
+    /* 悬浮微小右键菜单 (加深层次) */
+    .float-menu-mock {
+      position: absolute;
+      top: 155px;
+      left: 175px;
+      width: 215px;
+      background: rgba(20, 26, 38, 0.98);
+      backdrop-filter: blur(25px);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 10px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 120, 212, 0.3);
+      padding: 6px;
+      z-index: 50;
+      transform: translateZ(50px);
+    }
+    .menu-item-mock {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      color: #E2E8F0;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .menu-item-mock.active {
+      background: #0078D4;
+      color: #FFFFFF;
+    }
+
+    /* 虚拟鼠标 */
+    .mock-cursor {
+      position: absolute;
+      top: 195px;
+      left: 295px;
+      width: 28px;
+      height: 28px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFFFFF'%3E%3Cpath d='M3 3l7.5 18 2.5-6.5L20 12z' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+      z-index: 100;
+      transform: translateZ(80px);
+      filter: drop-shadow(0 6px 12px rgba(0,0,0,0.7));
+    }
+
+    /* 浮空发光功能药丸 (强化卖点冲击力) */
+    .floating-pill-1 {
+      position: absolute;
+      top: 40px;
+      right: 20px;
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: #FFFFFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 15px 35px rgba(16, 185, 129, 0.5), 0 0 25px rgba(52, 211, 153, 0.6);
+      transform: rotate(6deg) translateZ(60px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1.5px solid #6EE7B7;
+    }
+    .floating-pill-2 {
+      position: absolute;
+      bottom: 50px;
+      left: -20px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: #FFFFFF;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      box-shadow: 0 15px 35px rgba(245, 158, 11, 0.5), 0 0 25px rgba(251, 191, 36, 0.6);
+      transform: rotate(-6deg) translateZ(70px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1.5px solid #FCD34D;
+    }
+
+    /* 右下角留白提示（避免 B 站客户端 00:30 时长角标遮挡） */
+    .duration-safe-zone {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      width: 120px;
+      height: 50px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cover-canvas" id="coverCanvas">
+    <div class="tech-grid"></div>
+    <div class="bloom-ambient-1"></div>
+    <div class="bloom-ambient-2"></div>
+
+    <!-- 左侧：爆款大字标题区 -->
+    <div class="left-content">
+      <div class="pill-badge">
+        <div class="dot"></div>
+        <span>2026 Windows 必备剪贴板神器</span>
+      </div>
+
+      <div class="headline-hook">
+        告别自带剪贴板卡顿！
+        <span class="tag-red">痛点终结</span>
+      </div>
+
+      <div class="headline-main">
+        <span class="highlight-gold">0.1ms</span> 毫秒唤醒<br>
+        全键盘秒贴利器
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-text-group">
+            <span class="feature-title">100% 物理离线</span>
+            <span class="feature-desc">本地 SQLite 存储 · 零云端隐私泄露</span>
+          </div>
+        </div>
+
+        <div class="feature-item accent-gold">
+          <div class="feature-icon">⌨️</div>
+          <div class="feature-text-group">
+            <span class="feature-title">全键盘极致盲打</span>
+            <span class="feature-desc">数字键 1~9 秒贴 · Alt+V 毫秒呼出</span>
+          </div>
+        </div>
+
+        <div class="feature-item accent-gold">
+          <div class="feature-icon">🖼️</div>
+          <div class="feature-text-group">
+            <span class="feature-title">代码高亮与预览</span>
+            <span class="feature-desc">双列智能卡片 · 图片文本一览无余</span>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-text-group">
+            <span class="feature-title">中英双语 & ClearType</span>
+            <span class="feature-desc">Win11 原生质感 · 自由拖拽设置</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部信任背书 -->
+      <div class="trust-bar">
+        <div class="trust-badge">
+          <svg height="22" viewBox="0 0 16 16" width="22">
+            <path d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9 1.04 1.35.4 1.19 2.05.8 2.51.61 0 .68.01 1.25.01 1.43 0 .21-.15.47-.55.38A8.01 8.01 0 0 1 0 8c0-4.42 3.58-8 8-8z"></path>
+          </svg>
+          <span>GitHub 开源</span>
+        </div>
+        <div class="trust-sep"></div>
+        <div class="trust-url">github.com/1Than499/CopyBox</div>
+        <div class="trust-sep"></div>
+        <span style="color:#10B981; font-size:13px; font-weight:bold;">★ MIT License</span>
+      </div>
+    </div>
+
+    <!-- 右侧：真实 3D 浮空界面展示 -->
+    <div class="right-showcase">
+      <!-- 浮空徽章 1：极速唤醒 -->
+      <div class="floating-pill-1">
+        <span>⚡ 唤醒仅 0.1ms</span>
+      </div>
+
+      <!-- 浮空徽章 2：完全离线 -->
+      <div class="floating-pill-2">
+        <span>🔒 纯本地·零上云</span>
+      </div>
+
+      <!-- 3D 真实窗口 -->
+      <div class="window-card">
+        <div class="top-search-row">
+          <div class="search-mock">
+            <span>🔍</span>
+            <span class="search-typing">搜索剪贴板历史...</span>
+          </div>
+          <div class="top-icons">
+            <span>🌙</span>
+            <span>⚙</span>
+            <span>─</span>
+            <span>✕</span>
+          </div>
+        </div>
+
+        <div class="category-pills">
+          <div class="cat-pill active">📋 全部 (All)</div>
+          <div class="cat-pill">≡ 文本</div>
+          <div class="cat-pill">🖼 图片</div>
+          <div class="cat-pill">&lt;/&gt; 代码</div>
+          <div class="cat-pill">⭐ 置顶</div>
+        </div>
+
+        <div class="mini-cards-grid">
+          <!-- 卡片 1 (选中) -->
+          <div class="mini-card selected">
+            <div class="mini-card-head">
+              <span style="color:#F59E0B;">{ } JSON 代码</span>
+              <span class="key-badge">[1]</span>
+            </div>
+            <div class="code-box">
+              {<br>
+              &nbsp;&nbsp;"app": "CopyBox",<br>
+              &nbsp;&nbsp;"offline": true,<br>
+              &nbsp;&nbsp;"speed": "0.1ms"<br>
+              }
+            </div>
+          </div>
+
+          <!-- 卡片 2 -->
+          <div class="mini-card">
+            <div class="mini-card-head">
+              <span>🖼 桌面截图</span>
+              <span class="key-badge">[2]</span>
+            </div>
+            <div style="background:#0F141E; border:1px dashed #2A364C; border-radius:6px; flex:1; display:flex; align-items:center; justify-content:center; color:#64748B; font-size:12px; gap:6px;">
+              <span>🖼</span> 1920x1080.png
+            </div>
+          </div>
+
+          <!-- 卡片 3 -->
+          <div class="mini-card">
+            <div class="mini-card-head">
+              <span style="color:#94A3B8;">❝ 隐私承诺</span>
+              <span class="key-badge">[3]</span>
+            </div>
+            <div style="font-size:11.5px; color:#CBD5E1; line-height:1.45; padding:4px;">
+              100% 物理离线存储，Token 密码绝不上传云端。
+            </div>
+          </div>
+
+          <!-- 卡片 4 -->
+          <div class="mini-card">
+            <div class="mini-card-head">
+              <span style="color:#94A3B8;">❝ 开源命令</span>
+              <span class="key-badge">[4]</span>
+            </div>
+            <div style="font-size:11px; color:#38BDF8; font-family:monospace; background:#0B0E14; padding:6px; border-radius:4px;">
+              git clone .../CopyBox
+            </div>
+          </div>
+        </div>
+
+        <!-- 悬浮右键菜单 -->
+        <div class="float-menu-mock">
+          <div class="menu-item-mock active">
+            <span style="color:#F59E0B;">★</span>
+            <span>置顶此条记录</span>
+          </div>
+          <div class="menu-item-mock">
+            <span style="color:#38BDF8;">❐</span>
+            <span>复制到剪贴板</span>
+          </div>
+          <div class="menu-item-mock" style="color:#EF4444;">
+            <span>✕</span>
+            <span>删除此记录</span>
+          </div>
+        </div>
+
+        <!-- 光标 -->
+        <div class="mock-cursor"></div>
+      </div>
+    </div>
+
+    <!-- 右下角安全区域（留给 B 站客户端时长角标，不放关键文本） -->
+    <div class="duration-safe-zone"></div>
+  </div>
+
+</body>
+</html>
