@@ -23,47 +23,9 @@
       overflow-x: hidden;
     }
     
-    /* 顶部操作提示 */
+    /* 顶部操作提示 - 已隐藏以保持画面纯净 */
     .header-bar {
-      width: 100%;
-      max-width: 1100px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 20px;
-      margin-bottom: 8px;
-    }
-    .brand-title {
-      font-size: 18px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #FFFFFF;
-    }
-    .brand-title span {
-      font-size: 12px;
-      font-weight: 500;
-      background: rgba(0, 120, 212, 0.2);
-      color: #38BDF8;
-      border: 1px solid rgba(0, 120, 212, 0.4);
-      padding: 2px 8px;
-      border-radius: 12px;
-    }
-    .record-tip {
-      font-size: 13px;
-      color: #94A3B8;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .record-tip kbd {
-      background: #1E293B;
-      border: 1px solid #334155;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      color: #38BDF8;
+      display: none !important;
     }
 
     /* 16:9 电影级视频放映容器 */
@@ -79,16 +41,40 @@
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(0, 120, 212, 0.15);
     }
 
+    /* 全屏满画幅渲染模式：100% 满画幅 1920x1080，彻底消除外层黑边与任何提示栏 */
+    body.render-mode {
+      width: 1920px !important;
+      height: 1080px !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      justify-content: center !important;
+    }
+    body.render-mode .header-bar,
+    body.render-mode .control-panel {
+      display: none !important;
+    }
+    body.render-mode .video-viewport {
+      width: 1920px !important;
+      height: 1080px !important;
+      max-width: none !important;
+      aspect-ratio: auto !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
     /* 背景 Windows 动态流光粒子微光晕 */
     .bg-bloom {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 800px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(0, 120, 212, 0.18) 0%, rgba(56, 189, 248, 0.08) 40%, transparent 70%);
-      filter: blur(60px);
+      width: 900px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0, 120, 212, 0.22) 0%, rgba(56, 189, 248, 0.10) 45%, transparent 70%);
+      filter: blur(65px);
       pointer-events: none;
       animation: pulseBloom 8s ease-in-out infinite alternate;
     }
@@ -97,25 +83,24 @@
       100% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
     }
 
-    /* 拟真虚拟鼠标指针 */
+    /* 拟真虚拟鼠标指针 (绝对时间函数精确驱动，无延迟滞后) */
     .virtual-cursor {
       position: absolute;
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFFFFF'%3E%3Cpath d='M3 3l7.5 18 2.5-6.5L20 12z' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E");
       background-size: contain;
       background-repeat: no-repeat;
       pointer-events: none;
       z-index: 1000;
-      transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
       top: 50%;
       left: 50%;
-      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
     }
     .click-ripple {
       position: absolute;
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border: 2px solid #38BDF8;
       border-radius: 50%;
       transform: translate(-50%, -50%) scale(0);
@@ -128,7 +113,7 @@
     }
     @keyframes rippleEffect {
       0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
     }
 
     /* 舞台主场景 */
@@ -142,45 +127,15 @@
       padding: 30px;
     }
 
-    /* 章节开场标题卡片 */
+    /* 章节开场标题卡片 - 已移除最顶上的一行，保持纯净画面 */
     .scene-intro-overlay {
-      position: absolute;
-      top: 40px;
-      left: 45px;
-      z-index: 200;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      transition: all 0.5s ease;
-    }
-    .scene-badge {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: #38BDF8;
-      background: rgba(56, 189, 248, 0.12);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 3px 10px;
-      border-radius: 12px;
-      align-self: flex-start;
-    }
-    .scene-title {
-      font-size: 26px;
-      font-weight: 800;
-      color: #FFFFFF;
-      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-    }
-    .scene-subtitle {
-      font-size: 13.5px;
-      color: #94A3B8;
-      font-weight: 500;
+      display: none !important;
     }
 
     /* 模拟 CopyBox 主窗口 (1:1 还原界面) */
     .copybox-window {
-      width: 480px;
-      height: 480px;
+      width: 500px;
+      height: 490px;
       background: rgba(24, 28, 37, 0.95);
       backdrop-filter: blur(25px);
       border: 1px solid #2E384D;
@@ -201,6 +156,127 @@
     .copybox-window.visible {
       transform: scale(1) translateY(0);
       opacity: 1;
+    }
+    .copybox-window.scaled-back {
+      transform: scale(0.86) translateY(28px) !important;
+      opacity: 0.1 !important;
+      filter: blur(8px) !important;
+      pointer-events: none !important;
+    }
+
+    /* 终幕精美 GitHub 开源卡片 */
+    .github-end-card {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.88);
+      width: 560px;
+      background: rgba(16, 22, 34, 0.96);
+      backdrop-filter: blur(35px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 22px;
+      box-shadow: 0 35px 80px rgba(0, 0, 0, 0.85), 0 0 80px rgba(0, 120, 212, 0.25);
+      padding: 34px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 120;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .github-end-card.visible {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+    .github-logo-box {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #1E293B, #0F172A);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.2);
+    }
+    .github-brand-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #FFFFFF 20%, #38BDF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .github-brand-subtitle {
+      font-size: 13.5px;
+      color: #94A3B8;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+    .github-url-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(8, 12, 20, 0.75);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 9px 20px;
+      border-radius: 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 25px rgba(0, 120, 212, 0.2);
+    }
+    .github-url-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #38BDF8;
+      letter-spacing: 0.5px;
+    }
+    .github-star-btn {
+      background: linear-gradient(135deg, #0078D4, #0284C7);
+      border: 1px solid #38BDF8;
+      color: #FFFFFF;
+      font-size: 14.5px;
+      font-weight: 700;
+      padding: 10px 32px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0, 120, 212, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .github-star-btn .star-icon {
+      font-size: 17px;
+      color: #FBBF24;
+      transition: transform 0.4s ease;
+    }
+    .github-star-btn.starred {
+      background: linear-gradient(135deg, #10B981, #059669);
+      border-color: #34D399;
+      box-shadow: 0 12px 35px rgba(16, 185, 129, 0.5);
+    }
+    .github-star-btn.starred .star-icon {
+      transform: rotate(72deg) scale(1.3);
+    }
+    .github-tags-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .github-tag {
+      font-size: 11px;
+      color: #94A3B8;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 500;
     }
 
     /* 搜索栏与顶栏 */
@@ -632,16 +708,6 @@
 </head>
 <body>
 
-  <!-- 顶部标题与提示 -->
-  <div class="header-bar">
-    <div class="brand-title">
-      📦 CopyBox 宣传介绍视频 <span>HD 1080P 互动播放器</span>
-    </div>
-    <div class="record-tip">
-      💡 提示：按系统快捷键 <kbd>Win + Alt + R</kbd> 即可全屏内录生成高清宣传视频 MP4
-    </div>
-  </div>
-
   <!-- 16:9 核心视频舞台 -->
   <div class="video-viewport" id="viewport">
     <div class="bg-bloom"></div>
@@ -649,13 +715,6 @@
     <!-- 虚拟鼠标 -->
     <div class="virtual-cursor" id="cursor"></div>
     <div class="click-ripple" id="ripple"></div>
-
-    <!-- 章节标题指示牌 -->
-    <div class="scene-intro-overlay" id="sceneOverlay">
-      <div class="scene-badge" id="sceneBadge">Scene 01</div>
-      <div class="scene-title" id="sceneTitle">毫秒唤醒，全键盘秒贴</div>
-      <div class="scene-subtitle" id="sceneSubtitle">Sub-millisecond wake up with Alt+V & number keys instant paste</div>
-    </div>
 
     <!-- 舞台中心：CopyBox 应用程序界面 -->
     <div class="stage">
@@ -793,6 +852,29 @@
 
         <!-- 成功 Toast -->
         <div class="toast-pill" id="toastPill">✓ 已贴入光标位置</div>
+    </div>
+
+    <!-- 终幕：精美 GitHub 开源链接卡片 (26s~30s 展示) -->
+    <div class="github-end-card" id="githubEndCard">
+      <div class="github-logo-box">
+        <svg height="36" viewBox="0 0 16 16" width="36" fill="#FFFFFF">
+          <path d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9 1.04 1.35.4 1.19 2.05.8 2.51.61 0 .68.01 1.25.01 1.43 0 .21-.15.47-.55.38A8.01 8.01 0 0 1 0 8c0-4.42 3.58-8 8-8z"></path>
+        </svg>
+      </div>
+      <div class="github-brand-title">CopyBox</div>
+      <div class="github-brand-subtitle">0.1ms 毫秒唤醒 · 100% 物理离线 · 现代 Windows 原生</div>
+      <div class="github-url-badge">
+        <span style="font-size:16px;">🔗</span>
+        <span class="github-url-text">https://github.com/1Than499/CopyBox</span>
+      </div>
+      <button class="github-star-btn" id="githubStarBtn">
+        <span class="star-icon">★</span>
+        <span id="starBtnText">Star on GitHub</span>
+      </button>
+      <div class="github-tags-row">
+        <span class="github-tag">🛡️ 本地 SQLite</span>
+        <span class="github-tag">⚡ 零网络延迟</span>
+        <span class="github-tag">📜 MIT 开源协议</span>
       </div>
     </div>
 
@@ -835,42 +917,111 @@
   </div>
 
   <script>
-    // ==================== 场景与动效规划 (总长 30 秒) ====================
-    // 注：SCENES.run(t) 仅处理连续平滑视觉插值（光标移动、拖拽位移、高亮）；
-    // 所有单次点击、音效、弹窗均由下方的 TIMELINE_EVENTS 离散事件精准触发一次，绝不逐帧重叠。
+    // ==================== 全局平滑光标关键帧轨迹 (连续贝塞尔无缝插值) ====================
+    // 以主舞台中心 (0, 0) 为参考坐标系，全程 30 秒无任何瞬移突变，仿人手极度平滑推移
+    const CURSOR_KEYS = [
+      // 0s ~ 1.5s: 软件唤醒，光标优雅由左下方自然滑入
+      { t: 0.0,  x: -280, y: 240 },
+      { t: 1.0,  x: -180, y: 80  },
+      
+      // 1.5s ~ 3.5s: 平滑滑向第 1 个卡片 (JSON代码卡片) 并在 2.8s 点击秒贴
+      { t: 2.2,  x: -125, y: -45 },
+      { t: 3.2,  x: -125, y: -45 },
+
+      // 3.5s ~ 6.5s: 连续平滑滑向第 2 个卡片 (图片缩略图卡片)，卡片柔和浮起
+      { t: 5.0,  x: 125,  y: -45 },
+      { t: 6.8,  x: 125,  y: -45 },
+
+      // 6.8s ~ 8.5s: 自然滑向顶栏分类胶囊“⭐ 置顶”并在 8.2s 点击
+      { t: 8.2,  x: 150,  y: -165 },
+
+      // 8.5s ~ 11.2s: 平滑划回卡片 1 右键交互位置并在 11.2s 右键呼出菜单
+      { t: 10.5, x: -70,  y: -30 },
+      { t: 11.2, x: -70,  y: -30 },
+
+      // 11.2s ~ 13.8s: 移向右键上下文菜单第一项“★ 置顶此条记录”并在 13.2s 点击
+      { t: 12.2, x: -20,  y: -10 },
+      { t: 13.5, x: -20,  y: -10 },
+
+      // 13.8s ~ 16.5s: 优雅划向右上角齿轮设置按钮并在 16.2s 点击
+      { t: 15.0, x: 170,  y: -140 },
+      { t: 16.2, x: 215,  y: -210 },
+
+      // 16.5s ~ 17.5s: 移向设置面板顶部标题抓手栏
+      { t: 17.5, x: 0,    y: -130 },
+
+      // 17.5s ~ 21.0s: 拖拽设置面板（在 getCursorPos 中叠加正弦波位移，窗口内自由拖拽）
+      { t: 21.0, x: 0,    y: -130 },
+
+      // 21.0s ~ 22.0s: 平滑划向设置面板“完成”按钮并在 21.6s 点击
+      { t: 21.6, x: 155,  y: 135 },
+
+      // 22.0s ~ 24.5s: 设置面板关闭，光标移向搜索栏与双语展示区
+      { t: 22.8, x: -60,  y: -210 },
+      { t: 24.5, x: -20,  y: -165 },
+
+      // 24.5s ~ 26.5s: 光标平滑回到中心偏下位置，迎接终幕
+      { t: 26.0, x: 0,    y: -20 },
+
+      // 26.5s ~ 28.2s: 终幕 GitHub 开源卡片升起，光标平滑滑向 ★ Star on GitHub 按钮
+      { t: 28.0, x: 0,    y: 65 },
+      { t: 30.0, x: 0,    y: 65 }  // 点击 Star，金光绽放，优雅定格
+    ];
+
+    function getCursorPos(t) {
+      if (t <= CURSOR_KEYS[0].t) return { x: CURSOR_KEYS[0].x, y: CURSOR_KEYS[0].y };
+      const lastKey = CURSOR_KEYS[CURSOR_KEYS.length - 1];
+      if (t >= lastKey.t) return { x: lastKey.x, y: lastKey.y };
+
+      let i = 0;
+      while (i < CURSOR_KEYS.length - 1 && CURSOR_KEYS[i + 1].t < t) {
+        i++;
+      }
+      const k0 = CURSOR_KEYS[i];
+      const k1 = CURSOR_KEYS[i + 1];
+      const dt = k1.t - k0.t;
+      const progress = dt > 0 ? (t - k0.t) / dt : 1;
+      
+      // easeInOutCubic 平滑缓动
+      const ease = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      let x = k0.x + (k1.x - k0.x) * ease;
+      let y = k0.y + (k1.y - k0.y) * ease;
+
+      // 17.5s ~ 21.0s 拖拽设置面板期间平滑叠加位移
+      if (t >= 17.5 && t < 21.0) {
+        const dragP = (t - 17.5) / 3.5;
+        const dragX = Math.sin(dragP * Math.PI * 2) * 55;
+        const dragY = Math.cos(dragP * Math.PI * 2) * 30 - 30;
+        x += dragX;
+        y += dragY;
+      }
+
+      return { x, y };
+    }
+
+    // ==================== 场景分段与字幕规划 (总长 30 秒) ====================
     const SCENES = [
       {
         startTime: 0,
         endTime: 5,
-        badge: "Scene 01",
-        title: "毫秒唤醒，全键盘秒贴",
-        subtitle: "Instant Wake-up & Keyboard-Driven Flow",
         captionZh: "按下 Alt+V 瞬间唤醒 CopyBox，按数字键 1~9 直接秒贴对应内容！",
         captionEn: "Press Alt+V for instant wakeup; hit number keys 1~9 to paste items directly into active window.",
         run: (t) => {
           highlightCard(1);
-          if (t < 2.5) {
-            const p = t / 2.5;
-            moveCursor(180 + p * 60, 300 - p * 60);
-          } else {
-            moveCursor(240, 240);
-          }
         }
       },
       {
         startTime: 5,
         endTime: 10,
-        badge: "Scene 02",
-        title: "1:1 现代双列卡片布局",
-        subtitle: "1:1 Two-Column Card Grid with Code Highlight",
         captionZh: "代码语法高亮、高清图片缩略图、纯文本优雅段落排版，一目了然。",
         captionEn: "Syntax highlighted code snippets, image previews, and elegant typography for plain text.",
         run: (t) => {
           if (t < 7.5) {
-            moveCursor(150, 190);
             highlightCard(1);
           } else {
-            moveCursor(330, 190);
             highlightCard(2);
           }
         }
@@ -878,70 +1029,44 @@
       {
         startTime: 10,
         endTime: 16,
-        badge: "Scene 03",
-        title: "右键菜单与快捷操作",
-        subtitle: "Right-Click Context Menu & Quick Pinning",
         captionZh: "在任意卡片单击右键即刻高亮呼出菜单：暖金星号置顶、经典蓝复制、警示红删除。",
         captionEn: "Right-click any card for instant contextual actions: ★ Pin to top, ❐ Copy, ✕ Delete.",
         run: (t) => {
           highlightCard(1);
-          if (t < 11.2) {
-            moveCursor(240, 230);
-          } else if (t < 13.8) {
-            moveCursor(260, 270);
-          } else {
-            moveCursor(260, 270);
-          }
         }
       },
       {
         startTime: 16,
         endTime: 22,
-        badge: "Scene 04",
-        title: "独立设置面板，窗口内自由拖拽",
-        subtitle: "Draggable Settings Panel with Boundary Protection",
         captionZh: "设置面板支持在主窗口内任意拖拽移动，内置智能边界算法，绝不超出边缘。",
         captionEn: "Drag the settings panel anywhere inside the client area with zero boundary overflowing.",
         run: (t) => {
-          if (t < 17) {
-            moveCursor(240, 160);
-          } else if (t >= 17 && t < 21) {
-            const dragProgress = (t - 17) / 4;
-            const offsetX = Math.sin(dragProgress * Math.PI * 2) * 45;
-            const offsetY = Math.cos(dragProgress * Math.PI * 2) * 25 - 25;
-            moveSettingsPanel(offsetX, offsetY);
-            moveCursor(240 + offsetX, 160 + offsetY);
+          if (t >= 17.5 && t < 21.0) {
+            const dragP = (t - 17.5) / 3.5;
+            const dragX = Math.sin(dragP * Math.PI * 2) * 55;
+            const dragY = Math.cos(dragP * Math.PI * 2) * 30 - 30;
+            moveSettingsPanel(dragX, dragY);
           } else {
-            moveCursor(400, 320);
+            resetSettingsPanelPos();
           }
         }
       },
       {
         startTime: 22,
         endTime: 26,
-        badge: "Scene 05",
-        title: "原生中英双语与超清 ClearType",
-        subtitle: "Full Bilingual Support & Razor-Sharp Font Rendering",
         captionZh: "完美支持简体中文与 English 即时切换，分离阴影与文字，字迹刀锋般锐利清晰。",
         captionEn: "Seamless i18n switching with decoupled shadow layer for razor-sharp ClearType text rendering.",
         run: (t) => {
-          if (t < 23.6) {
-            moveCursor(210, 250);
-          } else {
-            moveCursor(320, 340);
-          }
+          highlightCard(1);
         }
       },
       {
         startTime: 26,
         endTime: 30,
-        badge: "Scene 06",
-        title: "100% 物理离线，完全开源",
-        subtitle: "100% Offline, Privacy-First, MIT Open Source",
-        captionZh: "所有数据物理留存本地 SQLite，支持私有云同步，GitHub 开源欢迎体验！",
-        captionEn: "All data safely saved in local SQLite. Zero cloud tracking. Proudly open source on GitHub!",
+        captionZh: "完全开源，数据自主。欢迎在 GitHub Star 收藏体验 CopyBox！",
+        captionEn: "100% Open Source. Privacy First. Star us on GitHub: github.com/1Than499/CopyBox",
         run: (t) => {
-          moveCursor(440, 60);
+          // 终幕状态维持
         }
       }
     ];
@@ -958,9 +1083,9 @@
     const contextMenu = document.getElementById("contextMenu");
     const settingsPanel = document.getElementById("settingsPanel");
     const toastPill = document.getElementById("toastPill");
-    const sceneBadge = document.getElementById("sceneBadge");
-    const sceneTitle = document.getElementById("sceneTitle");
-    const sceneSubtitle = document.getElementById("sceneSubtitle");
+    const githubEndCard = document.getElementById("githubEndCard");
+    const githubStarBtn = document.getElementById("githubStarBtn");
+    const starBtnText = document.getElementById("starBtnText");
     const captionZh = document.getElementById("captionZh");
     const captionEn = document.getElementById("captionEn");
     const progressFill = document.getElementById("progressFill");
@@ -1056,8 +1181,6 @@
 
         if (this.timer) clearInterval(this.timer);
         this.nextNoteTime = this.ctx.currentTime + 0.05;
-        // 精密前瞻调度器 (Lookahead Scheduler)，每 30ms 提前调度 150ms 内音频
-        // 彻底根除因主线程 DOM 动画波动导致的节奏颤动或卡顿
         this.timer = setInterval(() => this.scheduler(), 30);
       }
 
@@ -1074,8 +1197,8 @@
 
       scheduler() {
         if (!this.ctx || !this.isPlaying || !this.enabled) return;
-        const scheduleAheadTime = 0.15; // 提前 150ms 调度
-        const stepDuration = 0.24;      // 125 BPM: 60 / 125 / 2 = 0.24s (8分音符步长)
+        const scheduleAheadTime = 0.15;
+        const stepDuration = 0.24;
 
         while (this.nextNoteTime < this.ctx.currentTime + scheduleAheadTime) {
           this.scheduleBeat(this.beatIndex, this.nextNoteTime);
@@ -1089,20 +1212,17 @@
         const chord = this.chords[chordIndex];
         const beatInBar = beatIdx % 8;
 
-        // 1. 每小节第 1 拍弹奏温暖和弦背景 Pad & Sub-Bass
         if (beatInBar === 0) {
           this.playChordPad(chord.notes, time, 1.8);
           this.playSubBass(chord.bass, time, 1.6);
         }
 
-        // 2. 电子水滴晶莹琶音 Pluck (在偶数拍轻巧跃动)
         if (beatInBar % 2 === 0) {
           const noteIdx = (beatInBar / 2) % chord.notes.length;
           const freq = chord.notes[noteIdx] * 2;
           this.playPluck(freq, time, 0.35);
         }
 
-        // 3. 极细微清脆的闭镲节奏 (第 2, 6 拍轻点)
         if (beatInBar === 2 || beatInBar === 6) {
           this.playHiHat(time);
         }
@@ -1213,7 +1333,6 @@
       playClick() {
         if (!this.bgm.ctx || !this.bgm.enabled) return;
         const now = this.bgm.ctx.currentTime;
-        // 防高频连发抖动
         if (now - this.lastSoundTime < 0.05) return;
         this.lastSoundTime = now;
 
@@ -1301,13 +1420,24 @@
     function showSettings() { settingsPanel.classList.add("visible"); }
     function hideSettings() { settingsPanel.classList.remove("visible"); }
     
+    function showGitHubCard() {
+      appWindow.classList.add("scaled-back");
+      githubEndCard.classList.add("visible");
+    }
+    function hideGitHubCard() {
+      appWindow.classList.remove("scaled-back");
+      githubEndCard.classList.remove("visible");
+      githubStarBtn.classList.remove("starred");
+      if (starBtnText) starBtnText.textContent = "Star on GitHub";
+    }
+
     function moveCursor(x, y) {
       cursor.style.transform = `translate(${x}px, ${y}px)`;
     }
     function triggerClick(x, y) {
       sfx.playClick();
-      ripple.style.left = `${x + 2}px`;
-      ripple.style.top = `${y + 2}px`;
+      ripple.style.left = `calc(50% + ${x + 2}px)`;
+      ripple.style.top = `calc(50% + ${y + 2}px)`;
       ripple.classList.remove("animate");
       void ripple.offsetWidth;
       ripple.classList.add("animate");
@@ -1335,31 +1465,44 @@
     }
 
     // ==================== 精准离散事件时间线 ====================
-    // 每个动作只在时间轴经过对应秒数时严格触发一次，避免任何音效与动画狂闪
     const TIMELINE_EVENTS = [
-      // Scene 01: 毫秒唤醒
-      { time: 0.1,  id: "s1_init",    action: () => { hideSettings(); hideContextMenu(); showAppWindow(true); } },
-      { time: 3.2,  id: "s1_click",   action: () => { triggerClick(240, 240); showToast("✓ 已贴入光标位置 [1]"); } },
+      // 0.1s: 软件唤醒
+      { time: 0.1,  id: "s1_init",    action: () => { hideGitHubCard(); hideSettings(); hideContextMenu(); showAppWindow(true); } },
+      // 2.8s: 键盘秒贴第一张代码卡片
+      { time: 2.8,  id: "s1_click",   action: () => { triggerClick(-125, -45); showToast("✓ 已贴入光标位置 [1]"); } },
 
-      // Scene 02: 1:1 双列卡片
-      { time: 5.0,  id: "s2_init",    action: () => { showAppWindow(false); hideContextMenu(); hideSettings(); } },
+      // 5.0s: 双列卡片网格
+      { time: 5.0,  id: "s2_init",    action: () => { hideGitHubCard(); showAppWindow(false); hideContextMenu(); hideSettings(); } },
+      // 8.2s: 点击标签胶囊
+      { time: 8.2,  id: "s2_tab",     action: () => { triggerClick(150, -165); } },
 
-      // Scene 03: 右键菜单与置顶
-      { time: 10.0, id: "s3_init",    action: () => { showAppWindow(false); hideSettings(); hideContextMenu(); } },
-      { time: 11.2, id: "s3_rclick",  action: () => { triggerClick(240, 230); showContextMenu(); } },
-      { time: 13.8, id: "s3_pin",     action: () => { triggerClick(260, 270); hideContextMenu(); showToast("⭐ 已置顶此条记录至最顶部"); } },
+      // 10.0s: 回到卡片区准备右键
+      { time: 10.0, id: "s3_init",    action: () => { hideGitHubCard(); showAppWindow(false); hideSettings(); hideContextMenu(); } },
+      // 11.2s: 呼出右键菜单
+      { time: 11.2, id: "s3_rclick",  action: () => { triggerClick(-70, -30); showContextMenu(); } },
+      // 13.2s: 点击置顶此条记录
+      { time: 13.2, id: "s3_pin",     action: () => { triggerClick(-20, -10); hideContextMenu(); showToast("⭐ 已置顶此条记录至最顶部"); } },
 
-      // Scene 04: 拖拽设置面板
-      { time: 16.0, id: "s4_open",    action: () => { hideContextMenu(); showAppWindow(false); showSettings(); resetSettingsPanelPos(); } },
-      { time: 21.3, id: "s4_done",    action: () => { triggerClick(400, 320); hideSettings(); } },
+      // 16.0s: 打开偏好设置面板
+      { time: 16.2, id: "s4_open",    action: () => { triggerClick(215, -210); hideContextMenu(); showAppWindow(false); showSettings(); resetSettingsPanelPos(); } },
+      // 21.6s: 完成设置并关闭
+      { time: 21.6, id: "s4_done",    action: () => { triggerClick(155, 135); hideSettings(); } },
 
-      // Scene 05: 双语与 ClearType
-      { time: 22.0, id: "s5_open",    action: () => { showAppWindow(false); showSettings(); resetSettingsPanelPos(); setSearchPlaceholder("搜索剪贴板历史..."); } },
-      { time: 23.6, id: "s5_en",      action: () => { triggerClick(210, 250); setSearchPlaceholder("Search clipboard history..."); } },
+      // 22.0s: 双语国际化
+      { time: 22.0, id: "s5_open",    action: () => { hideGitHubCard(); showAppWindow(false); hideSettings(); setSearchPlaceholder("搜索剪贴板历史..."); } },
+      // 23.5s: 切换为 English
+      { time: 23.5, id: "s5_en",      action: () => { setSearchPlaceholder("Search clipboard history..."); } },
 
-      // Scene 06: 开源致谢
-      { time: 26.0, id: "s6_init",    action: () => { hideSettings(); hideContextMenu(); showAppWindow(false); } },
-      { time: 27.2, id: "s6_toast",   action: () => { triggerClick(440, 60); showToast("🎉 GitHub: 1Than499/CopyBox"); } }
+      // 26.0s: 终幕 GitHub 开源卡片升起
+      { time: 26.0, id: "s6_init",    action: () => { hideSettings(); hideContextMenu(); showGitHubCard(); } },
+      // 28.2s: 点击 ★ Star on GitHub 按钮
+      { time: 28.2, id: "s6_star",    action: () => { 
+          triggerClick(0, 65); 
+          githubStarBtn.classList.add("starred");
+          if (starBtnText) starBtnText.textContent = "★ Starred!";
+          showToast("🎉 感谢支持！欢迎体验与贡献开源"); 
+        } 
+      }
     ];
 
     let triggeredEvents = new Set();
@@ -1374,7 +1517,7 @@
         const prevTime = currentTime;
         currentTime += delta;
         if (currentTime >= TOTAL_DURATION) {
-          currentTime = 0; // 自动循环播放
+          currentTime = 0;
           triggeredEvents.clear();
           hasShownAppWindow = false;
         }
@@ -1389,7 +1532,7 @@
       const curSec = Math.floor(time).toString().padStart(2, "0");
       timeCode.textContent = `00:${curSec} / 00:30`;
 
-      // 触发离散事件（带时间判定与已触发 Set 去重，杜绝单帧重复触发）
+      // 触发离散事件
       if (prevTime !== null) {
         TIMELINE_EVENTS.forEach(ev => {
           if (!triggeredEvents.has(ev.id) && prevTime < ev.time && time >= ev.time) {
@@ -1399,13 +1542,14 @@
         });
       }
 
-      // 更新场景字幕与连续视觉动效
+      // 全局连续数学插值驱动光标，全程无突变
+      const cursorPos = getCursorPos(time);
+      moveCursor(cursorPos.x, cursorPos.y);
+
+      // 更新场景字幕与高亮
       const currentSceneIndex = SCENES.findIndex(s => time >= s.startTime && time < s.endTime);
       if (currentSceneIndex !== -1) {
         const scene = SCENES[currentSceneIndex];
-        sceneBadge.textContent = scene.badge;
-        sceneTitle.textContent = scene.title;
-        sceneSubtitle.textContent = scene.subtitle;
         captionZh.textContent = scene.captionZh;
         captionEn.textContent = scene.captionEn;
 
@@ -1470,28 +1614,40 @@
       triggeredEvents.clear();
       hasShownAppWindow = targetTime >= 0.1;
 
-      // 将目标时间之前的事件标记为已发生，防止倒退/快进时集中爆发音效
       TIMELINE_EVENTS.forEach(ev => {
         if (ev.time < targetTime) {
           triggeredEvents.add(ev.id);
         }
       });
 
-      // 快速恢复对应时间点的主界面布局
+      // 状态恢复
       if (currentTime < 5) {
-        hideSettings(); hideContextMenu(); showAppWindow(false);
+        hideGitHubCard(); hideSettings(); hideContextMenu(); showAppWindow(false);
       } else if (currentTime < 10) {
-        showAppWindow(false); hideContextMenu(); hideSettings();
+        hideGitHubCard(); showAppWindow(false); hideContextMenu(); hideSettings();
       } else if (currentTime < 16) {
-        showAppWindow(false); hideSettings();
-        if (currentTime > 11.2 && currentTime < 13.8) showContextMenu(); else hideContextMenu();
+        hideGitHubCard(); showAppWindow(false); hideSettings();
+        if (currentTime > 11.2 && currentTime < 13.2) showContextMenu(); else hideContextMenu();
       } else if (currentTime < 22) {
-        hideContextMenu(); showAppWindow(false);
-        if (currentTime < 21.3) showSettings(); else hideSettings();
+        hideGitHubCard(); hideContextMenu(); showAppWindow(false);
+        if (currentTime >= 16.2 && currentTime < 21.6) showSettings(); else hideSettings();
       } else if (currentTime < 26) {
-        showAppWindow(false); showSettings();
+        hideGitHubCard(); showAppWindow(false); hideSettings();
       } else {
-        hideSettings(); hideContextMenu(); showAppWindow(false);
+        hideSettings(); hideContextMenu(); showGitHubCard();
+        if (currentTime >= 28.2) {
+          githubStarBtn.classList.add("starred");
+          if (starBtnText) starBtnText.textContent = "★ Starred!";
+        } else {
+          githubStarBtn.classList.remove("starred");
+          if (starBtnText) starBtnText.textContent = "Star on GitHub";
+        }
+      }
+
+      if (currentTime >= 23.5) {
+        setSearchPlaceholder("Search clipboard history...");
+      } else {
+        setSearchPlaceholder("搜索剪贴板历史...");
       }
 
       updateTimeline(currentTime);
