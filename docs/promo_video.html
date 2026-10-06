@@ -1002,13 +1002,13 @@
       return { x, y };
     }
 
-    // ==================== 场景分段与字幕规划 (总长 30 秒) ====================
+    // ==================== 场景分段与字幕规划 (总长 30 秒，与旁白字句 100% 对齐) ====================
     const SCENES = [
       {
         startTime: 0,
         endTime: 5,
-        captionZh: "按下 Alt+V 瞬间唤醒 CopyBox，按数字键 1~9 直接秒贴对应内容！",
-        captionEn: "Press Alt+V for instant wakeup; hit number keys 1~9 to paste items directly into active window.",
+        captionZh: "按下 Alt+V 瞬间唤醒，数字键秒贴内容",
+        captionEn: "Press Alt+V for instant wakeup; number keys to paste directly.",
         run: (t) => {
           highlightCard(1);
         }
@@ -1016,8 +1016,8 @@
       {
         startTime: 5,
         endTime: 10,
-        captionZh: "代码语法高亮、高清图片缩略图、纯文本优雅段落排版，一目了然。",
-        captionEn: "Syntax highlighted code snippets, image previews, and elegant typography for plain text.",
+        captionZh: "现代双列卡片，代码高亮与图片一览无余",
+        captionEn: "Modern two-column cards with syntax highlight and image preview.",
         run: (t) => {
           if (t < 7.5) {
             highlightCard(1);
@@ -1029,8 +1029,8 @@
       {
         startTime: 10,
         endTime: 16,
-        captionZh: "在任意卡片单击右键即刻高亮呼出菜单：暖金星号置顶、经典蓝复制、警示红删除。",
-        captionEn: "Right-click any card for instant contextual actions: ★ Pin to top, ❐ Copy, ✕ Delete.",
+        captionZh: "右键呼出菜单，星标一键置顶常用记录",
+        captionEn: "Right-click for context menu; star and pin important items.",
         run: (t) => {
           highlightCard(1);
         }
@@ -1038,8 +1038,8 @@
       {
         startTime: 16,
         endTime: 22,
-        captionZh: "设置面板支持在主窗口内任意拖拽移动，内置智能边界算法，绝不超出边缘。",
-        captionEn: "Drag the settings panel anywhere inside the client area with zero boundary overflowing.",
+        captionZh: "设置面板随心拖拽，智能边界绝不溢出",
+        captionEn: "Freely drag the settings panel with boundary protection.",
         run: (t) => {
           if (t >= 17.5 && t < 21.0) {
             const dragP = (t - 17.5) / 3.5;
@@ -1054,8 +1054,8 @@
       {
         startTime: 22,
         endTime: 26,
-        captionZh: "完美支持简体中文与 English 即时切换，分离阴影与文字，字迹刀锋般锐利清晰。",
-        captionEn: "Seamless i18n switching with decoupled shadow layer for razor-sharp ClearType text rendering.",
+        captionZh: "中英双语无缝切换，文字超清锐利",
+        captionEn: "Seamless bilingual switching with razor-sharp font rendering.",
         run: (t) => {
           highlightCard(1);
         }
@@ -1063,8 +1063,8 @@
       {
         startTime: 26,
         endTime: 30,
-        captionZh: "完全开源，数据自主。欢迎在 GitHub Star 收藏体验 CopyBox！",
-        captionEn: "100% Open Source. Privacy First. Star us on GitHub: github.com/1Than499/CopyBox",
+        captionZh: "物理离线隐私，欢迎在 GitHub 体验 CopyBox！",
+        captionEn: "100% offline privacy. Star and experience CopyBox on GitHub!",
         run: (t) => {
           // 终幕状态维持
         }
