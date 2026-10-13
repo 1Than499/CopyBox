@@ -25,6 +25,7 @@ namespace ClipVault
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             base.OnStartup(e);
 
             AppDomain.CurrentDomain.UnhandledException += (s, args) =>
@@ -64,48 +65,17 @@ namespace ClipVault
                 _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
                 _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
 
-                // 4. 绑定全局热键: Alt + V 唤起主面板; Alt + Shift + V 唤起贴边双模抽屉
+                // 4. 绑定统一全局热键 (Alt + V)，根据当前设置呼出对应模式 (1.0 居中 或 2.0 侧边栏)
                 _hotkeyService.HotkeyPressed += () =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (_mainWindow != null)
-                        {
-                            if (_mainWindow.IsVisible && _mainWindow.WindowState != WindowState.Minimized)
-                            {
-                                _mainWindow.Hide();
-                            }
-                            else
-                            {
-                                _mainWindow.ShowAndActivate();
-                            }
-                        }
-                    });
-                };
-
-                _hotkeyService.SidebarHotkeyPressed += () =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (_sidebarWindow != null)
-                        {
-                            if (_sidebarWindow.IsVisible)
-                            {
-                                _sidebarWindow.SlideOutAndHide();
-                            }
-                            else
-                            {
-                                _sidebarWindow.ShowDocked();
-                            }
-                        }
-                    });
+                    ToggleActiveWindow();
                 };
 
                 // 5. 初始化 Windows 任务栏系统托盘 (100% 官方原生稳定常驻)
                 InitTrayIcon();
 
-                // 6. 启动后直接呼出主窗口
-                _mainWindow.ShowAndActivate();
+                // 6. 启动后根据当前选择的模式唤起界面
+                ToggleActiveWindow();
             }
             catch (Exception ex)
             {
@@ -168,7 +138,6 @@ namespace ClipVault
         }
 
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuQuick;
-        private System.Windows.Forms.ToolStripMenuItem? _trayMenuSidebar;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuPause;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuClear;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuSettings;
@@ -191,10 +160,7 @@ namespace ClipVault
 
                 _trayMenuQuick = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuQuick.Font = new Font(_trayMenuQuick.Font, System.Drawing.FontStyle.Bold);
-                _trayMenuQuick.Click += (s, e) => Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
-
-                _trayMenuSidebar = new System.Windows.Forms.ToolStripMenuItem();
-                _trayMenuSidebar.Click += (s, e) => Dispatcher.Invoke(() => _sidebarWindow?.ShowDocked());
+                _trayMenuQuick.Click += (s, e) => Dispatcher.Invoke(() => ToggleActiveWindow());
 
                 _trayMenuPause = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuPause.Click += (s, e) =>
@@ -215,22 +181,21 @@ namespace ClipVault
                     if (res == MessageBoxResult.Yes)
                     {
                         _dbService?.ClearAll();
-                        Dispatcher.Invoke(() => _mainWindow?.RefreshCards());
+                        Dispatcher.Invoke(() =>
+                        {
+                            _mainWindow?.RefreshCards();
+                            _sidebarWindow?.RefreshCards();
+                        });
                     }
                 };
 
                 _trayMenuSettings = new System.Windows.Forms.ToolStripMenuItem();
-                _trayMenuSettings.Click += (s, e) => Dispatcher.Invoke(() =>
-                {
-                    _mainWindow?.ShowAndActivate();
-                    _mainWindow?.OpenSettings();
-                });
+                _trayMenuSettings.Click += (s, e) => Dispatcher.Invoke(() => OpenSettings());
 
                 _trayMenuExit = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuExit.Click += (s, e) => Dispatcher.Invoke(() => ExitApplication());
 
                 contextMenu.Items.Add(_trayMenuQuick);
-                contextMenu.Items.Add(_trayMenuSidebar);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
                 contextMenu.Items.Add(_trayMenuPause);
                 contextMenu.Items.Add(_trayMenuClear);
@@ -243,17 +208,17 @@ namespace ClipVault
                 UpdateTrayTexts();
                 LocalizationService.Instance.LanguageChanged += UpdateTrayTexts;
 
-                // 单击或双击托盘图标：快速唤醒主窗口
+                // 单击或双击托盘图标：统一呼出当前设定的模式
                 _notifyIcon.MouseClick += (s, e) =>
                 {
                     if (e.Button == System.Windows.Forms.MouseButtons.Left)
                     {
-                        Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
+                        Dispatcher.Invoke(() => ToggleActiveWindow());
                     }
                 };
                 _notifyIcon.DoubleClick += (s, e) =>
                 {
-                    Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
+                    Dispatcher.Invoke(() => ToggleActiveWindow());
                 };
             }
             catch (Exception ex)
@@ -269,7 +234,6 @@ namespace ClipVault
             _notifyIcon.Text = loc.Get("TrayTooltip");
 
             if (_trayMenuQuick != null) _trayMenuQuick.Text = "🚀 " + loc.Get("TrayShow");
-            if (_trayMenuSidebar != null) _trayMenuSidebar.Text = "📱 " + loc.Get("TraySidebar");
             if (_trayMenuClear != null) _trayMenuClear.Text = "🗑️ " + loc.Get("TrayClear");
             if (_trayMenuSettings != null) _trayMenuSettings.Text = "⚙️ " + loc.Get("TraySettings");
             if (_trayMenuExit != null) _trayMenuExit.Text = "🛑 " + loc.Get("TrayExit");
@@ -283,6 +247,74 @@ namespace ClipVault
             _trayMenuPause.Text = _monitorService.IsPaused 
                 ? "▶️ " + loc.Get("TrayResume") 
                 : "⏸️ " + loc.Get("TrayPause");
+        }
+
+        /// <summary>
+        /// 核心多模统一调度：按全局快捷键 (Alt+V) 或点击托盘时，仅呼出当前设置选定的单一模式
+        /// </summary>
+        public void ToggleActiveWindow()
+        {
+            try
+            {
+                string mode = _settingsService?.CurrentSettings.WindowMode ?? "Sidebar";
+                if (mode == "Centered")
+                {
+                    if (_sidebarWindow != null && _sidebarWindow.IsVisible)
+                    {
+                        _sidebarWindow.SlideOutAndHide();
+                    }
+                    _mainWindow?.ToggleMainWindow();
+                }
+                else
+                {
+                    if (_mainWindow != null && _mainWindow.IsVisible)
+                    {
+                        _mainWindow.Hide();
+                    }
+                    _sidebarWindow?.ToggleDocked();
+                }
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText(@"d:\bank\crash.log", $"[ToggleActiveWindow Exception] {ex}\n");
+            }
+        }
+
+        /// <summary>
+        /// 设置中切换形态偏好 (1.0 居中 vs 2.0 侧边栏) 时的即时互斥响应
+        /// </summary>
+        public void OnWindowModeChanged(string newMode)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (newMode == "Centered")
+                {
+                    _sidebarWindow?.SlideOutAndHide();
+                    _mainWindow?.ShowAndActivate();
+                    _mainWindow?.OpenSettings();
+                }
+                else
+                {
+                    _mainWindow?.Hide();
+                    _sidebarWindow?.ShowDocked();
+                }
+            });
+        }
+
+        /// <summary>
+        /// 从侧边栏齿轮或托盘菜单打开偏好设置浮层
+        /// </summary>
+        public void OpenSettings()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (_sidebarWindow != null && _sidebarWindow.IsVisible)
+                {
+                    _sidebarWindow.SlideOutAndHide();
+                }
+                _mainWindow?.ShowAndActivate();
+                _mainWindow?.OpenSettings();
+            });
         }
 
         public void ExitApplication()

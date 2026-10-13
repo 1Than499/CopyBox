@@ -103,6 +103,16 @@ namespace ClipVault
                 RadioLangZh.IsChecked = true;
             }
 
+            // 0.5 界面展示形态偏好加载
+            if (s.WindowMode == "Centered")
+            {
+                RadioModeCentered.IsChecked = true;
+            }
+            else
+            {
+                RadioModeSidebar.IsChecked = true;
+            }
+
             // 1. 关闭行为加载
             if (s.CloseAction == "ExitApp")
             {
@@ -176,6 +186,10 @@ namespace ClipVault
             if (RadioLangZh != null) RadioLangZh.Content = loc.Get("LangZh");
             if (RadioLangEn != null) RadioLangEn.Content = loc.Get("LangEn");
 
+            if (TxtWindowModeTitle != null) TxtWindowModeTitle.Text = loc.Get("WindowModeTitle");
+            if (RadioModeSidebar != null) RadioModeSidebar.Content = loc.Get("WindowModeSidebar");
+            if (RadioModeCentered != null) RadioModeCentered.Content = loc.Get("WindowModeCentered");
+
             if (TxtStoragePathTitle != null) TxtStoragePathTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
 
@@ -217,6 +231,22 @@ namespace ClipVault
             }
         }
 
+        private void WindowMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null || RadioModeSidebar == null || RadioModeCentered == null) return;
+            string newMode = RadioModeSidebar.IsChecked == true ? "Sidebar" : "Centered";
+            if (_settingsService.CurrentSettings.WindowMode != newMode)
+            {
+                _settingsService.CurrentSettings.WindowMode = newMode;
+                _settingsService.SaveSettings();
+
+                if (Application.Current is App app)
+                {
+                    app.OnWindowModeChanged(newMode);
+                }
+            }
+        }
+
         private void UpdateStorageInfo()
         {
             var (dbSize, totalCount, pinnedCount, imgCount, imgSize) = _dbService.GetStats();
@@ -246,6 +276,18 @@ namespace ClipVault
             }
 
             SearchInputBox.Focus();
+        }
+
+        public void ToggleMainWindow()
+        {
+            if (this.IsVisible && this.WindowState != WindowState.Minimized)
+            {
+                this.Hide();
+            }
+            else
+            {
+                ShowAndActivate();
+            }
         }
 
         public void RefreshCards()

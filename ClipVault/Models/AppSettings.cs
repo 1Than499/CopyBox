@@ -12,6 +12,9 @@ namespace ClipVault.Models
         public string HotkeyModifiers { get; set; } = "Alt"; // Alt, Ctrl, Shift, Win
         public string HotkeyKey { get; set; } = "V";
 
+        // 界面展示形态偏好: "Sidebar" (v2.0 贴边毛玻璃双模抽屉，默认) 或 "Centered" (v1.0 经典居中极速浮窗)
+        public string WindowMode { get; set; } = "Sidebar";
+
         // 窗口关闭动作偏好: "MinimizeToTray" (最小化到托盘) 或 "ExitApp" (直接退出)
         public string CloseAction { get; set; } = "MinimizeToTray";
 

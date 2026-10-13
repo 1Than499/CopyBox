@@ -604,6 +604,17 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- 0.5. 界面形态切换 (1.0 居中 vs 2.0 侧边栏) -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtWindowModeTitle" Text="🖥️ 界面展示形态偏好：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,7"/>
+                                    <StackPanel>
+                                        <RadioButton x:Name="RadioModeSidebar" GroupName="WindowModeGroup" Content="📱 v2.0 贴边毛玻璃双模抽屉 (吸附右侧 / 仿生操作中心)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Margin="0,0,0,6" Checked="WindowMode_Changed"/>
+                                        <RadioButton x:Name="RadioModeCentered" GroupName="WindowModeGroup" Content="🪟 v1.0 经典居中极速浮窗 (居中弹出 / 双列卡片网格)" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="WindowMode_Changed"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
                             <!-- 1. 自选存储路径 -->
                             <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,8">
                                 <StackPanel>

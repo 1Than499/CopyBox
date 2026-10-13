@@ -48,6 +48,9 @@ namespace ClipVault.Services
                 ["LangSectionTitle"] = "🌐 界面语言 / Language：",
                 ["LangZh"] = "简体中文",
                 ["LangEn"] = "English",
+                ["WindowModeTitle"] = "🖥️ 界面展示形态偏好：",
+                ["WindowModeSidebar"] = "📱 v2.0 贴边毛玻璃双模抽屉 (吸附屏幕右侧 / 双模切换 / 磁贴看板)",
+                ["WindowModeCentered"] = "🪟 v1.0 经典居中极速浮窗 (居中弹出 / 双列卡片网格)",
                 ["StoragePathTitle"] = "本地数据存储路径：",
                 ["BrowseButton"] = "浏览...",
                 ["StatusInfoFormat"] = "ℹ 本地 SQLite 状态正常：已记录 {0} 条 (置顶 {1})，图片 {2} 张，数据 100% 物理留存于本地磁盘。",
@@ -68,7 +71,7 @@ namespace ClipVault.Services
 
                 // 托盘菜单与提示
                 ["TrayTooltip"] = "CopyBox - 剪贴板安全保管箱 (Alt+V)",
-                ["TrayShow"] = "唤起 CopyBox 主界面 (Alt+V)",
+                ["TrayShow"] = "唤起 CopyBox (Alt+V)",
                 ["TraySidebar"] = "打开贴边双模抽屉 (Alt+Shift+V)",
                 ["TrayPause"] = "暂停剪贴板监听",
                 ["TrayResume"] = "恢复剪贴板监听",
@@ -129,6 +132,9 @@ namespace ClipVault.Services
                 ["LangSectionTitle"] = "🌐 Language / 语言：",
                 ["LangZh"] = "简体中文",
                 ["LangEn"] = "English",
+                ["WindowModeTitle"] = "🖥️ Interface Presentation Mode:",
+                ["WindowModeSidebar"] = "📱 v2.0 Sidebar Acrylic Drawer (Docked right / Dual-mode / Action Center)",
+                ["WindowModeCentered"] = "🪟 v1.0 Classic Centered Palette (Centered floating / Two-column cards)",
                 ["StoragePathTitle"] = "Local Storage Path:",
                 ["BrowseButton"] = "Browse...",
                 ["StatusInfoFormat"] = "ℹ Local SQLite status is active: {0} items ({1} pinned), {2} images. 100% stored offline on your local disk.",

@@ -122,14 +122,11 @@
         </Style>
     </Window.Resources>
 
-    <!-- 侧边栏外层主体，带滑入/滑出平移动画支持 -->
+    <!-- 侧边栏外层主体 -->
     <Border x:Name="RootBorder" 
             Background="{StaticResource SidebarBgBrush}" 
             BorderBrush="{StaticResource SidebarBorderBrush}" 
             BorderThickness="1,0,0,0">
-        <Border.RenderTransform>
-            <TranslateTransform x:Name="WindowTranslate" X="0"/>
-        </Border.RenderTransform>
 
         <Grid>
             <Grid.RowDefinitions>

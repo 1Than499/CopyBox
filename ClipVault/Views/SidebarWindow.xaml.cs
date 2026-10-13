@@ -74,38 +74,34 @@ namespace ClipVault.Views
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-
-            // 注入 WS_EX_NOACTIVATE 扩展样式，避免点击本窗口夺取用户当前活动软件的光标焦点
-            var helper = new WindowInteropHelper(this);
-            if (helper.Handle != IntPtr.Zero)
-            {
-                NativeMethods.SetNoActivate(helper.Handle);
-            }
         }
 
         /// <summary>
-        /// 精准吸附至屏幕最右侧工作区全高，并执行滑入动效
+        /// 精准吸附至屏幕最右侧工作区全高，并执行顺滑显现
         /// </summary>
         public void ShowDocked()
         {
+            _pasteSimulator.RecordTargetWindow();
+
             var workArea = SystemParameters.WorkArea;
-            this.Left = workArea.Right - this.Width;
-            this.Top = workArea.Top;
+            this.Width = 360;
             this.Height = workArea.Height;
+            this.Top = workArea.Top;
+            this.Left = workArea.Right - this.Width;
+            this.WindowState = WindowState.Normal;
+            this.Topmost = true;
 
             RefreshCards();
 
             this.Show();
+            this.Activate();
 
-            // 滑入动效
-            var anim = new DoubleAnimation
-            {
-                From = this.Width,
-                To = 0,
-                Duration = TimeSpan.FromMilliseconds(260),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            WindowTranslate.BeginAnimation(TranslateTransform.XProperty, anim);
+            // 顺畅渐变显现，绝无越界裁剪问题
+            this.Opacity = 0;
+            var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+            this.BeginAnimation(UIElement.OpacityProperty, anim);
+
+            TxtSearch?.Focus();
         }
 
         /// <summary>
@@ -113,18 +109,28 @@ namespace ClipVault.Views
         /// </summary>
         public void SlideOutAndHide()
         {
-            var anim = new DoubleAnimation
-            {
-                From = WindowTranslate.X,
-                To = this.Width,
-                Duration = TimeSpan.FromMilliseconds(220),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
+            var anim = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(160));
             anim.Completed += (s, e) =>
             {
                 this.Hide();
+                this.Opacity = 1;
             };
-            WindowTranslate.BeginAnimation(TranslateTransform.XProperty, anim);
+            this.BeginAnimation(UIElement.OpacityProperty, anim);
+        }
+
+        /// <summary>
+        /// 切换展开/收起侧边栏抽屉
+        /// </summary>
+        public void ToggleDocked()
+        {
+            if (this.IsVisible)
+            {
+                SlideOutAndHide();
+            }
+            else
+            {
+                ShowDocked();
+            }
         }
 
         public void RefreshCards()
@@ -169,16 +175,10 @@ namespace ClipVault.Views
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (Application.Current is App app)
             {
-                // 打开应用主设置窗口
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "ms-settings:",
-                    UseShellExecute = true
-                });
+                app.OpenSettings();
             }
-            catch { }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
