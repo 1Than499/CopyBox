@@ -20,8 +20,9 @@
         SnapsToDevicePixels="True">
 
     <Window.Resources>
-        <!-- 动态色板与毛玻璃材质 -->
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- 动态色板与毛玻璃材质 (使用 DynamicResource 确保白天/深色主题毫秒级无缝热切换) -->
         <SolidColorBrush x:Key="SidebarBgBrush" Color="#F2141722"/>
         <SolidColorBrush x:Key="SidebarBorderBrush" Color="#2E3A4E"/>
         <SolidColorBrush x:Key="HeaderBgBrush" Color="#F50F121A"/>
@@ -34,6 +35,7 @@
         <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="#1E88E5"/>
         <SolidColorBrush x:Key="TileBgBrush" Color="#1B2230"/>
         <SolidColorBrush x:Key="TileHoverBgBrush" Color="#283348"/>
+        <SolidColorBrush x:Key="TabContainerBgBrush" Color="#151B26"/>
 
         <!-- 细线极简滚动条 -->
         <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
@@ -70,7 +72,7 @@
             <Setter Property="Height" Value="28"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Margin" Value="2,0,0,0"/>
             <Setter Property="Template">
@@ -81,11 +83,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#25FFFFFF"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                <Setter TargetName="bd" Property="Background" Value="#2578A4E8"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#40FFFFFF"/>
+                                <Setter TargetName="bd" Property="Background" Value="#4078A4E8"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -96,10 +98,10 @@
         <!-- 仿生快捷磁贴样式 (鼠标移动至每个地方均有精致高亮反馈) -->
         <Style x:Key="ActionCenterTileStyle" TargetType="Button">
             <Setter Property="Height" Value="58"/>
-            <Setter Property="Background" Value="{StaticResource TileBgBrush}"/>
-            <Setter Property="BorderBrush" Value="#25FFFFFF"/>
+            <Setter Property="Background" Value="{DynamicResource TileBgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -112,12 +114,12 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="tileBd" Property="Background" Value="{StaticResource TileHoverBgBrush}"/>
-                                <Setter TargetName="tileBd" Property="BorderBrush" Value="#800078D7"/>
+                                <Setter TargetName="tileBd" Property="Background" Value="{DynamicResource TileHoverBgBrush}"/>
+                                <Setter TargetName="tileBd" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="tileBd" Property="Background" Value="#32425E"/>
-                                <Setter TargetName="tileBd" Property="BorderBrush" Value="{StaticResource AccentBlueBrush}"/>
+                                <Setter TargetName="tileBd" Property="Opacity" Value="0.8"/>
+                                <Setter TargetName="tileBd" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -128,8 +130,8 @@
 
     <!-- 侧边栏外层主体 -->
     <Border x:Name="RootBorder" 
-            Background="{StaticResource SidebarBgBrush}" 
-            BorderBrush="{StaticResource SidebarBorderBrush}" 
+            Background="{DynamicResource SidebarBgBrush}" 
+            BorderBrush="{DynamicResource SidebarBorderBrush}" 
             BorderThickness="1,0,0,0">
 
         <Grid>
@@ -140,15 +142,15 @@
             </Grid.RowDefinitions>
 
             <!-- ================= 第一行：顶栏与双模切换药丸 ================= -->
-            <Border Grid.Row="0" Background="{StaticResource HeaderBgBrush}" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1" Padding="14,12,14,10">
+            <Border Grid.Row="0" Background="{DynamicResource HeaderBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="14,12,14,10">
                 <StackPanel>
                     <!-- 常态顶栏：标题与控制图标 -->
                     <Grid x:Name="HeaderNormalBar" Margin="0,0,0,10">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="20" Height="20" CornerRadius="5" Background="{StaticResource AccentBlueBrush}" Margin="0,0,7,0">
+                            <Border Width="20" Height="20" CornerRadius="5" Background="{DynamicResource AccentBlueBrush}" Margin="0,0,7,0">
                                 <TextBlock Text="📋" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
                                 <TextBlock Text="v2.0" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
@@ -174,7 +176,7 @@
                             <Button x:Name="BtnBackFromSettings" Style="{StaticResource SidebarTopIconBtn}" Click="BtnBackFromSettings_Click" ToolTip="返回上一视图" Margin="0,0,6,0">
                                 <TextBlock Text="←" FontSize="14" FontWeight="Bold"/>
                             </Button>
-                            <TextBlock Text="偏好设置" FontWeight="Bold" FontSize="13.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="偏好设置" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <Button Style="{StaticResource SidebarTopIconBtn}" HorizontalAlignment="Right" Click="BtnBackFromSettings_Click" ToolTip="完成并返回">
                             <TextBlock Text="✕" FontSize="11"/>
@@ -182,7 +184,7 @@
                     </Grid>
 
                     <!-- 双模切换药丸 (两边绝对居中对齐，鼠标移到每个地方均有丰富 Hover/Click 交互) -->
-                    <Border x:Name="TabSwitcherBorder" Background="#151B26" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Height="36">
+                    <Border x:Name="TabSwitcherBorder" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Height="36">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -191,7 +193,7 @@
 
                             <!-- Tab 1: 剪贴板中心 (左侧严格水平垂直居中) -->
                             <Button x:Name="TabBtnClipboard" Grid.Column="0" Click="TabBtnClipboard_Click"
-                                    Background="{StaticResource AccentBlueBrush}" Foreground="#FFFFFF"
+                                    Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF"
                                     BorderThickness="0" Cursor="Hand" Margin="1,1,2,1">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
@@ -215,7 +217,7 @@
 
                             <!-- Tab 2: 系统快捷看板 (右侧严格水平垂直居中) -->
                             <Button x:Name="TabBtnSystem" Grid.Column="1" Click="TabBtnSystem_Click"
-                                    Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                                    Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}"
                                     BorderThickness="0" Cursor="Hand" Margin="2,1,1,1">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
@@ -227,11 +229,11 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                                                <Setter TargetName="tabBd" Property="Background" Value="#22FFFFFF"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                                <Setter TargetName="tabBd" Property="Background" Value="#1A78A4E8"/>
                                             </Trigger>
                                             <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="tabBd" Property="Background" Value="#35FFFFFF"/>
+                                                <Setter TargetName="tabBd" Property="Background" Value="#3078A4E8"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -255,21 +257,21 @@
                     <!-- 搜索栏与分类筛选胶囊 -->
                     <StackPanel Grid.Row="0" Margin="14,10,14,6">
                         <!-- 搜索框 -->
-                        <Border Background="#121620" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="6" Height="32">
+                        <Border Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Height="32">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="🔍" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                <TextBlock Grid.Column="0" Text="🔍" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="8,0,4,0"/>
                                 <TextBox x:Name="TxtSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
-                                         Foreground="{StaticResource TextPrimaryBrush}" FontSize="11.5" VerticalContentAlignment="Center"
+                                         Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5" VerticalContentAlignment="Center"
                                          TextChanged="TxtSearch_TextChanged"/>
                                 <TextBlock x:Name="TxtSearchPlaceholder" Grid.Column="1" Text="搜索历史记录或按数字秒贴..." 
-                                           Foreground="#64748B" FontSize="11.5" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" VerticalAlignment="Center" IsHitTestVisible="False"/>
                                 <Button x:Name="BtnClearSearch" Grid.Column="2" Content="✕" Width="20" Height="20" Background="Transparent"
-                                        BorderThickness="0" Foreground="#64748B" Cursor="Hand" Click="BtnClearSearch_Click" Visibility="Collapsed"/>
+                                        BorderThickness="0" Foreground="{DynamicResource TextSecondaryBrush}" Cursor="Hand" Click="BtnClearSearch_Click" Visibility="Collapsed"/>
                             </Grid>
                         </Border>
 
@@ -316,15 +318,15 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border x:Name="CardBorder" Background="{StaticResource CardBgBrush}" 
-                                        BorderBrush="{StaticResource CardBorderBrush}" 
+                                <Border x:Name="CardBorder" Background="{DynamicResource CardBgBrush}" 
+                                        BorderBrush="{DynamicResource CardBorderBrush}" 
                                         BorderThickness="1" CornerRadius="8" Padding="10,8" Cursor="Hand">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource CardHoverBgBrush}"/>
-                                                    <Setter Property="BorderBrush" Value="#800078D7"/>
+                                                    <Setter Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
                                                 </Trigger>
                                             </Style.Triggers>
                                         </Style>
@@ -337,12 +339,12 @@
                                                     Visibility="{Binding DisplayBadge, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding DisplayBadge}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                                             </Border>
-                                            <TextBlock Text="{Binding SourceApp}" FontSize="10" Foreground="#64748B" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
+                                            <TextBlock Text="{Binding SourceApp}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Left" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
                                         </DockPanel>
 
                                         <!-- 1. 普通文本内容预览 -->
-                                        <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" 
+                                        <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
                                                    TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis" LineHeight="16"
                                                    Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
 
@@ -361,7 +363,7 @@
 
                                         <!-- 卡片底栏操作小按钮 (置顶/复制/删除，带悬浮高亮) -->
                                         <Grid Margin="0,4,0,0">
-                                            <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                                 <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
                                                 <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
@@ -380,7 +382,7 @@
                     <StackPanel Margin="14,10,14,14">
                         
                         <!-- 1. 正在播放音源卡片 (双引擎驱动：支持网易云、QQ音乐、抖音、Spotify、浏览器等) -->
-                        <Border x:Name="BdMediaCard" Background="#161E2C" BorderBrush="#350078D7" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                        <Border x:Name="BdMediaCard" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="54"/>
@@ -388,7 +390,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- 专辑封面或音乐唱片图标 -->
-                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="8" Background="#111622" BorderBrush="#25FFFFFF" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="8" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center">
                                     <Grid>
                                         <Image x:Name="ImgMediaThumb" Stretch="UniformToFill" Visibility="Collapsed"/>
                                         <TextBlock x:Name="TxtMediaIconPlaceholder" Text="🎵" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -399,16 +401,16 @@
                                 <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
                                     <!-- 歌曲/标题与状态 -->
                                     <DockPanel LastChildFill="True">
-                                        <Border x:Name="BdMediaStatusTag" DockPanel.Dock="Right" Background="#1AFFFFFF" CornerRadius="3" Padding="5,1.5" Margin="4,0,0,0">
-                                            <TextBlock x:Name="TxtMediaStatusTag" Text="待机中" FontSize="9.5" Foreground="#64748B"/>
+                                        <Border x:Name="BdMediaStatusTag" DockPanel.Dock="Right" Background="#1A78A4E8" CornerRadius="3" Padding="5,1.5" Margin="4,0,0,0">
+                                            <TextBlock x:Name="TxtMediaStatusTag" Text="待机中" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </Border>
                                         <TextBlock x:Name="TxtMediaTitle" Text="未检测到播放中的音源" FontWeight="Bold" FontSize="12.5" 
-                                                   Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
                                     </DockPanel>
 
                                     <!-- 歌手/应用名 -->
                                     <TextBlock x:Name="TxtMediaArtist" Text="支持网易云/QQ音乐/抖音/Spotify/Edge等" FontSize="11" 
-                                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,6" TextTrimming="CharacterEllipsis"/>
+                                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,6" TextTrimming="CharacterEllipsis"/>
 
                                     <!-- 播控按钮栏 (带明确交互反馈) -->
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -416,7 +418,7 @@
                                             <TextBlock Text="⏮" FontSize="12"/>
                                         </Button>
                                         <Button x:Name="BtnMediaPlayPause" Width="32" Height="32" Content="▶" FontSize="13"
-                                                Background="{StaticResource AccentBlueBrush}" Foreground="#FFFFFF" 
+                                                Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF" 
                                                 BorderThickness="0" Cursor="Hand" Margin="6,0,6,0" Click="BtnMediaPlayPause_Click" ToolTip="播放 / 暂停">
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
@@ -425,7 +427,7 @@
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="playBd" Property="Background" Value="{StaticResource AccentBlueHoverBrush}"/>
+                                                            <Setter TargetName="playBd" Property="Background" Value="{DynamicResource AccentBlueHoverBrush}"/>
                                                         </Trigger>
                                                         <Trigger Property="IsPressed" Value="True">
                                                             <Setter TargetName="playBd" Property="Opacity" Value="0.8"/>
@@ -442,13 +444,13 @@
                             </Grid>
                         </Border>
 
-                        <!-- 2. 四大核心关键功能 (WiFi、蓝牙、系统设置、屏幕截图) -->
-                        <TextBlock Text="核心系统快捷" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="2,0,0,6"/>
+                        <!-- 2. 四大核心关键功能 (WLAN网络、蓝牙、系统设置、屏幕截图) - 采用 100% 绝对兼容无乱码的 Windows 原生 Fluent 矢量图标 -->
+                        <TextBlock Text="核心系统快捷" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="2,0,0,6"/>
                         <UniformGrid Columns="2" Rows="2" Margin="0,0,0,12">
-                            <!-- 磁贴 1: WiFi 可用网络 -->
+                            <!-- 磁贴 1: WLAN / 网络 (使用 Segoe MDL2 Assets 官方 Wi-Fi 矢量图标 &#xE701;，彻底杜绝方框乱码！) -->
                             <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileWifi_Click" ToolTip="呼出 Windows 原生 WiFi 与网络连接面板">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🛜" FontSize="17" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="18" Foreground="{DynamicResource AccentBlueBrush}" HorizontalAlignment="Center"/>
                                     <TextBlock Text="WLAN / 网络" FontSize="11" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -456,7 +458,7 @@
                             <!-- 磁贴 2: 蓝牙 -->
                             <Button x:Name="TileBluetooth" Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileBluetooth_Click" ToolTip="呼出 Windows 蓝牙设备管理">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🔵" FontSize="17" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="18" Foreground="#60A5FA" HorizontalAlignment="Center"/>
                                     <TextBlock Text="蓝牙设备" FontSize="11" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -464,7 +466,7 @@
                             <!-- 磁贴 3: Windows 系统设置 -->
                             <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileSystemSettings_Click" ToolTip="打开 Windows 核心设置中心">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="⚙️" FontSize="17" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="18" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
                                     <TextBlock Text="Windows 设置" FontSize="11" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -472,7 +474,7 @@
                             <!-- 磁贴 4: 屏幕截图 -->
                             <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileScreenClip_Click" ToolTip="呼出 Windows 剪贴板截图工具">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="✂️" FontSize="17" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="&#xE77A;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="18" Foreground="#F472B6" HorizontalAlignment="Center"/>
                                     <TextBlock Text="屏幕截图" FontSize="11" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -480,31 +482,31 @@
 
                         <!-- 3. 自定义快捷动作网格 (用户可自行添加和管理) -->
                         <DockPanel Margin="2,0,2,6">
-                            <TextBlock Text="自定义快捷动作" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="右键可删除" FontSize="10" Foreground="#64748B" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+                            <TextBlock Text="自定义快捷动作" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="右键可删除" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center"/>
                         </DockPanel>
 
                         <!-- 动态自定义磁贴列表 + 常驻【➕ 添加】按钮 -->
                         <WrapPanel x:Name="CustomActionsPanel" Margin="0,0,0,12">
                             <!-- 常驻添加磁贴 (带精致 Hover 交互) -->
-                            <Button x:Name="BtnAddNewAction" Width="80" Height="58" Margin="3" Background="#161B26" BorderBrush="#35FFFFFF" 
+                            <Button x:Name="BtnAddNewAction" Width="80" Height="58" Margin="3" Background="{DynamicResource TileBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" 
                                     BorderThickness="1" Cursor="Hand" Click="BtnAddNewAction_Click" ToolTip="添加新的自定义软件、网站或命令动作">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="addBd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" 
                                                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
                                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <TextBlock Text="➕" FontSize="15" Foreground="#60A5FA" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="添加动作" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="➕" FontSize="15" Foreground="{DynamicResource AccentBlueBrush}" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="添加动作" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" HorizontalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="addBd" Property="Background" Value="#222B3D"/>
-                                                <Setter TargetName="addBd" Property="BorderBrush" Value="#800078D7"/>
+                                                <Setter TargetName="addBd" Property="Background" Value="{DynamicResource TileHoverBgBrush}"/>
+                                                <Setter TargetName="addBd" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
                                             </Trigger>
                                             <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="addBd" Property="Background" Value="#2E3C56"/>
+                                                <Setter TargetName="addBd" Property="Opacity" Value="0.8"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -513,11 +515,11 @@
                         </WrapPanel>
 
                         <!-- 4. 统一的系统屏幕真实亮度调节 (两边实时保持一致，范围 0~100) -->
-                        <Border Background="#161D2A" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,6">
-                                    <TextBlock Text="🔅 屏幕亮度 (系统双向同步)" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                    <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="100%" FontSize="11.5" FontWeight="Bold" Foreground="#60A5FA"/>
+                                    <TextBlock Text="🔅 屏幕亮度 (系统双向同步)" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="100%" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}"/>
                                 </DockPanel>
                                 <Slider x:Name="SliderBrightness" Minimum="0" Maximum="100" Value="100" SmallChange="5" LargeChange="10"
                                         ValueChanged="SliderBrightness_ValueChanged"/>
@@ -525,9 +527,9 @@
                         </Border>
 
                         <!-- 5. 系统音量快捷调节 -->
-                        <Border Background="#161D2A" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
                             <DockPanel>
-                                <TextBlock Text="🔊 系统主音量" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="🔊 系统主音量" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button Content="🔉 减小" Style="{StaticResource ActionCenterTileStyle}" Height="30" Padding="10,2" Margin="2,0" FontSize="11" Click="BtnVolDown_Click"/>
                                     <Button Content="🔇 静音" Style="{StaticResource ActionCenterTileStyle}" Height="30" Padding="10,2" Margin="2,0" FontSize="11" Click="BtnVolMute_Click"/>
@@ -544,58 +546,58 @@
                     <StackPanel Margin="14,12,14,16">
                         
                         <!-- 1. 软件形态与模式切换 -->
-                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="🖥️ 软件交互形态" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
-                                <TextBlock Text="可根据使用习惯自由选择经典悬浮卡片或侧边栏模式：" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                                <RadioButton x:Name="RadioModeSidebar2" Content="📑 2.0 贴边抽屉模式 (现代化看板+毛玻璃侧边栏)" IsChecked="True" GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked"/>
-                                <RadioButton x:Name="RadioModeCentered2" Content="🗂️ 1.0 屏幕居中模式 (原版经典悬浮极速卡片)" GroupName="SideWindowMode" Checked="WindowModeRadio_Checked"/>
+                                <TextBlock Text="🖥️ 软件交互形态" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock Text="可根据使用习惯自由选择经典悬浮卡片或侧边栏模式：" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                                <RadioButton x:Name="RadioModeSidebar2" Content="📑 2.0 贴边抽屉模式 (现代化看板+毛玻璃侧边栏)" IsChecked="True" GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <RadioButton x:Name="RadioModeCentered2" Content="🗂️ 1.0 屏幕居中模式 (原版经典悬浮极速卡片)" GroupName="SideWindowMode" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}"/>
                             </StackPanel>
                         </Border>
 
                         <!-- 2. 界面显示语言 -->
-                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="🌐 界面语言" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="🌐 界面语言" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="RadioLangZh2" Content="🇨🇳 简体中文" IsChecked="True" GroupName="SideLang" Margin="0,0,18,0" Checked="LangRadio_Checked" Tag="zh-CN"/>
-                                    <RadioButton x:Name="RadioLangEn2" Content="🇺🇸 English" GroupName="SideLang" Checked="LangRadio_Checked" Tag="en-US"/>
+                                    <RadioButton x:Name="RadioLangZh2" Content="🇨🇳 简体中文" IsChecked="True" GroupName="SideLang" Margin="0,0,18,0" Checked="LangRadio_Checked" Tag="zh-CN" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <RadioButton x:Name="RadioLangEn2" Content="🇺🇸 English" GroupName="SideLang" Checked="LangRadio_Checked" Tag="en-US" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
                         <!-- 3. 外观模式与透明度 (范围 0~100%，实时应用) -->
-                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="🎨 外观与主题" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="🎨 外观与主题" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <RadioButton x:Name="RadioThemeDark2" Content="🌙 深色暗黑" IsChecked="True" GroupName="SideTheme" Margin="0,0,18,0" Checked="ThemeRadio_Checked" Tag="Dark"/>
-                                    <RadioButton x:Name="RadioThemeLight2" Content="☀️ 明亮白天" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Light"/>
+                                    <RadioButton x:Name="RadioThemeDark2" Content="🌙 深色暗黑" IsChecked="True" GroupName="SideTheme" Margin="0,0,18,0" Checked="ThemeRadio_Checked" Tag="Dark" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <RadioButton x:Name="RadioThemeLight2" Content="☀️ 明亮白天" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Light" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 </StackPanel>
                                 <DockPanel Margin="0,4,0,4">
-                                    <TextBlock Text="抽屉毛玻璃透明度" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="11" Foreground="#60A5FA"/>
+                                    <TextBlock Text="抽屉毛玻璃透明度" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="11" Foreground="{DynamicResource AccentBlueBrush}"/>
                                 </DockPanel>
                                 <Slider x:Name="SliderSideOpacity" Minimum="0" Maximum="100" Value="92" SmallChange="5" LargeChange="10" ValueChanged="SliderSideOpacity_ValueChanged"/>
                             </StackPanel>
                         </Border>
 
                         <!-- 4. 本地数据存储目录 -->
-                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="📁 本地数据存储路径" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSideStoragePath" Text="C:\Users\...\Data" FontSize="10.5" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
-                                <Button Content="📂 更改目录并迁移数据" Background="#1F293D" Foreground="#60A5FA" BorderThickness="0" 
+                                <TextBlock Text="📁 本地数据存储路径" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSideStoragePath" Text="C:\Users\...\Data" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+                                <Button Content="📂 更改目录并迁移数据" Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderThickness="0" 
                                         Padding="10,5" FontSize="11" Cursor="Hand" Click="BtnBrowseStorage_Click"/>
                             </StackPanel>
                         </Border>
 
                         <!-- 5. 交互偏好 -->
-                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="⚡ 交互细节" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
-                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="点击窗口外部时自动收起" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed"/>
-                                <CheckBox x:Name="ChkPasteOnDblClick" Content="双击直接模拟粘贴并收起" Checked="ChkPasteOnDblClick_Changed" Unchecked="ChkPasteOnDblClick_Changed"/>
+                                <TextBlock Text="⚡ 交互细节" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="点击窗口外部时自动收起" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <CheckBox x:Name="ChkPasteOnDblClick" Content="双击直接模拟粘贴并收起" Checked="ChkPasteOnDblClick_Changed" Unchecked="ChkPasteOnDblClick_Changed" Foreground="{DynamicResource TextPrimaryBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -616,33 +618,33 @@
 
                 <!-- 【浮层：添加自定义快捷动作弹窗】 -->
                 <Grid x:Name="AddActionOverlay" Visibility="Collapsed" Background="#D0080B12">
-                    <Border Width="310" Background="#1A2232" BorderBrush="#400078D7" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
+                    <Border Width="310" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
                         <StackPanel>
-                            <TextBlock Text="➕ 添加自定义快捷动作" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                            <TextBlock Text="➕ 添加自定义快捷动作" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
                             
                             <!-- 动作名称 -->
-                            <TextBlock Text="名称 (如: 微信 / 计算器 / 哔哩哔哩)" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtNewActionName" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="11.5" Margin="0,0,0,8"/>
+                            <TextBlock Text="名称 (如: 微信 / 计算器 / 哔哩哔哩)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtNewActionName" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5" Margin="0,0,0,8"/>
 
                             <!-- 图标 Emoji -->
-                            <TextBlock Text="图标 (Emoji)" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtNewActionIcon" Text="🚀" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="12" Margin="0,0,0,8"/>
+                            <TextBlock Text="图标 (Emoji)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtNewActionIcon" Text="🚀" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="12" Margin="0,0,0,8"/>
 
                             <!-- 执行目标 -->
-                            <TextBlock Text="执行目标 (程序路径 / 网址 / 命令)" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBlock Text="执行目标 (程序路径 / 网址 / 命令)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                             <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBox x:Name="TxtNewActionCommand" Grid.Column="0" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="11.5"/>
-                                <Button Grid.Column="1" Content="浏览..." Background="#253248" Foreground="#60A5FA" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnBrowseActionFile_Click"/>
+                                <TextBox x:Name="TxtNewActionCommand" Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5"/>
+                                <Button Grid.Column="1" Content="浏览..." Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnBrowseActionFile_Click"/>
                             </Grid>
 
                             <!-- 操作按钮 -->
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="取消" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderThickness="0" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" Click="BtnCancelAddAction_Click"/>
-                                <Button Content="保存并添加" Background="{StaticResource AccentBlueBrush}" Foreground="#FFFFFF" BorderThickness="0" Padding="12,5" Cursor="Hand" Click="BtnConfirmAddAction_Click"/>
+                                <Button Content="取消" Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" Click="BtnCancelAddAction_Click"/>
+                                <Button Content="保存并添加" Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF" BorderThickness="0" Padding="12,5" Cursor="Hand" Click="BtnConfirmAddAction_Click"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -651,11 +653,11 @@
             </Grid>
 
             <!-- ================= 第三行：底部状态栏 ================= -->
-            <Border Grid.Row="2" Background="{StaticResource HeaderBgBrush}" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" Padding="14,7">
+            <Border Grid.Row="2" Background="{DynamicResource HeaderBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,1,0,0" Padding="14,7">
                 <DockPanel LastChildFill="False">
-                    <TextBlock x:Name="TxtStatusLeft" Text="共 0 条历史记录" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtStatusLeft" Text="共 0 条历史记录" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                        <TextBlock Text="按 Alt+V 秒收" FontSize="10" Foreground="#64748B" VerticalAlignment="Center"/>
+                        <TextBlock Text="按 Alt+V 秒收" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </DockPanel>
             </Border>

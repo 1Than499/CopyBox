@@ -137,6 +137,14 @@ namespace ClipVault.Services
             }
 
             // 3. 同时调节 Gamma Ramp，确保在外接显示器/独显直连屏幕上肉眼产生极清晰明暗反馈
+            ApplyVisualBrightness(brightness);
+        }
+
+        /// <summary>
+        /// 实时应用视觉亮度色彩映射 (使屏幕实际明暗输出与外部系统亮度 100% 保持完全同步)
+        /// </summary>
+        public static void ApplyVisualBrightness(int brightness)
+        {
             try
             {
                 IntPtr hdc = GetDC(IntPtr.Zero);
@@ -149,8 +157,8 @@ namespace ClipVault.Services
                         Blue = new ushort[256]
                     };
 
-                    // 映射 0 ~ 100 到适度合理的色彩倍率 (0.4 ~ 1.0)
-                    double factor = 0.35 + (brightness / 100.0) * 0.65;
+                    // 映射 0 ~ 100 到适度合理的色彩倍率 (0.35 ~ 1.0)
+                    double factor = 0.35 + (Math.Clamp(brightness, 0, 100) / 100.0) * 0.65;
                     for (int i = 0; i < 256; i++)
                     {
                         int value = (int)(i * 256 * factor);

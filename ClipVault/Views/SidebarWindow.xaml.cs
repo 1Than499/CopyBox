@@ -67,10 +67,10 @@ namespace ClipVault.Views
                 });
             };
 
-            // 监听失焦自动收起 (若未钉住)
+            // 监听失焦自动收起 (严格遵循用户在设置中配置的 HideOnDeactivate 偏好)
             this.Deactivated += (s, e) =>
             {
-                if (!_isPinned && this.IsVisible && (AddActionOverlay.Visibility != Visibility.Visible))
+                if (!_isPinned && _settingsService.CurrentSettings.HideOnDeactivate && this.IsVisible && (AddActionOverlay.Visibility != Visibility.Visible))
                 {
                     SlideOutAndHide();
                 }
@@ -99,6 +99,8 @@ namespace ClipVault.Views
                             _isUpdatingBrightnessUi = true;
                             SliderBrightness.Value = currentSys;
                             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
+                            // 关键修复：系统外部调高/调低亮度时，实际屏幕视觉亮度立即同步刷新！
+                            SystemControlService.ApplyVisualBrightness(currentSys);
                             _isUpdatingBrightnessUi = false;
                         }
                     }
@@ -127,10 +129,10 @@ namespace ClipVault.Views
             LoadSettingsToSidebarUI();
         }
 
-        #region 外观主题与透明度动态应用
+        #region 外观主题与透明度动态应用 (支持深色/白天浅色热切换)
 
         /// <summary>
-        /// 实时应用外观主题 (深色 / 浅色)，界面画刷即时刷新
+        /// 实时应用外观主题 (深色 / 浅色)，通过修改 Resources 实现 DynamicResource 毫秒级刷新
         /// </summary>
         public void ApplyTheme(string theme)
         {
@@ -138,36 +140,36 @@ namespace ClipVault.Views
 
             if (isLight)
             {
-                Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0xFA, 0xFA, 0xFC));
-                Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFF, 0xFF, 0xFF));
-                Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-                Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
-                Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-                Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
-                Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
-
-                RootBorder.Background = (SolidColorBrush)Resources["SidebarBgBrush"];
-                RootBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                // 白天浅色 Fluent 毛玻璃高级质感
+                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0xFA, 0xFB, 0xFD));
+                this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFF, 0xFF, 0xFF));
+                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+                this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+                this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
+                this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE8, 0xED, 0xF5));
             }
             else
             {
-                Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
-                Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
-                Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
-                Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
-                Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
-                Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
-                Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
-                Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
-                Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
-
-                RootBorder.Background = (SolidColorBrush)Resources["SidebarBgBrush"];
-                RootBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
+                // 暗夜深色 Fluent 极简质感
+                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
+                this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
+                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
+                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
+                this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
+                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
+                this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+                this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
+                this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
+                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
             }
 
-            // 更新药丸按钮与顶栏选中色
+            // 更新药丸按钮激活态前景色和背景色
             if (ClipboardViewPanel.Visibility == Visibility.Visible)
             {
                 TabBtnClipboard.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
@@ -182,6 +184,9 @@ namespace ClipVault.Views
                 TabBtnClipboard.Background = Brushes.Transparent;
                 TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
             }
+
+            // 重新刷新自定义磁贴列表的色彩
+            RefreshCustomActions();
         }
 
         #endregion
@@ -204,6 +209,9 @@ namespace ClipVault.Views
             this.Topmost = true;
 
             RefreshCards();
+            
+            // 立即用当前音源信息刷新 UI，并触发后台重新检测
+            UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
 
             // 同步当前系统真实亮度
@@ -321,6 +329,8 @@ namespace ClipVault.Views
             TabBtnClipboard.Background = Brushes.Transparent;
             TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
 
+            // 切换到看板时立即渲染音源 UI
+            UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
         }
 
@@ -487,10 +497,26 @@ namespace ClipVault.Views
         {
             if (CardsListBox.SelectedItem is ClipboardItem selected)
             {
-                await _pasteSimulator.PasteItemAsync(selected, () =>
+                // 关键修复：双击卡片动作严格遵循设置中的配置 (PasteAndHide 还是 CopyOnly)
+                if (_settingsService.CurrentSettings.DoubleClickAction == "PasteAndHide")
                 {
-                    if (!_isPinned) SlideOutAndHide();
-                });
+                    await _pasteSimulator.PasteItemAsync(selected, () =>
+                    {
+                        if (!_isPinned) SlideOutAndHide();
+                    });
+                }
+                else
+                {
+                    // 仅复制到剪贴板，保持窗口打开
+                    if (!string.IsNullOrEmpty(selected.Content))
+                    {
+                        Clipboard.SetText(selected.Content);
+                    }
+                    else if (selected.IsImage && selected.ImagePreview is BitmapSource bmp)
+                    {
+                        Clipboard.SetImage(bmp);
+                    }
+                }
             }
         }
 
@@ -556,7 +582,7 @@ namespace ClipVault.Views
 
         private void UpdateMediaUI(MediaInfo info)
         {
-            if (info.HasMedia)
+            if (info != null && info.HasMedia)
             {
                 TxtMediaTitle.Text = info.Title;
                 TxtMediaArtist.Text = string.IsNullOrEmpty(info.Artist) ? "未知艺术家" : info.Artist;
@@ -565,10 +591,10 @@ namespace ClipVault.Views
                 // 播放时微光高亮标签
                 BdMediaStatusTag.Background = info.IsPlaying 
                     ? new SolidColorBrush(Color.FromArgb(0x35, 0x10, 0xB9, 0x81)) 
-                    : new SolidColorBrush(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
+                    : new SolidColorBrush(Color.FromArgb(0x1A, 0x78, 0xA4, 0xE8));
                 TxtMediaStatusTag.Foreground = info.IsPlaying 
                     ? new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99)) 
-                    : new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+                    : (SolidColorBrush)FindResource("TextSecondaryBrush");
 
                 BtnMediaPlayPause.Content = info.IsPlaying ? "⏸" : "▶";
 
@@ -589,8 +615,8 @@ namespace ClipVault.Views
                 TxtMediaTitle.Text = "未检测到播放中的音源";
                 TxtMediaArtist.Text = "支持网易云/QQ音乐/抖音/Spotify/Edge等";
                 TxtMediaStatusTag.Text = "待机中";
-                BdMediaStatusTag.Background = new SolidColorBrush(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
-                TxtMediaStatusTag.Foreground = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+                BdMediaStatusTag.Background = new SolidColorBrush(Color.FromArgb(0x1A, 0x78, 0xA4, 0xE8));
+                TxtMediaStatusTag.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
                 BtnMediaPlayPause.Content = "▶";
                 ImgMediaThumb.Visibility = Visibility.Collapsed;
                 TxtMediaIconPlaceholder.Visibility = Visibility.Visible;
@@ -600,19 +626,22 @@ namespace ClipVault.Views
         private async void BtnMediaPlayPause_Click(object sender, RoutedEventArgs e)
         {
             await _mediaService.TogglePlayPauseAsync();
+            UpdateMediaUI(_mediaService.CurrentMedia);
         }
 
         private async void BtnMediaPrev_Click(object sender, RoutedEventArgs e)
         {
             await _mediaService.SkipPreviousAsync();
+            UpdateMediaUI(_mediaService.CurrentMedia);
         }
 
         private async void BtnMediaNext_Click(object sender, RoutedEventArgs e)
         {
             await _mediaService.SkipNextAsync();
+            UpdateMediaUI(_mediaService.CurrentMedia);
         }
 
-        // 四大核心功能联动
+        // 四大核心功能联动 (WLAN、蓝牙、系统设置、屏幕截图)
         private void TileWifi_Click(object sender, RoutedEventArgs e)
         {
             SystemControlService.OpenAvailableNetworks();
@@ -688,7 +717,7 @@ namespace ClipVault.Views
             var template = new ControlTemplate(typeof(Button));
             var borderFactory = new FrameworkElementFactory(typeof(Border));
             borderFactory.SetValue(Border.BackgroundProperty, (SolidColorBrush)FindResource("TileBgBrush"));
-            borderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)));
+            borderFactory.SetValue(Border.BorderBrushProperty, (SolidColorBrush)FindResource("CardBorderBrush"));
             borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
             borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
 
@@ -912,7 +941,7 @@ namespace ClipVault.Views
         private void ChkPasteOnDblClick_Changed(object sender, RoutedEventArgs e)
         {
             if (_settingsService == null || ChkPasteOnDblClick == null) return;
-            _settingsService.CurrentSettings.DoubleClickAction = ChkPasteOnDblClick.IsChecked == true ? "PasteAndHide" : "None";
+            _settingsService.CurrentSettings.DoubleClickAction = ChkPasteOnDblClick.IsChecked == true ? "PasteAndHide" : "CopyOnly";
             _settingsService.SaveSettings();
         }
 

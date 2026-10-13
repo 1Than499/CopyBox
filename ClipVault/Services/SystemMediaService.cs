@@ -46,7 +46,7 @@ namespace ClipVault.Services
             }
             catch { }
 
-            // 1 秒心跳轮询，实时捕获后台播放器状态与波形峰值
+            // 1 秒心跳轮询，实时捕获后台播放器状态
             _pollTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(1000)
@@ -96,7 +96,6 @@ namespace ClipVault.Services
                     var allSessions = _sessionManager.GetSessions();
                     GlobalSystemMediaTransportControlsSession? bestSession = null;
 
-                    // 优先选择处于播放状态的 session
                     foreach (var s in allSessions)
                     {
                         try
@@ -160,8 +159,8 @@ namespace ClipVault.Services
             catch { }
 
             // ================= 引擎 2: CoreAudio WASAPI 会话探测 (100% 捕获发声进程) =================
-            // 若 GSMTC 未提供曲目详情，但系统确实有播放器（网易云、QQ音乐、抖音、浏览器）正在发声输出
-            if (!newInfo.HasMedia || !newInfo.IsPlaying)
+            // 若 GSMTC 未提供曲目详情，或者未处于活跃发声，通过核心音频枚举底层会话
+            if (!newInfo.HasMedia)
             {
                 try
                 {
@@ -173,56 +172,103 @@ namespace ClipVault.Services
                         if (sessionManager != null)
                         {
                             var sessions = sessionManager.Sessions;
+
+                            int bestIndex = -1;
+                            float maxPeak = -1f;
+                            int fallbackIndex = -1;
+
                             for (int i = 0; i < sessions.Count; i++)
                             {
                                 var s = sessions[i];
                                 uint pid = s.GetProcessID;
                                 if (pid == 0) continue;
 
-                                bool isActive = (int)s.State == 1; // 1 代表 AudioSessionStateActive
                                 float peak = 0;
                                 try { peak = s.AudioMeterInformation.MasterPeakValue; } catch { }
+                                bool isActive = (int)s.State == 1; // AudioSessionStateActive
 
-                                // 只要处于 Active 状态或有声波振幅峰值
-                                if (isActive || peak > 0.001f)
+                                // 优先寻找正在发声 (peak > 0 或 Active) 的媒体
+                                if ((isActive || peak > 0.001f) && peak > maxPeak)
                                 {
-                                    try
+                                    maxPeak = peak;
+                                    bestIndex = i;
+                                }
+                                else if (fallbackIndex == -1 && IsKnownMediaProcess(pid))
+                                {
+                                    fallbackIndex = i;
+                                }
+                            }
+
+                            // 优先选正在发声的，其次选已打开的媒体会话
+                            int targetIdx = bestIndex >= 0 ? bestIndex : fallbackIndex;
+
+                            if (targetIdx >= 0)
+                            {
+                                var s = sessions[targetIdx];
+                                uint pid = s.GetProcessID;
+                                try
+                                {
+                                    var proc = Process.GetProcessById((int)pid);
+                                    string pName = proc.ProcessName.ToLowerInvariant();
+
+                                    if (pName != "system" && pName != "audiodg" && pName != "explorer")
                                     {
-                                        var proc = Process.GetProcessById((int)pid);
-                                        string pName = proc.ProcessName.ToLowerInvariant();
-
-                                        // 过滤系统自身与通知服务
-                                        if (pName == "system" || pName == "audiodg" || pName == "explorer") continue;
-
-                                        string friendlyName = GetFriendlyAppName(pName);
-                                        string windowTitle = "";
-                                        try { windowTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
+                                        string friendly = GetFriendlyAppName(pName);
+                                        string wTitle = "";
+                                        try { wTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
 
                                         newInfo.HasMedia = true;
-                                        newInfo.IsPlaying = true;
+                                        newInfo.IsPlaying = bestIndex >= 0; // 有峰值或Active则为播放中
                                         newInfo.SourceAppId = pName;
 
-                                        // 如果主窗口标题有歌名 (如 "周杰伦 - 晴天")
-                                        if (!string.IsNullOrEmpty(windowTitle) && !windowTitle.Equals(friendlyName, StringComparison.OrdinalIgnoreCase))
+                                        // 若窗口标题包含有价值的歌名信息 (例如 "周杰伦 - 晴天")
+                                        if (!string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) && !wTitle.Equals(pName, StringComparison.OrdinalIgnoreCase))
                                         {
-                                            newInfo.Title = windowTitle;
-                                            newInfo.Artist = friendlyName;
+                                            newInfo.Title = wTitle;
+                                            newInfo.Artist = friendly;
                                         }
                                         else
                                         {
-                                            newInfo.Title = "正在播放音频";
-                                            newInfo.Artist = friendlyName;
+                                            newInfo.Title = newInfo.IsPlaying ? "正在播放音频" : "音频已暂停";
+                                            newInfo.Artist = friendly;
                                         }
-
-                                        break; // 优先挑选首个正在输出音频的活跃媒体应用
                                     }
-                                    catch { }
                                 }
+                                catch { }
                             }
                         }
                     }
                 }
                 catch { }
+            }
+
+            // ================= 引擎 3: 知名播放器进程保障兜底 =================
+            // 若声卡驱动会话延迟，检测系统是否存在网易云、QQ音乐、酷狗等进程
+            if (!newInfo.HasMedia)
+            {
+                string[] knownMedia = { "cloudmusic", "qqmusic", "kugou", "kuwo", "spotify", "douyin" };
+                foreach (var km in knownMedia)
+                {
+                    try
+                    {
+                        var procs = Process.GetProcessesByName(km);
+                        if (procs.Length > 0)
+                        {
+                            var proc = procs[0];
+                            string friendly = GetFriendlyAppName(km);
+                            string wTitle = "";
+                            try { wTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
+
+                            newInfo.HasMedia = true;
+                            newInfo.IsPlaying = true; // 进程在后台运行，保持可播控
+                            newInfo.SourceAppId = km;
+                            newInfo.Title = !string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) ? wTitle : "正在播放音频";
+                            newInfo.Artist = friendly;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
             }
 
             // 比较并触发更新
@@ -231,6 +277,21 @@ namespace ClipVault.Services
                 CurrentMedia = newInfo;
                 MediaInfoChanged?.Invoke(newInfo);
             }
+        }
+
+        private bool IsKnownMediaProcess(uint pid)
+        {
+            try
+            {
+                var proc = Process.GetProcessById((int)pid);
+                string pName = proc.ProcessName.ToLowerInvariant();
+                return pName.Contains("cloudmusic") || pName.Contains("qqmusic") ||
+                       pName.Contains("kugou") || pName.Contains("kuwo") ||
+                       pName.Contains("spotify") || pName.Contains("douyin") ||
+                       pName.Contains("edge") || pName.Contains("chrome") ||
+                       pName.Contains("potplayer");
+            }
+            catch { return false; }
         }
 
         private bool HasMediaInfoChanged(MediaInfo a, MediaInfo b)
@@ -245,14 +306,9 @@ namespace ClipVault.Services
 
         public async Task TogglePlayPauseAsync()
         {
-            bool handled = false;
             if (_currentSession != null)
             {
-                try
-                {
-                    handled = await _currentSession.TryTogglePlayPauseAsync();
-                }
-                catch { }
+                try { await _currentSession.TryTogglePlayPauseAsync(); } catch { }
             }
 
             // 硬件级多媒体按键兜底 (对网易云音乐、QQ音乐、抖音、浏览器 100% 有效)
