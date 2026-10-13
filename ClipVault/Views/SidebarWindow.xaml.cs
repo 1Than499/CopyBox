@@ -31,8 +31,8 @@ namespace ClipVault.Views
         private Point _cardDragStartPoint;
         private bool _isDraggingCard = false;
 
-        // 记录进入设置前的上一个视图 (用于按返回按钮切回)
         private string _previousView = "Clipboard";
+        private bool _isUpdatingBrightnessUi = false;
 
         public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
@@ -84,6 +84,20 @@ namespace ClipVault.Views
             // 加载自定义动作磁贴
             RefreshCustomActions();
 
+            // 实时同步当前系统的真实屏幕亮度 (与 Windows 系统调度 100% 保持一致)
+            try
+            {
+                int sysBrightness = SystemControlService.GetCurrentBrightness();
+                if (SliderBrightness != null)
+                {
+                    _isUpdatingBrightnessUi = true;
+                    SliderBrightness.Value = sysBrightness;
+                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
+                    _isUpdatingBrightnessUi = false;
+                }
+            }
+            catch { }
+
             // 加载设置项到侧边栏设置页
             LoadSettingsToSidebarUI();
         }
@@ -98,7 +112,7 @@ namespace ClipVault.Views
             _pasteSimulator.RecordTargetWindow();
 
             var workArea = SystemParameters.WorkArea;
-            this.Width = 360;
+            this.Width = 380; // 优化抽屉黄金宽度
             this.Height = workArea.Height;
             this.Top = workArea.Top;
             this.Left = workArea.Right - this.Width;
@@ -106,7 +120,21 @@ namespace ClipVault.Views
             this.Topmost = true;
 
             RefreshCards();
-            _ = _mediaService.RefreshMediaInfoAsync();
+            _ = _mediaService.RefreshMediaAsync();
+
+            // 刷新当前系统亮度至滑块
+            try
+            {
+                int sysBrightness = SystemControlService.GetCurrentBrightness();
+                if (SliderBrightness != null)
+                {
+                    _isUpdatingBrightnessUi = true;
+                    SliderBrightness.Value = sysBrightness;
+                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
+                    _isUpdatingBrightnessUi = false;
+                }
+            }
+            catch { }
 
             this.Show();
             this.Activate();
@@ -200,7 +228,7 @@ namespace ClipVault.Views
             TabBtnClipboard.Background = Brushes.Transparent;
             TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
 
-            _ = _mediaService.RefreshMediaInfoAsync();
+            _ = _mediaService.RefreshMediaAsync();
         }
 
         /// <summary>
@@ -467,7 +495,7 @@ namespace ClipVault.Views
             {
                 TxtMediaTitle.Text = "未检测到正在播放的音源";
                 TxtMediaArtist.Text = "支持网易云/QQ音乐/Spotify/浏览器";
-                TxtMediaStatusTag.Text = "播放器待机";
+                TxtMediaStatusTag.Text = "待机中";
                 BtnMediaPlayPause.Content = "▶";
                 ImgMediaThumb.Visibility = Visibility.Collapsed;
                 TxtMediaIconPlaceholder.Visibility = Visibility.Visible;
@@ -514,9 +542,10 @@ namespace ClipVault.Views
             SystemControlService.OpenUri("ms-screenclip:");
         }
 
-        // 真实屏幕亮度调节 (GDI Gamma / 硬件)
+        // 统一系统级屏幕真实亮度调节 (WMI 驱动调度)
         private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            if (_isUpdatingBrightnessUi) return;
             int val = (int)e.NewValue;
             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{val}%";
             SystemControlService.SetBrightness(val);
@@ -556,8 +585,8 @@ namespace ClipVault.Views
         {
             var btn = new Button
             {
-                Width = 76,
-                Height = 56,
+                Width = 80,
+                Height = 58,
                 Margin = new Thickness(3),
                 Tag = act,
                 Cursor = Cursors.Hand,
@@ -572,18 +601,18 @@ namespace ClipVault.Views
             stack.Children.Add(new TextBlock
             {
                 Text = act.Icon,
-                FontSize = 14,
+                FontSize = 15,
                 HorizontalAlignment = HorizontalAlignment.Center
             });
             stack.Children.Add(new TextBlock
             {
                 Text = act.Name,
-                FontSize = 10,
+                FontSize = 10.5,
                 Foreground = (Brush)FindResource("TextPrimaryBrush"),
                 Margin = new Thickness(0, 3, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 68
+                MaxWidth = 72
             });
 
             btn.Content = stack;

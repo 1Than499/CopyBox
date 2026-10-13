@@ -1,21 +1,22 @@
 using System;
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 
 namespace ClipVault.Services
 {
     /// <summary>
-    /// 提供系统快捷控制支持：真实屏幕亮度（Gamma/硬件）、WiFi可用网络弹窗、蓝牙、系统音量控制
+    /// 提供系统快捷控制支持：统一的系统屏幕真实亮度调度、WiFi 可用网络弹窗、蓝牙、系统音量控制
     /// </summary>
     public static class SystemControlService
     {
-        #region 真实屏幕亮度调节 (GDI Gamma Ramp，跨平台跨屏幕 100% 普适兼容)
+        #region 屏幕真实亮度统一调度 (WMI 系统硬件背光 + GDI Gamma 平滑回退)
+
+        private static bool _useWmi = true;
+        private static int _cachedBrightness = -1;
 
         [DllImport("gdi32.dll")]
         private static extern bool SetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
-
-        [DllImport("gdi32.dll")]
-        private static extern bool GetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetDC(IntPtr hWnd);
@@ -34,20 +35,63 @@ namespace ClipVault.Services
             public ushort[] Blue;
         }
 
-        private static int _currentBrightness = 80;
-
-        public static int GetCurrentBrightness() => _currentBrightness;
-
         /// <summary>
-        /// 设置屏幕亮度 (10 ~ 100)
+        /// 读取当前系统真实的屏幕亮度 (0 ~ 100)，与 Windows 系统设置保持完全一致
         /// </summary>
-        public static void SetBrightness(int brightness)
+        public static int GetCurrentBrightness()
         {
             try
             {
-                brightness = Math.Clamp(brightness, 15, 100);
-                _currentBrightness = brightness;
+                using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness FROM WmiMonitorBrightness");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    byte b = (byte)obj["CurrentBrightness"];
+                    _cachedBrightness = (int)b;
+                    _useWmi = true;
+                    return _cachedBrightness;
+                }
+            }
+            catch
+            {
+                _useWmi = false;
+            }
 
+            // 若不支持 WMI (如外接显示器台式机)，优先返回上次设定的缓存值或 100% 正常亮度
+            if (_cachedBrightness >= 0) return _cachedBrightness;
+            _cachedBrightness = 100;
+            return _cachedBrightness;
+        }
+
+        /// <summary>
+        /// 设置屏幕亮度 (10 ~ 100)，优先通过 Windows WMI 驱动与系统保持完全一致调度
+        /// </summary>
+        public static void SetBrightness(int brightness)
+        {
+            brightness = Math.Clamp(brightness, 10, 100);
+            _cachedBrightness = brightness;
+
+            if (_useWmi)
+            {
+                try
+                {
+                    using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
+                    bool success = false;
+                    foreach (ManagementObject obj in searcher.Get())
+                    {
+                        obj.InvokeMethod("WmiSetBrightness", new object[] { 1, (byte)brightness });
+                        success = true;
+                    }
+                    if (success) return;
+                }
+                catch
+                {
+                    _useWmi = false;
+                }
+            }
+
+            // WMI 不可用时的无缝平滑回退：调节色彩亮度
+            try
+            {
                 IntPtr hdc = GetDC(IntPtr.Zero);
                 if (hdc != IntPtr.Zero)
                 {
@@ -59,7 +103,6 @@ namespace ClipVault.Services
                     };
 
                     double factor = brightness / 100.0;
-
                     for (int i = 0; i < 256; i++)
                     {
                         int value = (int)(i * 256 * factor);
@@ -123,33 +166,12 @@ namespace ClipVault.Services
             catch { }
         }
 
-        /// <summary>
-        /// 唤出 Windows 原生 WiFi 与网络可用连接浮层
-        /// </summary>
-        public static void OpenAvailableNetworks()
-        {
-            OpenUri("ms-availablenetworks:");
-        }
+        public static void OpenAvailableNetworks() => OpenUri("ms-availablenetworks:");
 
-        /// <summary>
-        /// 呼出 Windows 蓝牙设备设置
-        /// </summary>
-        public static void OpenBluetoothSettings()
-        {
-            OpenUri("ms-settings:bluetooth");
-        }
+        public static void OpenBluetoothSettings() => OpenUri("ms-settings:bluetooth");
 
-        /// <summary>
-        /// 呼出 Windows 整体设置中心
-        /// </summary>
-        public static void OpenSystemSettings()
-        {
-            OpenUri("ms-settings:");
-        }
+        public static void OpenSystemSettings() => OpenUri("ms-settings:");
 
-        /// <summary>
-        /// 执行自定义动作 (URL / 可执行程序 / 系统命令)
-        /// </summary>
         public static void ExecuteAction(string commandOrPath)
         {
             if (string.IsNullOrWhiteSpace(commandOrPath)) return;
