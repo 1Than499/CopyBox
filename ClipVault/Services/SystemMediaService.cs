@@ -220,6 +220,7 @@ namespace ClipVault.Services
                                         newInfo.HasMedia = true;
                                         newInfo.IsPlaying = bestIndex >= 0; // 有峰值或Active则为播放中
                                         newInfo.SourceAppId = pName;
+                                        newInfo.Thumbnail = ExtractIconFromProcess((int)pid);
 
                                         // 若窗口标题包含有价值的歌名信息 (例如 "周杰伦 - 晴天")
                                         if (!string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) && !wTitle.Equals(pName, StringComparison.OrdinalIgnoreCase))
@@ -262,6 +263,7 @@ namespace ClipVault.Services
                             newInfo.HasMedia = true;
                             newInfo.IsPlaying = true; // 进程在后台运行，保持可播控
                             newInfo.SourceAppId = km;
+                            newInfo.Thumbnail = ExtractIconFromProcess(proc.Id);
                             newInfo.Title = !string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) ? wTitle : "正在播放音频";
                             newInfo.Artist = friendly;
                             break;
@@ -356,6 +358,36 @@ namespace ClipVault.Services
             if (lower.Contains("video.ui")) return "Windows 电影与电视";
 
             return appId;
+        }
+
+        private static BitmapImage? ExtractIconFromProcess(int pid)
+        {
+            try
+            {
+                var proc = Process.GetProcessById(pid);
+                string? exePath = proc.MainModule?.FileName;
+                if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+                {
+                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+                    if (icon != null)
+                    {
+                        using var bmp = icon.ToBitmap();
+                        using var ms = new MemoryStream();
+                        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                        ms.Position = 0;
+
+                        var bi = new BitmapImage();
+                        bi.BeginInit();
+                        bi.CacheOption = BitmapCacheOption.OnLoad;
+                        bi.StreamSource = ms;
+                        bi.EndInit();
+                        bi.Freeze();
+                        return bi;
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
     }
 }

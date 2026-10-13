@@ -70,10 +70,16 @@ namespace ClipVault.Views
             // 监听失焦自动收起 (严格遵循用户在设置中配置的 HideOnDeactivate 偏好)
             this.Deactivated += (s, e) =>
             {
-                if (!_isPinned && _settingsService.CurrentSettings.HideOnDeactivate && this.IsVisible && (AddActionOverlay.Visibility != Visibility.Visible))
+                if (_settingsService.CurrentSettings.HideOnDeactivate && this.IsVisible && (AddActionOverlay.Visibility != Visibility.Visible))
                 {
                     SlideOutAndHide();
                 }
+            };
+
+            // 监听多语言全局变更
+            LocalizationService.Instance.LanguageChanged += () =>
+            {
+                Dispatcher.Invoke(() => UpdateLocalizedTexts());
             };
 
             // 初始化媒体播放控制服务联动
@@ -127,9 +133,12 @@ namespace ClipVault.Views
 
             // 加载设置项与主题到侧边栏
             LoadSettingsToSidebarUI();
+
+            // 首次应用多语言
+            UpdateLocalizedTexts();
         }
 
-        #region 外观主题与透明度动态应用 (支持深色/白天浅色热切换)
+        #region 外观主题与多语言热更新 (支持深色/白天浅色热切换)
 
         /// <summary>
         /// 实时应用外观主题 (深色 / 浅色)，通过修改 Resources 实现 DynamicResource 毫秒级刷新
@@ -140,18 +149,20 @@ namespace ClipVault.Views
 
             if (isLight)
             {
-                // 白天浅色 Fluent 毛玻璃高级质感
-                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0xFA, 0xFB, 0xFD));
+                // 白天浅色 Fluent 毛玻璃高级质感 (高不透明度象牙白，杜绝刺眼叠影；浅灰底盘彻底告别黑块)
+                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFA, 0xFB, 0xFD));
                 this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFF, 0xFF, 0xFF));
+                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
                 this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
                 this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                 this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
                 this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
+                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
                 this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
                 this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE8, 0xED, 0xF5));
+                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
+                this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
             }
             else
             {
@@ -167,6 +178,8 @@ namespace ClipVault.Views
                 this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
                 this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
                 this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
+                this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
+                this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
             }
 
             // 更新药丸按钮激活态前景色和背景色
@@ -187,6 +200,61 @@ namespace ClipVault.Views
 
             // 重新刷新自定义磁贴列表的色彩
             RefreshCustomActions();
+        }
+
+        /// <summary>
+        /// 全局多语言更新：动态翻译侧边栏所有文本与占位符
+        /// </summary>
+        public void UpdateLocalizedTexts()
+        {
+            var loc = LocalizationService.Instance;
+
+            // 药丸 Tab 按钮
+            if (TxtTabBtnClipboard != null) TxtTabBtnClipboard.Text = loc.Get("SidebarClipboard");
+            if (TxtTabBtnSystem != null) TxtTabBtnSystem.Text = loc.Get("SidebarActions");
+
+            // 搜索占位符与分类胶囊
+            if (TxtSearchPlaceholder != null) TxtSearchPlaceholder.Text = loc.Get("SidebarSearchPlaceholder");
+            if (RadioAll != null) RadioAll.Content = loc.Get("SidebarFilterAll");
+            if (RadioText != null) RadioText.Content = loc.Get("SidebarFilterText");
+            if (RadioImages != null) RadioImages.Content = loc.Get("SidebarFilterImage");
+            if (RadioCode != null) RadioCode.Content = loc.Get("SidebarFilterCode");
+            if (RadioPinned != null) RadioPinned.Content = loc.Get("SidebarFilterPinned");
+
+            // 快捷看板各板块
+            if (TxtSectionCoreShortcuts != null) TxtSectionCoreShortcuts.Text = loc.Get("SidebarCoreActions");
+            if (TxtSectionCustomActions != null) TxtSectionCustomActions.Text = loc.Get("SidebarCustomActions");
+            if (TxtTipRightClickDelete != null) TxtTipRightClickDelete.Text = loc.Get("SidebarRightClickDelete");
+            if (TxtBtnAddAction != null) TxtBtnAddAction.Text = loc.Get("SidebarAddAction");
+            if (TxtBrightnessTitle != null) TxtBrightnessTitle.Text = "🔅 " + loc.Get("SidebarBrightness");
+            if (TxtVolumeTitle != null) TxtVolumeTitle.Text = "🔊 " + loc.Get("SidebarVolume");
+            if (BtnVolDown != null) BtnVolDown.Content = loc.Get("SidebarVolDown");
+            if (BtnVolMute != null) BtnVolMute.Content = loc.Get("SidebarVolMute");
+            if (BtnVolUp != null) BtnVolUp.Content = loc.Get("SidebarVolUp");
+
+            // 偏好设置页面
+            if (TxtSettingsHeaderTitle != null) TxtSettingsHeaderTitle.Text = loc.Get("SidebarPreferences");
+            if (TxtSetModeTitle != null) TxtSetModeTitle.Text = loc.Get("WindowModeTitle");
+            if (RadioModeSidebar2 != null) RadioModeSidebar2.Content = loc.Get("WindowModeSidebar");
+            if (RadioModeCentered2 != null) RadioModeCentered2.Content = loc.Get("WindowModeCentered");
+            if (TxtSetLangTitle != null) TxtSetLangTitle.Text = loc.Get("LangSectionTitle");
+            if (RadioLangZh2 != null) RadioLangZh2.Content = loc.Get("LangZh");
+            if (RadioLangEn2 != null) RadioLangEn2.Content = loc.Get("LangEn");
+            if (TxtSetThemeTitle != null) TxtSetThemeTitle.Text = loc.Get("AppearanceTitle");
+            if (RadioThemeDark2 != null) RadioThemeDark2.Content = loc.Get("ThemeDark");
+            if (RadioThemeLight2 != null) RadioThemeLight2.Content = loc.Get("ThemeLight");
+            if (TxtSetOpacityTitle != null) TxtSetOpacityTitle.Text = loc.Get("OpacityLabel");
+            if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
+            if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
+            if (TxtSetInteractionTitle != null) TxtSetInteractionTitle.Text = loc.Get("DoubleClickTitle");
+            if (ChkHideOnDeactivate2 != null) ChkHideOnDeactivate2.Content = loc.Get("DeactivateTitle");
+            if (ChkPasteOnDblClick != null) ChkPasteOnDblClick.Content = loc.Get("DoubleClickPaste");
+            if (BtnClearHistory != null) BtnClearHistory.Content = loc.Get("TrayClear");
+            if (BtnExitApp != null) BtnExitApp.Content = loc.Get("BtnExitApp");
+
+            // 底部提示
+            if (TxtStatusRightTip != null) TxtStatusRightTip.Text = loc.Get("SidebarAltVTip");
+            if (TxtStatusLeft != null) TxtStatusLeft.Text = loc.Get("SidebarRecordCount", DisplayCards.Count);
         }
 
         #endregion
@@ -422,7 +490,7 @@ namespace ClipVault.Views
 
                 if (TxtStatusLeft != null)
                 {
-                    TxtStatusLeft.Text = $"共 {DisplayCards.Count} 条记录";
+                    TxtStatusLeft.Text = LocalizationService.Instance.Get("SidebarRecordCount", DisplayCards.Count);
                 }
             }
             catch { }
@@ -497,12 +565,12 @@ namespace ClipVault.Views
         {
             if (CardsListBox.SelectedItem is ClipboardItem selected)
             {
-                // 关键修复：双击卡片动作严格遵循设置中的配置 (PasteAndHide 还是 CopyOnly)
+                // 关键修复：选择 PasteAndHide 时，双击必须无条件模拟粘贴并平滑收起抽屉！
                 if (_settingsService.CurrentSettings.DoubleClickAction == "PasteAndHide")
                 {
                     await _pasteSimulator.PasteItemAsync(selected, () =>
                     {
-                        if (!_isPinned) SlideOutAndHide();
+                        SlideOutAndHide();
                     });
                 }
                 else
@@ -598,6 +666,7 @@ namespace ClipVault.Views
 
                 BtnMediaPlayPause.Content = info.IsPlaying ? "⏸" : "▶";
 
+                // 高清封面/软件专属图标展示
                 if (info.Thumbnail != null)
                 {
                     ImgMediaThumb.Source = info.Thumbnail;
@@ -902,6 +971,7 @@ namespace ClipVault.Views
                 _settingsService.CurrentSettings.Language = newLang;
                 _settingsService.SaveSettings();
                 LocalizationService.Instance.SetLanguage(newLang);
+                UpdateLocalizedTexts();
             }
         }
 
