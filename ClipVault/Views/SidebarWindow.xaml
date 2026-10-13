@@ -22,13 +22,13 @@
     <Window.Resources>
         <!-- 动态色板与毛玻璃材质 -->
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <SolidColorBrush x:Key="SidebarBgBrush" Color="#E8161922"/>
+        <SolidColorBrush x:Key="SidebarBgBrush" Color="#EE141722"/>
         <SolidColorBrush x:Key="SidebarBorderBrush" Color="#2E3A4E"/>
-        <SolidColorBrush x:Key="HeaderBgBrush" Color="#D911141C"/>
-        <SolidColorBrush x:Key="CardBgBrush" Color="#1E2432"/>
-        <SolidColorBrush x:Key="CardHoverBgBrush" Color="#2A3346"/>
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#2F3B4F"/>
-        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F1F5F9"/>
+        <SolidColorBrush x:Key="HeaderBgBrush" Color="#F00F121A"/>
+        <SolidColorBrush x:Key="CardBgBrush" Color="#1C2230"/>
+        <SolidColorBrush x:Key="CardHoverBgBrush" Color="#283246"/>
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#2D394D"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F8FAFC"/>
         <SolidColorBrush x:Key="TextSecondaryBrush" Color="#94A3B8"/>
         <SolidColorBrush x:Key="AccentBlueBrush" Color="#0078D7"/>
         <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="#1E88E5"/>
@@ -64,15 +64,15 @@
             </Setter>
         </Style>
 
-        <!-- 顶部小图标按钮样式 -->
+        <!-- 顶栏图标按钮通用样式 -->
         <Style x:Key="SidebarTopIconBtn" TargetType="Button">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#CBD5E1"/>
-            <Setter Property="Width" Value="26"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -84,19 +84,22 @@
                                 <Setter TargetName="bd" Property="Background" Value="#25FFFFFF"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#35FFFFFF"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- 仿生操作中心磁贴按钮基础样式 -->
+        <!-- 仿生快捷磁贴样式 -->
         <Style x:Key="ActionCenterTileStyle" TargetType="Button">
+            <Setter Property="Height" Value="56"/>
             <Setter Property="Background" Value="{StaticResource TileBgBrush}"/>
-            <Setter Property="BorderBrush" Value="#1AFFFFFF"/>
+            <Setter Property="BorderBrush" Value="#2AFFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
-            <Setter Property="Height" Value="54"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -104,16 +107,16 @@
                         <Border x:Name="tileBd" Background="{TemplateBinding Background}" 
                                 BorderBrush="{TemplateBinding BorderBrush}" 
                                 BorderThickness="{TemplateBinding BorderThickness}" 
-                                CornerRadius="4" Padding="4">
+                                CornerRadius="6" Padding="4">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="tileBd" Property="Background" Value="{StaticResource TileHoverBgBrush}"/>
-                                <Setter TargetName="tileBd" Property="BorderBrush" Value="#40FFFFFF"/>
+                                <Setter TargetName="tileBd" Property="BorderBrush" Value="#600078D7"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="tileBd" Property="Background" Value="#455A7D"/>
+                                <Setter TargetName="tileBd" Property="Background" Value="#384966"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -131,15 +134,15 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 顶栏与双模切换 Tab -->
-                <RowDefinition Height="*"/>    <!-- 核心视图区域 (剪贴板 / 操作中心) -->
+                <RowDefinition Height="*"/>    <!-- 核心视图区域 (剪贴板 / 快捷看板 / 侧边栏内置设置) -->
                 <RowDefinition Height="Auto"/> <!-- 底部状态栏 -->
             </Grid.RowDefinitions>
 
             <!-- ================= 第一行：顶栏与双模切换药丸 ================= -->
             <Border Grid.Row="0" Background="{StaticResource HeaderBgBrush}" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1" Padding="12,10,12,10">
                 <StackPanel>
-                    <!-- 窗口标题与控制图标 -->
-                    <Grid Margin="0,0,0,8">
+                    <!-- 常态顶栏：标题与控制图标 -->
+                    <Grid x:Name="HeaderNormalBar" Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Border Width="18" Height="18" CornerRadius="4" Background="{StaticResource AccentBlueBrush}" Margin="0,0,6,0">
                                 <TextBlock Text="📋" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -155,7 +158,7 @@
                             <Button x:Name="BtnPin" Style="{StaticResource SidebarTopIconBtn}" Click="BtnPin_Click" ToolTip="切换贴边自隐藏 / 图钉锁定常驻">
                                 <TextBlock x:Name="TxtPinIcon" Text="📌" FontSize="11"/>
                             </Button>
-                            <Button x:Name="BtnSettings" Style="{StaticResource SidebarTopIconBtn}" Click="BtnSettings_Click" ToolTip="打开偏好设置">
+                            <Button x:Name="BtnSettings" Style="{StaticResource SidebarTopIconBtn}" Click="BtnSettings_Click" ToolTip="打开侧边栏偏好设置">
                                 <TextBlock Text="⚙" FontSize="11"/>
                             </Button>
                             <Button x:Name="BtnClose" Style="{StaticResource SidebarTopIconBtn}" Click="BtnClose_Click" ToolTip="收起侧边栏">
@@ -164,8 +167,21 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- 双模切换药丸 (核心创新点) -->
-                    <Border Background="#1C222E" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="2">
+                    <!-- 设置模式顶栏：带返回按钮 (进入设置时显现) -->
+                    <Grid x:Name="HeaderSettingsBar" Margin="0,0,0,8" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="BtnBackFromSettings" Style="{StaticResource SidebarTopIconBtn}" Click="BtnBackFromSettings_Click" ToolTip="返回上一视图" Margin="0,0,6,0">
+                                <TextBlock Text="←" FontSize="13" FontWeight="Bold"/>
+                            </Button>
+                            <TextBlock Text="偏好设置" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Style="{StaticResource SidebarTopIconBtn}" HorizontalAlignment="Right" Click="BtnBackFromSettings_Click" ToolTip="完成并返回">
+                            <TextBlock Text="✕" FontSize="10"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- 双模切换药丸 (在设置视图时折叠) -->
+                    <Border x:Name="TabSwitcherBorder" Background="#1C222E" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="2">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -196,8 +212,8 @@
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6">
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <TextBlock Text="🔔" FontSize="11" Margin="0,0,4,0"/>
-                                                <TextBlock Text="系统快捷看板" FontSize="11" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}"/>
+                                                <TextBlock Text="⚡" FontSize="11" Margin="0,0,4,0"/>
+                                                <TextBlock Text="快捷看板" FontSize="11" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}"/>
                                             </StackPanel>
                                         </Border>
                                         <ControlTemplate.Triggers>
@@ -216,7 +232,7 @@
             <!-- ================= 第二行：核心内容区域 ================= -->
             <Grid Grid.Row="1">
                 
-                <!-- 【模式一：CopyBox 剪贴板中心】 -->
+                <!-- 【视图 1：CopyBox 剪贴板中心】 -->
                 <Grid x:Name="ClipboardViewPanel" Visibility="Visible">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- 搜索框与分类胶囊 -->
@@ -359,148 +375,261 @@
                     </ListBox>
                 </Grid>
 
-                <!-- 【模式二：1:1 仿生 Windows 10/11 系统操作中心快捷看板】 -->
-                <Grid x:Name="SystemActionsPanel" Visibility="Collapsed" Margin="12,10,12,10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- 管理通知链接 -->
-                        <RowDefinition Height="*"/>    <!-- 通知流区域 -->
-                        <RowDefinition Height="Auto"/> <!-- 仿生 4x4 快捷磁贴网格与亮度调节 -->
-                    </Grid.RowDefinitions>
+                <!-- 【视图 2：系统快捷看板 (当前播放音源 + 4大关键控制 + 用户自定义扩展 + 真实亮度/音量调节)】 -->
+                <ScrollViewer x:Name="SystemActionsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="12,10,12,12">
+                        
+                        <!-- 1. 正在播放音源卡片 (媒体播控中心) -->
+                        <Border Background="#182030" BorderBrush="#350078D7" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="52"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                    <!-- 管理通知 -->
-                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
-                        <TextBlock Text="通知与操作中心" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <Button DockPanel.Dock="Right" Content="管理通知" Background="Transparent" BorderThickness="0" 
-                                Foreground="#60A5FA" FontSize="11" Cursor="Hand" Click="BtnManageNotifications_Click"/>
-                    </DockPanel>
+                                <!-- 专辑封面或音乐脉冲图标 -->
+                                <Border Grid.Column="0" Width="48" Height="48" CornerRadius="8" Background="#121622" BorderBrush="#25FFFFFF" BorderThickness="1" HorizontalAlignment="Left">
+                                    <Grid>
+                                        <Image x:Name="ImgMediaThumb" Stretch="UniformToFill" Visibility="Collapsed"/>
+                                        <TextBlock x:Name="TxtMediaIconPlaceholder" Text="🎵" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
 
-                    <!-- 通知聚合区 -->
-                    <Border Grid.Row="1" Background="#141822" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="8" Padding="16">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <TextBlock Text="🔔" FontSize="26" HorizontalAlignment="Center" Foreground="#475569" Margin="0,0,0,8"/>
-                            <TextBlock Text="没有新通知" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Windows 系统操作中心已就绪" FontSize="10.5" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                            <Button Content="🪟 呼出原版 Win+A" Background="#1E293B" Foreground="#94A3B8" BorderThickness="0"
-                                    Margin="0,14,0,0" Padding="12,5" FontSize="10.5" Cursor="Hand" Click="BtnTriggerWinA_Click"
-                                    ToolTip="模拟触发 Windows 原版操作中心快捷键"/>
-                        </StackPanel>
-                    </Border>
+                                <!-- 媒体信息与控制按钮 -->
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <!-- 歌曲/标题与状态 -->
+                                    <DockPanel LastChildFill="True">
+                                        <TextBlock x:Name="TxtMediaStatusTag" DockPanel.Dock="Right" Text="播放器待机" FontSize="9.5" Foreground="#64748B" Margin="4,0,0,0"/>
+                                        <TextBlock x:Name="TxtMediaTitle" Text="未检测到正在播放的音源" FontWeight="SemiBold" FontSize="12" 
+                                                   Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
 
-                    <!-- 底部：4×4 经典仿生磁贴网格与亮度调节 -->
-                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                        <DockPanel Margin="0,0,0,8">
-                            <TextBlock Text="折叠" Foreground="#60A5FA" FontSize="11" Cursor="Hand" MouseDown="BtnCollapseTiles_MouseDown"/>
-                            <TextBlock Text="快捷磁贴" DockPanel.Dock="Right" Foreground="#64748B" FontSize="10"/>
-                        </DockPanel>
+                                    <!-- 歌手/应用名 -->
+                                    <TextBlock x:Name="TxtMediaArtist" Text="支持网易云/QQ音乐/Spotify/浏览器" FontSize="10.5" 
+                                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,6" TextTrimming="CharacterEllipsis"/>
 
-                        <!-- 4 列网格磁贴 (完全对齐用户上传截图) -->
-                        <UniformGrid x:Name="TilesGrid" Columns="4" Rows="4">
-                            <!-- 行 1 -->
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileLocation_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="📍" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="定位" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                    <!-- 播控按钮栏 -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button x:Name="BtnMediaPrev" Style="{StaticResource SidebarTopIconBtn}" Width="24" Height="24" Click="BtnMediaPrev_Click" ToolTip="上一曲">
+                                            <TextBlock Text="⏮" FontSize="10"/>
+                                        </Button>
+                                        <Button x:Name="BtnMediaPlayPause" Width="28" Height="28" Content="▶" FontSize="11" Background="{StaticResource AccentBlueBrush}" 
+                                                Foreground="#FFFFFF" BorderThickness="0" Cursor="Hand" Margin="4,0,4,0" Click="BtnMediaPlayPause_Click" ToolTip="播放 / 暂停">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="14">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                        <Button x:Name="BtnMediaNext" Style="{StaticResource SidebarTopIconBtn}" Width="24" Height="24" Click="BtnMediaNext_Click" ToolTip="下一曲">
+                                            <TextBlock Text="⏭" FontSize="10"/>
+                                        </Button>
+                                    </StackPanel>
                                 </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileBatterySaver_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="⚡" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="节电模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <!-- 蓝牙默认亮起蓝色 -->
-                            <Button x:Name="TileBluetooth" Style="{StaticResource ActionCenterTileStyle}" Background="{StaticResource AccentBlueBrush}" Margin="2" Click="TileBluetooth_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🔵" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="蓝牙" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center" Foreground="#FFFFFF"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNightLight_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="☀️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="夜间模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
+                            </Grid>
+                        </Border>
 
-                            <!-- 行 2 -->
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileHotspot_Click">
+                        <!-- 2. 四大核心关键功能 (WiFi、蓝牙、系统设置、屏幕截图) -->
+                        <TextBlock Text="核心系统快捷" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" Margin="2,0,0,6"/>
+                        <UniformGrid Columns="2" Rows="2" Margin="0,0,0,12">
+                            <!-- 磁贴 1: WiFi 可用网络 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileWifi_Click" ToolTip="呼出 Windows 原生 WiFi 与网络连接面板">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="📶" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="移动热点" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileAirplane_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="✈️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="飞行模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNearbySharing_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="📡" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="就近共享" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileSettings_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="⚙️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="所有设置" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="🛜" FontSize="15" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="WLAN / 网络" FontSize="10.5" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
-                            <!-- 行 3 -->
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNetwork_Click">
+                            <!-- 磁贴 2: 蓝牙 -->
+                            <Button x:Name="TileBluetooth" Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileBluetooth_Click" ToolTip="呼出 Windows 蓝牙设备管理">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🛜" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="网络" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileConnect_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🖥️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="连接" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileProject_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="📽️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="投影" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileVPN_Click">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🛡️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="VPN" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="🔵" FontSize="15" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="蓝牙设备" FontSize="10.5" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
-                            <!-- 行 4 -->
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileFocusAssist_Click">
+                            <!-- 磁贴 3: Windows 系统设置 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileSystemSettings_Click" ToolTip="打开 Windows 核心设置中心">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="🌙" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="专注助手" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="⚙️" FontSize="15" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Windows 设置" FontSize="10.5" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileScreenClip_Click">
+
+                            <!-- 磁贴 4: 屏幕截图 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="3" Click="TileScreenClip_Click" ToolTip="呼出 Windows 剪贴板截图工具">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="✂️" FontSize="13" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="屏幕截图" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="✂️" FontSize="15" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="屏幕截图" FontSize="10.5" FontWeight="SemiBold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
 
-                        <!-- 亮度调节滑动条 -->
-                        <Grid Margin="4,8,4,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="🔅" FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="80" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="🔆" FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                        </Grid>
+                        <!-- 3. 自定义快捷动作网格 (用户可自行添加和管理) -->
+                        <DockPanel Margin="2,0,2,6">
+                            <TextBlock Text="自定义快捷动作" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="右键磁贴可删除" FontSize="9.5" Foreground="#64748B" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+                        </DockPanel>
+
+                        <!-- 动态自定义磁贴列表 + 常驻【➕ 添加】按钮 -->
+                        <WrapPanel x:Name="CustomActionsPanel" Margin="0,0,0,12">
+                            <!-- 动态项目通过后台代码挂载生成 -->
+                            <!-- 常驻添加磁贴 -->
+                            <Button x:Name="BtnAddNewAction" Width="76" Height="56" Margin="3" Background="#161B26" BorderBrush="#35FFFFFF" 
+                                    BorderThickness="1" Cursor="Hand" Click="BtnAddNewAction_Click" ToolTip="添加新的自定义软件、网站或命令动作">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" 
+                                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="➕" FontSize="13" Foreground="#60A5FA" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="添加动作" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </WrapPanel>
+
+                        <!-- 4. 真实屏幕亮度调节 (Gamma / 硬件) -->
+                        <Border Background="#161D2A" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <TextBlock Text="🔅 屏幕亮度调节" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="80%" FontSize="11" FontWeight="Bold" Foreground="#60A5FA"/>
+                                </DockPanel>
+                                <Slider x:Name="SliderBrightness" Minimum="15" Maximum="100" Value="80" SmallChange="5" LargeChange="10"
+                                        ValueChanged="SliderBrightness_ValueChanged"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 5. 系统音量快捷调节 -->
+                        <Border Background="#161D2A" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                            <DockPanel>
+                                <TextBlock Text="🔊 系统主音量" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="🔉 减小" Style="{StaticResource ActionCenterTileStyle}" Height="28" Padding="8,2" Margin="2,0" FontSize="10.5" Click="BtnVolDown_Click"/>
+                                    <Button Content="🔇 静音" Style="{StaticResource ActionCenterTileStyle}" Height="28" Padding="8,2" Margin="2,0" FontSize="10.5" Click="BtnVolMute_Click"/>
+                                    <Button Content="🔊 增大" Style="{StaticResource ActionCenterTileStyle}" Height="28" Padding="8,2" Margin="2,0" FontSize="10.5" Click="BtnVolUp_Click"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
                     </StackPanel>
+                </ScrollViewer>
+
+                <!-- 【视图 3：侧边栏内置设置中心 (彻底解耦 1.0 MainWindow)】 -->
+                <ScrollViewer x:Name="SettingsViewPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="14,10,14,14">
+                        
+                        <!-- 1. 界面展示形态偏好 (单选互斥) -->
+                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="🖥️ 界面展示形态偏好" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock Text="设置全局快捷键 (Alt+V) 与托盘唤出的界面模式" FontSize="10" Foreground="#64748B" Margin="0,0,0,8"/>
+                                
+                                <RadioButton x:Name="RadioModeSidebar2" Content="📱 2.0 贴边毛玻璃双模抽屉 (当前)" IsChecked="True" 
+                                             GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked" Tag="Sidebar"/>
+                                <RadioButton x:Name="RadioModeCentered2" Content="🪟 1.0 经典居中极速浮窗" 
+                                             GroupName="SideWindowMode" Checked="WindowModeRadio_Checked" Tag="Centered"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 2. 界面显示语言 -->
+                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="🌐 界面语言" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="RadioLangZh2" Content="🇨🇳 简体中文" IsChecked="True" GroupName="SideLang" Margin="0,0,16,0" Checked="LangRadio_Checked" Tag="zh-CN"/>
+                                    <RadioButton x:Name="RadioLangEn2" Content="🇺🇸 English" GroupName="SideLang" Checked="LangRadio_Checked" Tag="en-US"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 3. 外观模式与透明度 -->
+                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="🎨 外观与主题" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <RadioButton x:Name="RadioThemeDark2" Content="🌙 深色暗黑" IsChecked="True" GroupName="SideTheme" Margin="0,0,16,0" Checked="ThemeRadio_Checked" Tag="Dark"/>
+                                    <RadioButton x:Name="RadioThemeLight2" Content="☀️ 明亮白天" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Light"/>
+                                </StackPanel>
+                                <DockPanel Margin="0,4,0,4">
+                                    <TextBlock Text="抽屉透明度" FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="10.5" Foreground="#60A5FA"/>
+                                </DockPanel>
+                                <Slider x:Name="SliderSideOpacity" Minimum="60" Maximum="100" Value="92" SmallChange="2" LargeChange="5" ValueChanged="SliderSideOpacity_ValueChanged"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 4. 本地数据存储目录 -->
+                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="📁 本地数据存储路径" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSideStoragePath" Text="C:\Users\...\Data" FontSize="10" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+                                <Button Content="📂 更改目录并迁移数据" Background="#1F293D" Foreground="#60A5FA" BorderThickness="0" 
+                                        Padding="10,5" FontSize="10.5" Cursor="Hand" Click="BtnBrowseStorage_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 5. 交互偏好 -->
+                        <Border Background="#182030" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="⚡ 交互细节" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="点击窗口外部时自动收起" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed"/>
+                                <CheckBox x:Name="ChkPasteOnDblClick" Content="双击直接模拟粘贴并收起" Checked="ChkPasteOnDblClick_Changed" Unchecked="ChkPasteOnDblClick_Changed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 6. 清空与退出按钮 -->
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="🗑️ 清空历史" Background="#261A22" Foreground="#F87171" BorderThickness="0" 
+                                    Margin="0,0,4,0" Padding="8,6" FontSize="11" Cursor="Hand" Click="BtnClearHistory_Click"/>
+                            <Button Grid.Column="1" Content="🛑 彻底退出" Background="#2E1C22" Foreground="#EF4444" BorderThickness="0" 
+                                    Margin="4,0,0,0" Padding="8,6" FontSize="11" Cursor="Hand" Click="BtnExitApp_Click"/>
+                        </Grid>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 【浮层：添加自定义快捷动作弹窗】 -->
+                <Grid x:Name="AddActionOverlay" Visibility="Collapsed" Background="#D0080B12">
+                    <Border Width="300" Background="#1A2232" BorderBrush="#400078D7" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
+                        <StackPanel>
+                            <TextBlock Text="➕ 添加自定义快捷动作" FontWeight="Bold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                            
+                            <!-- 动作名称 -->
+                            <TextBlock Text="名称 (如: 微信 / 计算器 / 哔哩哔哩)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtNewActionName" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="11" Margin="0,0,0,8"/>
+
+                            <!-- 图标 Emoji -->
+                            <TextBlock Text="图标 (Emoji)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtNewActionIcon" Text="🚀" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="12" Margin="0,0,0,8"/>
+
+                            <!-- 执行目标 -->
+                            <TextBlock Text="执行目标 (程序路径 / 网址 / 命令)" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtNewActionCommand" Grid.Column="0" Background="#121622" Foreground="#FFFFFF" BorderBrush="#25FFFFFF" Padding="6,4" FontSize="11"/>
+                                <Button Grid.Column="1" Content="浏览..." Background="#253248" Foreground="#60A5FA" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnBrowseActionFile_Click"/>
+                            </Grid>
+
+                            <!-- 操作按钮 -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="取消" Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}" BorderThickness="0" Padding="10,4" Margin="0,0,6,0" Cursor="Hand" Click="BtnCancelAddAction_Click"/>
+                                <Button Content="保存并添加" Background="{StaticResource AccentBlueBrush}" Foreground="#FFFFFF" BorderThickness="0" Padding="12,5" Cursor="Hand" Click="BtnConfirmAddAction_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
             </Grid>

@@ -40,6 +40,14 @@ namespace ClipVault.Models
         public bool StartWithWindows { get; set; } = false; // 开机自启
         public bool PortableMode { get; set; } = false; // 便携模式
 
+        // 用户自定义快捷动作列表 (系统操作中心扩展磁贴)
+        public System.Collections.Generic.List<CustomActionItem> CustomActions { get; set; } = new()
+        {
+            new CustomActionItem { Id = "screenclip", Name = "屏幕截图", Icon = "✂️", CommandOrPath = "ms-screenclip:" },
+            new CustomActionItem { Id = "calc", Name = "计算器", Icon = "🧮", CommandOrPath = "calc" },
+            new CustomActionItem { Id = "taskmgr", Name = "任务管理", Icon = "📊", CommandOrPath = "taskmgr" }
+        };
+
         public static string GetDefaultStoragePath()
         {
             return Path.Combine(
@@ -48,5 +56,13 @@ namespace ClipVault.Models
                 "Data"
             );
         }
+    }
+
+    public class CustomActionItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Name { get; set; } = string.Empty;
+        public string Icon { get; set; } = "⚡";
+        public string CommandOrPath { get; set; } = string.Empty;
     }
 }

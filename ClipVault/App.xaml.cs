@@ -302,18 +302,31 @@ namespace ClipVault
         }
 
         /// <summary>
-        /// 从侧边栏齿轮或托盘菜单打开偏好设置浮层
+        /// 打开偏好设置：若当前是 2.0 侧边栏模式，直接在侧边栏内部展开设置页，绝不弹出 1.0 MainWindow！
+        /// 仅当用户处于 1.0 居中模式时，才唤起 1.0 MainWindow 浮层设置。
         /// </summary>
         public void OpenSettings()
         {
             Dispatcher.Invoke(() =>
             {
-                if (_sidebarWindow != null && _sidebarWindow.IsVisible)
+                string mode = _settingsService?.CurrentSettings.WindowMode ?? "Sidebar";
+                if (mode == "Sidebar")
                 {
-                    _sidebarWindow.SlideOutAndHide();
+                    if (_mainWindow != null && _mainWindow.IsVisible)
+                    {
+                        _mainWindow.Hide();
+                    }
+                    _sidebarWindow?.ShowSettings();
                 }
-                _mainWindow?.ShowAndActivate();
-                _mainWindow?.OpenSettings();
+                else
+                {
+                    if (_sidebarWindow != null && _sidebarWindow.IsVisible)
+                    {
+                        _sidebarWindow.SlideOutAndHide();
+                    }
+                    _mainWindow?.ShowAndActivate();
+                    _mainWindow?.OpenSettings();
+                }
             });
         }
 
