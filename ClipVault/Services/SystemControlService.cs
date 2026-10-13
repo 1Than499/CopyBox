@@ -6,14 +6,26 @@ using System.Runtime.InteropServices;
 namespace ClipVault.Services
 {
     /// <summary>
-    /// 提供系统快捷控制支持：统一的系统屏幕真实亮度调度、WiFi 可用网络弹窗、蓝牙、系统音量控制
+    /// 提供系统快捷控制支持：统一的系统屏幕真实亮度调度 (powrprof + WMI)、WiFi 可用网络弹窗、蓝牙、系统音量与全局媒体播控
     /// </summary>
     public static class SystemControlService
     {
-        #region 屏幕真实亮度统一调度 (WMI 系统硬件背光 + GDI Gamma 平滑回退)
+        #region 屏幕真实亮度统一调度 (powrprof 电源背光方案 + WMI + 视觉平滑同步)
 
-        private static bool _useWmi = true;
-        private static int _cachedBrightness = -1;
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerGetActiveScheme(IntPtr UserRootPowerKey, out IntPtr ActivePolicyGuid);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerReadACValueIndex(IntPtr RootPowerKey, ref Guid SchemeGuid, ref Guid SubGroup, ref Guid Setting, out uint AcValueIndex);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerWriteACValueIndex(IntPtr RootPowerKey, ref Guid SchemeGuid, ref Guid SubGroup, ref Guid Setting, uint AcValueIndex);
+
+        [DllImport("powrprof.dll")]
+        private static extern uint PowerSetActiveScheme(IntPtr UserRootPowerKey, ref Guid SchemeGuid);
+
+        private static readonly Guid SubVideo = new Guid("7516b95f-f776-4464-8c53-06167f40cc99");
+        private static readonly Guid VideoBrightness = new Guid("aded5e82-b909-4619-9949-f5d71dac0bcb");
 
         [DllImport("gdi32.dll")]
         private static extern bool SetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
@@ -35,53 +47,45 @@ namespace ClipVault.Services
             public ushort[] Blue;
         }
 
+        private static int _lastKnownBrightness = 100;
+        private static bool _useWmi = true;
+
         /// <summary>
-        /// 读取当前系统真实的屏幕亮度 (0 ~ 100)，与 Windows 系统设置保持完全一致
+        /// 实时读取当前 Windows 系统的真实物理屏幕亮度 (0 ~ 100)，无论用户在键盘 Fn 键还是系统设置中改变，均能即时获取
         /// </summary>
         public static int GetCurrentBrightness()
         {
+            // 1. 优先通过 Windows 电源方案获取 (Windows 原生权威亮度)
             try
             {
-                using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness FROM WmiMonitorBrightness");
-                foreach (ManagementObject obj in searcher.Get())
+                IntPtr pScheme;
+                if (PowerGetActiveScheme(IntPtr.Zero, out pScheme) == 0 && pScheme != IntPtr.Zero)
                 {
-                    byte b = (byte)obj["CurrentBrightness"];
-                    _cachedBrightness = (int)b;
-                    _useWmi = true;
-                    return _cachedBrightness;
+                    Guid scheme = Marshal.PtrToStructure<Guid>(pScheme);
+                    var sub = SubVideo;
+                    var setting = VideoBrightness;
+                    uint val;
+                    if (PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out val) == 0)
+                    {
+                        _lastKnownBrightness = (int)Math.Clamp(val, 0, 100);
+                        return _lastKnownBrightness;
+                    }
                 }
             }
-            catch
-            {
-                _useWmi = false;
-            }
+            catch { }
 
-            // 若不支持 WMI (如外接显示器台式机)，优先返回上次设定的缓存值或 100% 正常亮度
-            if (_cachedBrightness >= 0) return _cachedBrightness;
-            _cachedBrightness = 100;
-            return _cachedBrightness;
-        }
-
-        /// <summary>
-        /// 设置屏幕亮度 (10 ~ 100)，优先通过 Windows WMI 驱动与系统保持完全一致调度
-        /// </summary>
-        public static void SetBrightness(int brightness)
-        {
-            brightness = Math.Clamp(brightness, 10, 100);
-            _cachedBrightness = brightness;
-
+            // 2. 其次通过 WMI 查询
             if (_useWmi)
             {
                 try
                 {
-                    using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
-                    bool success = false;
+                    using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness FROM WmiMonitorBrightness");
                     foreach (ManagementObject obj in searcher.Get())
                     {
-                        obj.InvokeMethod("WmiSetBrightness", new object[] { 1, (byte)brightness });
-                        success = true;
+                        byte b = (byte)obj["CurrentBrightness"];
+                        _lastKnownBrightness = (int)b;
+                        return _lastKnownBrightness;
                     }
-                    if (success) return;
                 }
                 catch
                 {
@@ -89,7 +93,50 @@ namespace ClipVault.Services
                 }
             }
 
-            // WMI 不可用时的无缝平滑回退：调节色彩亮度
+            return _lastKnownBrightness;
+        }
+
+        /// <summary>
+        /// 设置屏幕亮度 (0 ~ 100)，直接写入 Windows 当前活动电源方案并广播，保证与系统完全一致
+        /// </summary>
+        public static void SetBrightness(int brightness)
+        {
+            brightness = Math.Clamp(brightness, 0, 100);
+            _lastKnownBrightness = brightness;
+
+            // 1. 写入 Windows 系统活动电源方案 (即时影响系统快速设置滑块和硬件)
+            try
+            {
+                IntPtr pScheme;
+                if (PowerGetActiveScheme(IntPtr.Zero, out pScheme) == 0 && pScheme != IntPtr.Zero)
+                {
+                    Guid scheme = Marshal.PtrToStructure<Guid>(pScheme);
+                    var sub = SubVideo;
+                    var setting = VideoBrightness;
+                    PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, (uint)brightness);
+                    PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+                }
+            }
+            catch { }
+
+            // 2. 尝试 WMI 硬件背光驱动通知
+            if (_useWmi)
+            {
+                try
+                {
+                    using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
+                    foreach (ManagementObject obj in searcher.Get())
+                    {
+                        obj.InvokeMethod("WmiSetBrightness", new object[] { 1, (byte)brightness });
+                    }
+                }
+                catch
+                {
+                    _useWmi = false;
+                }
+            }
+
+            // 3. 同时调节 Gamma Ramp，确保在外接显示器/独显直连屏幕上肉眼产生极清晰明暗反馈
             try
             {
                 IntPtr hdc = GetDC(IntPtr.Zero);
@@ -102,7 +149,8 @@ namespace ClipVault.Services
                         Blue = new ushort[256]
                     };
 
-                    double factor = brightness / 100.0;
+                    // 映射 0 ~ 100 到适度合理的色彩倍率 (0.4 ~ 1.0)
+                    double factor = 0.35 + (brightness / 100.0) * 0.65;
                     for (int i = 0; i < 256; i++)
                     {
                         int value = (int)(i * 256 * factor);
@@ -121,7 +169,7 @@ namespace ClipVault.Services
 
         #endregion
 
-        #region 系统音量快捷调节 (通过原生多媒体虚拟键)
+        #region 系统多媒体播控与音量调节 (原生硬件虚拟键)
 
         [DllImport("user32.dll")]
         private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -129,7 +177,28 @@ namespace ClipVault.Services
         private const byte VK_VOLUME_MUTE = 0xAD;
         private const byte VK_VOLUME_DOWN = 0xAE;
         private const byte VK_VOLUME_UP = 0xAF;
+        private const byte VK_MEDIA_NEXT_TRACK = 0xB0;
+        private const byte VK_MEDIA_PREV_TRACK = 0xB1;
+        private const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
         private const uint KEYEVENTF_KEYUP = 0x0002;
+
+        public static void MediaPlayPause()
+        {
+            keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_MEDIA_PLAY_PAUSE, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        }
+
+        public static void MediaNext()
+        {
+            keybd_event(VK_MEDIA_NEXT_TRACK, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_MEDIA_NEXT_TRACK, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        }
+
+        public static void MediaPrev()
+        {
+            keybd_event(VK_MEDIA_PREV_TRACK, 0, 0, UIntPtr.Zero);
+            keybd_event(VK_MEDIA_PREV_TRACK, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        }
 
         public static void VolumeUp()
         {
@@ -151,7 +220,22 @@ namespace ClipVault.Services
 
         #endregion
 
-        #region 原生核心快捷动作
+        #region Windows 原生面板联动 (WiFi / 蓝牙 / 系统设置)
+
+        public static void OpenAvailableNetworks()
+        {
+            OpenUri("ms-availablenetworks:");
+        }
+
+        public static void OpenBluetoothSettings()
+        {
+            OpenUri("ms-settings:bluetooth");
+        }
+
+        public static void OpenSystemSettings()
+        {
+            OpenUri("ms-settings:");
+        }
 
         public static void OpenUri(string uri)
         {
@@ -164,29 +248,6 @@ namespace ClipVault.Services
                 });
             }
             catch { }
-        }
-
-        public static void OpenAvailableNetworks() => OpenUri("ms-availablenetworks:");
-
-        public static void OpenBluetoothSettings() => OpenUri("ms-settings:bluetooth");
-
-        public static void OpenSystemSettings() => OpenUri("ms-settings:");
-
-        public static void ExecuteAction(string commandOrPath)
-        {
-            if (string.IsNullOrWhiteSpace(commandOrPath)) return;
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = commandOrPath.Trim(),
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show($"执行失败: {ex.Message}", "快捷动作错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-            }
         }
 
         #endregion

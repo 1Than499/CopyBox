@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using ClipVault.Models;
 using ClipVault.Services;
 using Microsoft.Win32;
@@ -22,6 +23,7 @@ namespace ClipVault.Views
         private readonly ClipboardMonitorService _monitorService;
         private readonly PasteSimulator _pasteSimulator;
         private readonly SystemMediaService _mediaService;
+        private readonly DispatcherTimer _brightnessSyncTimer;
 
         public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
 
@@ -74,17 +76,40 @@ namespace ClipVault.Views
                 }
             };
 
-            // 初始化媒体播放控制服务
+            // 初始化媒体播放控制服务联动
             _mediaService.MediaInfoChanged += info =>
             {
                 Dispatcher.Invoke(() => UpdateMediaUI(info));
             };
-            _ = _mediaService.InitializeAsync();
+
+            // 初始化系统亮度双向同步定时器 (每 800ms 检查一次 Windows 系统外部调节)
+            _brightnessSyncTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(800)
+            };
+            _brightnessSyncTimer.Tick += (s, e) =>
+            {
+                if (this.IsVisible && SystemActionsPanel.Visibility == Visibility.Visible && !_isUpdatingBrightnessUi)
+                {
+                    try
+                    {
+                        int currentSys = SystemControlService.GetCurrentBrightness();
+                        if (Math.Abs(currentSys - (int)SliderBrightness.Value) >= 1)
+                        {
+                            _isUpdatingBrightnessUi = true;
+                            SliderBrightness.Value = currentSys;
+                            if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
+                            _isUpdatingBrightnessUi = false;
+                        }
+                    }
+                    catch { }
+                }
+            };
 
             // 加载自定义动作磁贴
             RefreshCustomActions();
 
-            // 实时同步当前系统的真实屏幕亮度 (与 Windows 系统调度 100% 保持一致)
+            // 实时同步当前系统屏幕真实亮度
             try
             {
                 int sysBrightness = SystemControlService.GetCurrentBrightness();
@@ -98,9 +123,68 @@ namespace ClipVault.Views
             }
             catch { }
 
-            // 加载设置项到侧边栏设置页
+            // 加载设置项与主题到侧边栏
             LoadSettingsToSidebarUI();
         }
+
+        #region 外观主题与透明度动态应用
+
+        /// <summary>
+        /// 实时应用外观主题 (深色 / 浅色)，界面画刷即时刷新
+        /// </summary>
+        public void ApplyTheme(string theme)
+        {
+            bool isLight = theme.Equals("Light", StringComparison.OrdinalIgnoreCase);
+
+            if (isLight)
+            {
+                Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0xFA, 0xFA, 0xFC));
+                Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFF, 0xFF, 0xFF));
+                Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+                Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+                Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+                Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B));
+                Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+
+                RootBorder.Background = (SolidColorBrush)Resources["SidebarBgBrush"];
+                RootBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+            }
+            else
+            {
+                Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
+                Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
+                Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
+                Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
+                Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
+                Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+                Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
+                Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
+
+                RootBorder.Background = (SolidColorBrush)Resources["SidebarBgBrush"];
+                RootBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
+            }
+
+            // 更新药丸按钮与顶栏选中色
+            if (ClipboardViewPanel.Visibility == Visibility.Visible)
+            {
+                TabBtnClipboard.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
+                TabBtnClipboard.Foreground = Brushes.White;
+                TabBtnSystem.Background = Brushes.Transparent;
+                TabBtnSystem.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
+            }
+            else if (SystemActionsPanel.Visibility == Visibility.Visible)
+            {
+                TabBtnSystem.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
+                TabBtnSystem.Foreground = Brushes.White;
+                TabBtnClipboard.Background = Brushes.Transparent;
+                TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
+            }
+        }
+
+        #endregion
 
         #region 窗口生命周期与抽屉平滑动画
 
@@ -112,7 +196,7 @@ namespace ClipVault.Views
             _pasteSimulator.RecordTargetWindow();
 
             var workArea = SystemParameters.WorkArea;
-            this.Width = 380; // 优化抽屉黄金宽度
+            this.Width = 380;
             this.Height = workArea.Height;
             this.Top = workArea.Top;
             this.Left = workArea.Right - this.Width;
@@ -122,7 +206,7 @@ namespace ClipVault.Views
             RefreshCards();
             _ = _mediaService.RefreshMediaAsync();
 
-            // 刷新当前系统亮度至滑块
+            // 同步当前系统真实亮度
             try
             {
                 int sysBrightness = SystemControlService.GetCurrentBrightness();
@@ -136,12 +220,20 @@ namespace ClipVault.Views
             }
             catch { }
 
+            _brightnessSyncTimer.Start();
+
             this.Show();
             this.Activate();
 
-            // 顺畅渐变显现，绝无越界裁剪问题
+            // 顺畅渐变显现，动画完成后解除时钟绑定，使滑块手动调节实时生效
+            double finalOpacity = Math.Max(0.08, _settingsService.CurrentSettings.WindowOpacity);
             this.Opacity = 0;
-            var anim = new DoubleAnimation(0, _settingsService.CurrentSettings.WindowOpacity, TimeSpan.FromMilliseconds(200));
+            var anim = new DoubleAnimation(0, finalOpacity, TimeSpan.FromMilliseconds(200));
+            anim.Completed += (s, e) =>
+            {
+                this.BeginAnimation(UIElement.OpacityProperty, null);
+                this.Opacity = finalOpacity;
+            };
             this.BeginAnimation(UIElement.OpacityProperty, anim);
 
             if (ClipboardViewPanel.Visibility == Visibility.Visible)
@@ -155,21 +247,22 @@ namespace ClipVault.Views
         /// </summary>
         public void SlideOutAndHide()
         {
-            var anim = new DoubleAnimation(this.Opacity, 0, TimeSpan.FromMilliseconds(160));
+            _brightnessSyncTimer.Stop();
+
+            double currentOp = this.Opacity;
+            var anim = new DoubleAnimation(currentOp, 0, TimeSpan.FromMilliseconds(160));
             anim.Completed += (s, e) =>
             {
                 this.Hide();
-                this.Opacity = _settingsService.CurrentSettings.WindowOpacity;
+                this.BeginAnimation(UIElement.OpacityProperty, null);
+                this.Opacity = Math.Max(0.08, _settingsService.CurrentSettings.WindowOpacity);
             };
             this.BeginAnimation(UIElement.OpacityProperty, anim);
         }
 
-        /// <summary>
-        /// 切换展开/收起侧边栏抽屉
-        /// </summary>
         public void ToggleDocked()
         {
-            if (this.IsVisible)
+            if (this.IsVisible && this.Opacity > 0.1)
             {
                 SlideOutAndHide();
             }
@@ -181,7 +274,7 @@ namespace ClipVault.Views
 
         #endregion
 
-        #region 顶栏视图切换 (剪贴板 / 快捷看板 / 内嵌设置)
+        #region 双模视图切换 (剪贴板中心 vs 系统快捷看板)
 
         private void TabBtnClipboard_Click(object sender, RoutedEventArgs e)
         {
@@ -319,7 +412,7 @@ namespace ClipVault.Views
 
                 if (TxtStatusLeft != null)
                 {
-                    TxtStatusLeft.Text = $"已存 {allItems.Count} 条 · SQLite WAL";
+                    TxtStatusLeft.Text = $"共 {DisplayCards.Count} 条记录";
                 }
             }
             catch { }
@@ -336,65 +429,56 @@ namespace ClipVault.Views
         private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
         {
             TxtSearch.Text = string.Empty;
+            TxtSearch.Focus();
         }
 
         private void Filter_Checked(object sender, RoutedEventArgs e)
         {
-            if (sender is RadioButton rb && rb.Tag is string cat)
+            if (sender is RadioButton rb && rb.Tag != null)
             {
-                _currentCategory = cat;
+                _currentCategory = rb.Tag.ToString() ?? "all";
                 RefreshCards();
             }
         }
 
-        private async void Card_MouseDown(object sender, MouseButtonEventArgs e)
+        private void CardsListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                _cardDragStartPoint = e.GetPosition(this);
-                _isDraggingCard = true;
-
-                if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
-                {
-                    // 单击直接秒贴入之前的主工作窗口
-                    await _pasteSimulator.PasteItemAsync(item, () =>
-                    {
-                        if (!_isPinned) SlideOutAndHide();
-                    });
-                }
-            }
+            _cardDragStartPoint = e.GetPosition(null);
+            _isDraggingCard = false;
         }
 
-        private void Card_MouseMove(object sender, MouseEventArgs e)
+        private void CardsListBox_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (!_isDraggingCard || e.LeftButton != MouseButtonState.Pressed) return;
-
-            Point currentPoint = e.GetPosition(this);
-            Vector diff = _cardDragStartPoint - currentPoint;
-
-            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            if (e.LeftButton == MouseButtonState.Pressed && !_isDraggingCard)
             {
-                _isDraggingCard = false;
-                if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
-                {
-                    DataObject dragData = new DataObject();
-                    if (item.IsImage && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
-                    {
-                        var files = new System.Collections.Specialized.StringCollection { item.FullImagePath };
-                        dragData.SetFileDropList(files);
-                        dragData.SetData(DataFormats.Bitmap, item.ImagePreview);
-                    }
-                    else
-                    {
-                        dragData.SetText(item.Content ?? string.Empty);
-                    }
+                Point currentPos = e.GetPosition(null);
+                Vector diff = _cardDragStartPoint - currentPos;
 
-                    try
+                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                {
+                    if (CardsListBox.SelectedItem is ClipboardItem selectedItem)
                     {
-                        DragDrop.DoDragDrop(elem, dragData, DragDropEffects.Copy);
+                        _isDraggingCard = true;
+                        try
+                        {
+                            var data = new DataObject();
+                            if (selectedItem.IsImage && selectedItem.ImagePreview is BitmapSource bmp)
+                            {
+                                data.SetImage(bmp);
+                            }
+                            else if (!string.IsNullOrEmpty(selectedItem.Content))
+                            {
+                                data.SetText(selectedItem.Content);
+                            }
+                            DragDrop.DoDragDrop(CardsListBox, data, DragDropEffects.Copy);
+                        }
+                        catch { }
+                        finally
+                        {
+                            _isDraggingCard = false;
+                        }
                     }
-                    catch { }
                 }
             }
         }
@@ -410,7 +494,7 @@ namespace ClipVault.Views
             }
         }
 
-        private async void CardsListBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        private async void CardsListBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key >= Key.D1 && e.Key <= Key.D9)
             {
@@ -477,6 +561,15 @@ namespace ClipVault.Views
                 TxtMediaTitle.Text = info.Title;
                 TxtMediaArtist.Text = string.IsNullOrEmpty(info.Artist) ? "未知艺术家" : info.Artist;
                 TxtMediaStatusTag.Text = info.IsPlaying ? "正在播放" : "已暂停";
+                
+                // 播放时微光高亮标签
+                BdMediaStatusTag.Background = info.IsPlaying 
+                    ? new SolidColorBrush(Color.FromArgb(0x35, 0x10, 0xB9, 0x81)) 
+                    : new SolidColorBrush(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
+                TxtMediaStatusTag.Foreground = info.IsPlaying 
+                    ? new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99)) 
+                    : new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+
                 BtnMediaPlayPause.Content = info.IsPlaying ? "⏸" : "▶";
 
                 if (info.Thumbnail != null)
@@ -493,9 +586,11 @@ namespace ClipVault.Views
             }
             else
             {
-                TxtMediaTitle.Text = "未检测到正在播放的音源";
-                TxtMediaArtist.Text = "支持网易云/QQ音乐/Spotify/浏览器";
+                TxtMediaTitle.Text = "未检测到播放中的音源";
+                TxtMediaArtist.Text = "支持网易云/QQ音乐/抖音/Spotify/Edge等";
                 TxtMediaStatusTag.Text = "待机中";
+                BdMediaStatusTag.Background = new SolidColorBrush(Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
+                TxtMediaStatusTag.Foreground = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
                 BtnMediaPlayPause.Content = "▶";
                 ImgMediaThumb.Visibility = Visibility.Collapsed;
                 TxtMediaIconPlaceholder.Visibility = Visibility.Visible;
@@ -542,7 +637,7 @@ namespace ClipVault.Views
             SystemControlService.OpenUri("ms-screenclip:");
         }
 
-        // 统一系统级屏幕真实亮度调节 (WMI 驱动调度)
+        // 统一系统级屏幕真实亮度调节 (两边实时保持一致)
         private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingBrightnessUi) return;
@@ -564,91 +659,99 @@ namespace ClipVault.Views
         {
             if (CustomActionsPanel == null) return;
 
-            // 保留最后一个常驻的 BtnAddNewAction
-            var itemsToRemove = CustomActionsPanel.Children.OfType<UIElement>().Where(c => c != BtnAddNewAction).ToList();
-            foreach (var item in itemsToRemove)
+            while (CustomActionsPanel.Children.Count > 1)
             {
-                CustomActionsPanel.Children.Remove(item);
+                CustomActionsPanel.Children.RemoveAt(0);
             }
 
             var actions = _settingsService.CurrentSettings.CustomActions;
-            int insertIndex = 0;
-
-            foreach (var act in actions)
+            for (int i = 0; i < actions.Count; i++)
             {
-                var btn = CreateActionTileButton(act);
-                CustomActionsPanel.Children.Insert(insertIndex++, btn);
+                var action = actions[i];
+                var btn = CreateActionTile(action, i);
+                CustomActionsPanel.Children.Insert(CustomActionsPanel.Children.Count - 1, btn);
             }
         }
 
-        private Button CreateActionTileButton(CustomActionItem act)
+        private Button CreateActionTile(CustomActionItem action, int index)
         {
             var btn = new Button
             {
                 Width = 80,
                 Height = 58,
                 Margin = new Thickness(3),
-                Tag = act,
                 Cursor = Cursors.Hand,
-                ToolTip = $"{act.Name} ({act.CommandOrPath})\n右键可删除"
+                ToolTip = $"{action.Name}\n{action.CommandOrPath}\n(右键删除)",
+                Tag = index
             };
 
-            var stack = new StackPanel
-            {
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            stack.Children.Add(new TextBlock
-            {
-                Text = act.Icon,
-                FontSize = 15,
-                HorizontalAlignment = HorizontalAlignment.Center
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = act.Name,
-                FontSize = 10.5,
-                Foreground = (Brush)FindResource("TextPrimaryBrush"),
-                Margin = new Thickness(0, 3, 0, 0),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                MaxWidth = 72
-            });
+            var template = new ControlTemplate(typeof(Button));
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.SetValue(Border.BackgroundProperty, (SolidColorBrush)FindResource("TileBgBrush"));
+            borderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF)));
+            borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
 
-            btn.Content = stack;
-            btn.Style = (Style)FindResource("ActionCenterTileStyle");
+            var stack = new FrameworkElementFactory(typeof(StackPanel));
+            stack.SetValue(StackPanel.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            stack.SetValue(StackPanel.VerticalAlignmentProperty, VerticalAlignment.Center);
 
-            // 单击执行动作
+            var iconTxt = new FrameworkElementFactory(typeof(TextBlock));
+            iconTxt.SetValue(TextBlock.TextProperty, string.IsNullOrEmpty(action.Icon) ? "🚀" : action.Icon);
+            iconTxt.SetValue(TextBlock.FontSizeProperty, 16.0);
+            iconTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+
+            var nameTxt = new FrameworkElementFactory(typeof(TextBlock));
+            nameTxt.SetValue(TextBlock.TextProperty, action.Name);
+            nameTxt.SetValue(TextBlock.FontSizeProperty, 10.5);
+            nameTxt.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+            nameTxt.SetValue(TextBlock.ForegroundProperty, (SolidColorBrush)FindResource("TextPrimaryBrush"));
+            nameTxt.SetValue(TextBlock.MarginProperty, new Thickness(0, 3, 0, 0));
+            nameTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            nameTxt.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+            nameTxt.SetValue(TextBlock.MaxWidthProperty, 70.0);
+
+            stack.AppendChild(iconTxt);
+            stack.AppendChild(nameTxt);
+            borderFactory.AppendChild(stack);
+            template.VisualTree = borderFactory;
+            btn.Template = template;
+
             btn.Click += (s, e) =>
             {
-                SystemControlService.ExecuteAction(act.CommandOrPath);
-                if (!_isPinned) SlideOutAndHide();
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = action.CommandOrPath,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"启动失败: {ex.Message}", "快捷动作", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             };
 
-            // 右键删除菜单
-            var contextMenu = new ContextMenu();
-            var delItem = new MenuItem
+            btn.MouseRightButtonUp += (s, e) =>
             {
-                Header = $"🗑️ 删除 \"{act.Name}\"",
-                Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68))
+                var result = MessageBox.Show($"确定删除快捷动作【{action.Name}】吗？", "删除快捷动作", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result == MessageBoxResult.Yes)
+                {
+                    _settingsService.CurrentSettings.CustomActions.RemoveAt(index);
+                    _settingsService.SaveSettings();
+                    RefreshCustomActions();
+                }
             };
-            delItem.Click += (s, e) =>
-            {
-                _settingsService.CurrentSettings.CustomActions.Remove(act);
-                _settingsService.SaveSettings();
-                RefreshCustomActions();
-            };
-            contextMenu.Items.Add(delItem);
-            btn.ContextMenu = contextMenu;
 
             return btn;
         }
 
         private void BtnAddNewAction_Click(object sender, RoutedEventArgs e)
         {
-            TxtNewActionName.Text = string.Empty;
+            TxtNewActionName.Text = "";
             TxtNewActionIcon.Text = "🚀";
-            TxtNewActionCommand.Text = string.Empty;
+            TxtNewActionCommand.Text = "";
             AddActionOverlay.Visibility = Visibility.Visible;
             TxtNewActionName.Focus();
         }
@@ -662,13 +765,13 @@ namespace ClipVault.Views
         {
             var dlg = new OpenFileDialog
             {
-                Title = "选择要启动的程序或文件",
-                Filter = "所有可执行程序与文件|*.exe;*.bat;*.cmd;*.lnk;*.*|可执行程序 (*.exe)|*.exe|所有文件 (*.*)|*.*"
+                Title = "选择可执行程序或文件",
+                Filter = "所有文件 (*.*)|*.*|应用程序 (*.exe)|*.exe"
             };
             if (dlg.ShowDialog() == true)
             {
                 TxtNewActionCommand.Text = dlg.FileName;
-                if (string.IsNullOrWhiteSpace(TxtNewActionName.Text))
+                if (string.IsNullOrEmpty(TxtNewActionName.Text))
                 {
                     TxtNewActionName.Text = Path.GetFileNameWithoutExtension(dlg.FileName);
                 }
@@ -678,23 +781,22 @@ namespace ClipVault.Views
         private void BtnConfirmAddAction_Click(object sender, RoutedEventArgs e)
         {
             string name = TxtNewActionName.Text.Trim();
-            string icon = string.IsNullOrWhiteSpace(TxtNewActionIcon.Text) ? "⚡" : TxtNewActionIcon.Text.Trim();
             string cmd = TxtNewActionCommand.Text.Trim();
+            string icon = TxtNewActionIcon.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(cmd))
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(cmd))
             {
-                MessageBox.Show("请填写动作名称与执行目标！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("请填写名称和执行目标！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var newItem = new CustomActionItem
+            _settingsService.CurrentSettings.CustomActions.Add(new CustomActionItem
             {
+                Id = Guid.NewGuid().ToString("N"),
                 Name = name,
-                Icon = icon,
-                CommandOrPath = cmd
-            };
-
-            _settingsService.CurrentSettings.CustomActions.Add(newItem);
+                CommandOrPath = cmd,
+                Icon = string.IsNullOrEmpty(icon) ? "🚀" : icon
+            });
             _settingsService.SaveSettings();
 
             AddActionOverlay.Visibility = Visibility.Collapsed;
@@ -731,10 +833,15 @@ namespace ClipVault.Views
                 else RadioThemeDark2.IsChecked = true;
             }
 
+            // 立即应用当前主题
+            ApplyTheme(s.ThemeMode);
+
             if (SliderSideOpacity != null)
             {
-                SliderSideOpacity.Value = (int)(s.WindowOpacity * 100);
-                if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{(int)SliderSideOpacity.Value}%";
+                int opVal = (int)Math.Round(s.WindowOpacity * 100);
+                SliderSideOpacity.Value = opVal;
+                if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{opVal}%";
+                this.Opacity = Math.Max(0.08, s.WindowOpacity);
             }
 
             if (ChkHideOnDeactivate2 != null) ChkHideOnDeactivate2.IsChecked = s.HideOnDeactivate;
@@ -775,17 +882,24 @@ namespace ClipVault.Views
             string newTheme = RadioThemeLight2.IsChecked == true ? "Light" : "Dark";
             _settingsService.CurrentSettings.ThemeMode = newTheme;
             _settingsService.SaveSettings();
+
+            // 立即生效外观切换
+            ApplyTheme(newTheme);
         }
 
         private void SliderSideOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_settingsService == null) return;
-            double val = e.NewValue / 100.0;
+            int intVal = (int)e.NewValue;
+            double val = intVal / 100.0;
             _settingsService.CurrentSettings.WindowOpacity = val;
             _settingsService.SaveSettings();
 
-            if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{(int)e.NewValue}%";
-            this.Opacity = val;
+            if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{intVal}%";
+
+            // 清除可能锁住属性的动画时钟，立即应用真实透明度
+            this.BeginAnimation(UIElement.OpacityProperty, null);
+            this.Opacity = Math.Max(0.08, val);
         }
 
         private void ChkHideOnDeactivate_Changed(object sender, RoutedEventArgs e)
@@ -798,36 +912,33 @@ namespace ClipVault.Views
         private void ChkPasteOnDblClick_Changed(object sender, RoutedEventArgs e)
         {
             if (_settingsService == null || ChkPasteOnDblClick == null) return;
-            _settingsService.CurrentSettings.DoubleClickAction = ChkPasteOnDblClick.IsChecked == true ? "PasteAndHide" : "CopyOnly";
+            _settingsService.CurrentSettings.DoubleClickAction = ChkPasteOnDblClick.IsChecked == true ? "PasteAndHide" : "None";
             _settingsService.SaveSettings();
         }
 
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
-            var loc = LocalizationService.Instance;
-            var dialog = new OpenFolderDialog
+            using var dlg = new System.Windows.Forms.FolderBrowserDialog
             {
-                Title = loc.Get("FolderDialogTitle"),
-                InitialDirectory = _settingsService.CurrentSettings.StorageDirectory
+                Description = "选择 CopyBox 历史数据存储目录",
+                UseDescriptionForTitle = true,
+                SelectedPath = _settingsService.CurrentSettings.StorageDirectory
             };
-
-            if (dialog.ShowDialog() == true)
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                string chosenPath = dialog.FolderName;
-                if (_settingsService.UpdateStorageDirectory(chosenPath, true))
+                string newDir = dlg.SelectedPath;
+                if (_settingsService.UpdateStorageDirectory(newDir, true))
                 {
-                    _dbService.SwitchStorageDirectory(chosenPath);
-                    if (TxtSideStoragePath != null) TxtSideStoragePath.Text = chosenPath;
+                    TxtSideStoragePath.Text = newDir;
                     RefreshCards();
-                    MessageBox.Show(loc.Get("StorageMigratedMsg", chosenPath), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("数据目录已成功迁移并生效！", "迁移完成", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
         }
 
         private void BtnClearHistory_Click(object sender, RoutedEventArgs e)
         {
-            var loc = LocalizationService.Instance;
-            var res = MessageBox.Show(loc.Get("ConfirmClearMsg"), loc.Get("ConfirmClearTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var res = MessageBox.Show("确定要清空全部剪贴板历史记录吗？此操作无法撤销！", "警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (res == MessageBoxResult.Yes)
             {
                 _dbService.ClearAll();
@@ -837,14 +948,9 @@ namespace ClipVault.Views
 
         private void BtnExitApp_Click(object sender, RoutedEventArgs e)
         {
-            var loc = LocalizationService.Instance;
-            var res = MessageBox.Show(loc.Get("ConfirmExitMsg"), loc.Get("ConfirmExitTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (res == MessageBoxResult.Yes)
+            if (Application.Current is App app)
             {
-                if (Application.Current is App app)
-                {
-                    app.ExitApplication();
-                }
+                app.ExitApplication();
             }
         }
 

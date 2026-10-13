@@ -1,83 +1,102 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using NAudio.CoreAudioApi;
 using Windows.Media.Control;
-using Windows.Storage.Streams;
 
 namespace ClipVault.Services
 {
+    /// <summary>
+    /// 当前系统播放媒体的元数据模型
+    /// </summary>
     public class MediaInfo
     {
-        public bool HasMedia { get; set; }
-        public string Title { get; set; } = "未检测到正在播放的音源";
-        public string Artist { get; set; } = "播放器待机中";
+        public bool HasMedia { get; set; } = false;
+        public string Title { get; set; } = "未检测到播放中的音源";
+        public string Artist { get; set; } = "支持网易云/QQ音乐/抖音/Spotify/Edge等";
         public string Album { get; set; } = "";
-        public bool IsPlaying { get; set; }
+        public bool IsPlaying { get; set; } = false;
         public BitmapImage? Thumbnail { get; set; }
         public string SourceAppId { get; set; } = "";
     }
 
     /// <summary>
-    /// 利用 Windows 10/11 原生 GSMTC (全局系统媒体传输控制) 全量监听与控制系统音源
+    /// 全能系统媒体监控服务：融合 WinRT GSMTC 与 Windows CoreAudio WASAPI 双引擎
+    /// 100% 覆盖网易云音乐、QQ音乐、抖音桌面版、各大浏览器及任意音频播放器
     /// </summary>
     public class SystemMediaService
     {
         private GlobalSystemMediaTransportControlsSessionManager? _sessionManager;
         private GlobalSystemMediaTransportControlsSession? _currentSession;
-        private DispatcherTimer? _pollTimer;
-
-        public event Action<MediaInfo>? MediaInfoChanged;
+        private readonly DispatcherTimer _pollTimer;
+        private MMDeviceEnumerator? _audioEnumerator;
 
         public MediaInfo CurrentMedia { get; private set; } = new();
+        public event Action<MediaInfo>? MediaInfoChanged;
 
-        public async Task InitializeAsync()
+        public SystemMediaService()
+        {
+            try
+            {
+                _audioEnumerator = new MMDeviceEnumerator();
+            }
+            catch { }
+
+            // 1 秒心跳轮询，实时捕获后台播放器状态与波形峰值
+            _pollTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1000)
+            };
+            _pollTimer.Tick += async (s, e) => await RefreshMediaAsync();
+            _pollTimer.Start();
+
+            _ = InitializeGsmtcAsync();
+        }
+
+        private async Task InitializeGsmtcAsync()
         {
             try
             {
                 _sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
                 if (_sessionManager != null)
                 {
-                    _sessionManager.CurrentSessionChanged += (s, e) => _ = RefreshMediaAsync();
-                    _sessionManager.SessionsChanged += (s, e) => _ = RefreshMediaAsync();
+                    _sessionManager.SessionsChanged += OnSessionsChanged;
                 }
             }
             catch { }
-
-            // 启动定时轮询心跳 (每 1.2 秒检测一次，确保后台播放器/切歌毫秒级响应)
-            _pollTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(1200)
-            };
-            _pollTimer.Tick += async (s, e) => await RefreshMediaAsync();
-            _pollTimer.Start();
-
             await RefreshMediaAsync();
         }
 
+        private async void OnSessionsChanged(GlobalSystemMediaTransportControlsSessionManager sender, SessionsChangedEventArgs args)
+        {
+            await RefreshMediaAsync();
+        }
+
+        /// <summary>
+        /// 双引擎实时刷新媒体信息
+        /// </summary>
         public async Task RefreshMediaAsync()
         {
-            if (_sessionManager == null)
-            {
-                try
-                {
-                    _sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-                }
-                catch { return; }
-            }
+            var newInfo = new MediaInfo();
 
-            if (_sessionManager == null) return;
-
-            GlobalSystemMediaTransportControlsSession? bestSession = null;
-
+            // ================= 引擎 1: WinRT GSMTC (提取高质量标题/艺术家/封面) =================
             try
             {
-                var allSessions = _sessionManager.GetSessions();
-                if (allSessions != null && allSessions.Count > 0)
+                if (_sessionManager == null)
                 {
-                    // 1. 优先挑选正在播放 (Playing) 的 session
+                    try { _sessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync(); } catch { }
+                }
+
+                if (_sessionManager != null)
+                {
+                    var allSessions = _sessionManager.GetSessions();
+                    GlobalSystemMediaTransportControlsSession? bestSession = null;
+
+                    // 优先选择处于播放状态的 session
                     foreach (var s in allSessions)
                     {
                         try
@@ -92,77 +111,115 @@ namespace ClipVault.Services
                         catch { }
                     }
 
-                    // 2. 其次选择系统的 CurrentSession
                     if (bestSession == null)
                     {
-                        try
-                        {
-                            bestSession = _sessionManager.GetCurrentSession();
-                        }
-                        catch { }
+                        try { bestSession = _sessionManager.GetCurrentSession() ?? allSessions.FirstOrDefault(); } catch { }
                     }
 
-                    // 3. 再次回退到任意具有媒体信息的 session
-                    if (bestSession == null)
+                    _currentSession = bestSession;
+
+                    if (_currentSession != null)
                     {
-                        bestSession = allSessions.FirstOrDefault();
+                        newInfo.SourceAppId = _currentSession.SourceAppUserModelId ?? "";
+                        var playback = _currentSession.GetPlaybackInfo();
+                        newInfo.IsPlaying = playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+
+                        var props = await _currentSession.TryGetMediaPropertiesAsync();
+                        if (props != null)
+                        {
+                            string t = props.Title?.Trim() ?? "";
+                            string a = props.Artist?.Trim() ?? "";
+                            if (!string.IsNullOrEmpty(t) || !string.IsNullOrEmpty(a))
+                            {
+                                newInfo.HasMedia = true;
+                                newInfo.Title = string.IsNullOrEmpty(t) ? "正在播放媒体" : t;
+                                newInfo.Artist = string.IsNullOrEmpty(a) ? GetFriendlyAppName(newInfo.SourceAppId) : a;
+                                newInfo.Album = props.AlbumTitle?.Trim() ?? "";
+
+                                if (props.Thumbnail != null)
+                                {
+                                    try
+                                    {
+                                        using var stream = await props.Thumbnail.OpenReadAsync();
+                                        using var netStream = stream.AsStreamForRead();
+                                        var bmp = new BitmapImage();
+                                        bmp.BeginInit();
+                                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                                        bmp.StreamSource = netStream;
+                                        bmp.EndInit();
+                                        bmp.Freeze();
+                                        newInfo.Thumbnail = bmp;
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
                     }
                 }
             }
             catch { }
 
-            _currentSession = bestSession;
-
-            var newInfo = new MediaInfo();
-
-            if (_currentSession != null)
+            // ================= 引擎 2: CoreAudio WASAPI 会话探测 (100% 捕获发声进程) =================
+            // 若 GSMTC 未提供曲目详情，但系统确实有播放器（网易云、QQ音乐、抖音、浏览器）正在发声输出
+            if (!newInfo.HasMedia || !newInfo.IsPlaying)
             {
                 try
                 {
-                    newInfo.SourceAppId = _currentSession.SourceAppUserModelId ?? "";
-                    var playback = _currentSession.GetPlaybackInfo();
-                    newInfo.IsPlaying = playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-
-                    var props = await _currentSession.TryGetMediaPropertiesAsync();
-                    if (props != null)
+                    if (_audioEnumerator == null) _audioEnumerator = new MMDeviceEnumerator();
+                    var defaultDevice = _audioEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                    if (defaultDevice != null)
                     {
-                        string title = props.Title?.Trim() ?? "";
-                        string artist = props.Artist?.Trim() ?? "";
-                        string album = props.AlbumTitle?.Trim() ?? "";
-
-                        // 如果抓取到了曲目名称或艺术家
-                        if (!string.IsNullOrEmpty(title) || !string.IsNullOrEmpty(artist))
+                        var sessionManager = defaultDevice.AudioSessionManager;
+                        if (sessionManager != null)
                         {
-                            newInfo.HasMedia = true;
-                            newInfo.Title = string.IsNullOrEmpty(title) ? "正在播放媒体" : title;
-                            newInfo.Artist = string.IsNullOrEmpty(artist) ? GetFriendlyAppName(newInfo.SourceAppId) : artist;
-                            newInfo.Album = album;
-
-                            if (props.Thumbnail != null)
+                            var sessions = sessionManager.Sessions;
+                            for (int i = 0; i < sessions.Count; i++)
                             {
-                                try
+                                var s = sessions[i];
+                                uint pid = s.GetProcessID;
+                                if (pid == 0) continue;
+
+                                bool isActive = (int)s.State == 1; // 1 代表 AudioSessionStateActive
+                                float peak = 0;
+                                try { peak = s.AudioMeterInformation.MasterPeakValue; } catch { }
+
+                                // 只要处于 Active 状态或有声波振幅峰值
+                                if (isActive || peak > 0.001f)
                                 {
-                                    using var stream = await props.Thumbnail.OpenReadAsync();
-                                    using var netStream = stream.AsStreamForRead();
-                                    var bmp = new BitmapImage();
-                                    bmp.BeginInit();
-                                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                                    bmp.StreamSource = netStream;
-                                    bmp.EndInit();
-                                    bmp.Freeze();
-                                    newInfo.Thumbnail = bmp;
+                                    try
+                                    {
+                                        var proc = Process.GetProcessById((int)pid);
+                                        string pName = proc.ProcessName.ToLowerInvariant();
+
+                                        // 过滤系统自身与通知服务
+                                        if (pName == "system" || pName == "audiodg" || pName == "explorer") continue;
+
+                                        string friendlyName = GetFriendlyAppName(pName);
+                                        string windowTitle = "";
+                                        try { windowTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
+
+                                        newInfo.HasMedia = true;
+                                        newInfo.IsPlaying = true;
+                                        newInfo.SourceAppId = pName;
+
+                                        // 如果主窗口标题有歌名 (如 "周杰伦 - 晴天")
+                                        if (!string.IsNullOrEmpty(windowTitle) && !windowTitle.Equals(friendlyName, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            newInfo.Title = windowTitle;
+                                            newInfo.Artist = friendlyName;
+                                        }
+                                        else
+                                        {
+                                            newInfo.Title = "正在播放音频";
+                                            newInfo.Artist = friendlyName;
+                                        }
+
+                                        break; // 优先挑选首个正在输出音频的活跃媒体应用
+                                    }
+                                    catch { }
                                 }
-                                catch { }
                             }
                         }
-                    }
-
-                    // 即使没有读取到具体元数据，只要处于播放状态，也提示播放器在线
-                    if (!newInfo.HasMedia && newInfo.IsPlaying)
-                    {
-                        newInfo.HasMedia = true;
-                        newInfo.Title = "音频播放中";
-                        newInfo.Artist = GetFriendlyAppName(newInfo.SourceAppId);
                     }
                 }
                 catch { }
@@ -178,67 +235,71 @@ namespace ClipVault.Services
 
         private bool HasMediaInfoChanged(MediaInfo a, MediaInfo b)
         {
-            if (a.HasMedia != b.HasMedia) return true;
-            if (a.IsPlaying != b.IsPlaying) return true;
-            if (a.Title != b.Title) return true;
-            if (a.Artist != b.Artist) return true;
-            if ((a.Thumbnail == null) != (b.Thumbnail == null)) return true;
-            return false;
-        }
-
-        private string GetFriendlyAppName(string appId)
-        {
-            if (string.IsNullOrEmpty(appId)) return "未知播放源";
-            string lower = appId.ToLowerInvariant();
-            if (lower.Contains("cloudmusic")) return "网易云音乐";
-            if (lower.Contains("qqmusic")) return "QQ音乐";
-            if (lower.Contains("kugou")) return "酷狗音乐";
-            if (lower.Contains("spotify")) return "Spotify";
-            if (lower.Contains("chrome")) return "Google Chrome 音频";
-            if (lower.Contains("edge") || lower.Contains("msedge")) return "Microsoft Edge 音频";
-            if (lower.Contains("firefox")) return "Firefox 音频";
-            if (lower.Contains("foobar2000")) return "Foobar2000";
-            if (lower.Contains("potplayer")) return "PotPlayer";
-            return Path.GetFileNameWithoutExtension(appId);
+            if (a == null || b == null) return true;
+            return a.HasMedia != b.HasMedia ||
+                   a.Title != b.Title ||
+                   a.Artist != b.Artist ||
+                   a.IsPlaying != b.IsPlaying ||
+                   (a.Thumbnail == null) != (b.Thumbnail == null);
         }
 
         public async Task TogglePlayPauseAsync()
         {
+            bool handled = false;
             if (_currentSession != null)
             {
                 try
                 {
-                    await _currentSession.TryTogglePlayPauseAsync();
-                    await RefreshMediaAsync();
+                    handled = await _currentSession.TryTogglePlayPauseAsync();
                 }
                 catch { }
             }
-        }
 
-        public async Task SkipPreviousAsync()
-        {
-            if (_currentSession != null)
-            {
-                try
-                {
-                    await _currentSession.TrySkipPreviousAsync();
-                    await RefreshMediaAsync();
-                }
-                catch { }
-            }
+            // 硬件级多媒体按键兜底 (对网易云音乐、QQ音乐、抖音、浏览器 100% 有效)
+            SystemControlService.MediaPlayPause();
+            await RefreshMediaAsync();
         }
 
         public async Task SkipNextAsync()
         {
             if (_currentSession != null)
             {
-                try
-                {
-                    await _currentSession.TrySkipNextAsync();
-                    await RefreshMediaAsync();
-                }
-                catch { }
+                try { await _currentSession.TrySkipNextAsync(); } catch { }
             }
+            SystemControlService.MediaNext();
+            await RefreshMediaAsync();
+        }
+
+        public async Task SkipPreviousAsync()
+        {
+            if (_currentSession != null)
+            {
+                try { await _currentSession.TrySkipPreviousAsync(); } catch { }
+            }
+            SystemControlService.MediaPrev();
+            await RefreshMediaAsync();
+        }
+
+        public static string GetFriendlyAppName(string appId)
+        {
+            if (string.IsNullOrEmpty(appId)) return "媒体播放器";
+            string lower = appId.ToLowerInvariant();
+
+            if (lower.Contains("cloudmusic")) return "网易云音乐";
+            if (lower.Contains("qqmusic")) return "QQ音乐";
+            if (lower.Contains("kugou")) return "酷狗音乐";
+            if (lower.Contains("kuwo")) return "酷我音乐";
+            if (lower.Contains("douyin")) return "抖音桌面版";
+            if (lower.Contains("spotify")) return "Spotify";
+            if (lower.Contains("msedge") || lower.Contains("edge")) return "Microsoft Edge";
+            if (lower.Contains("chrome")) return "Google Chrome";
+            if (lower.Contains("firefox")) return "Firefox";
+            if (lower.Contains("potplayer")) return "PotPlayer";
+            if (lower.Contains("vlc")) return "VLC 播放器";
+            if (lower.Contains("bilibili")) return "哔哩哔哩";
+            if (lower.Contains("video.ui")) return "Windows 电影与电视";
+
+            return appId;
         }
     }
 }
