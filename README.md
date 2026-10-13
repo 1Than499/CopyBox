@@ -121,6 +121,23 @@ D:\CopyBoxData\
 
 ---
 
+## 🗺️ 路线图 (Roadmap & v2.0 规划)
+
+CopyBox 正处于活跃迭代中，下一代大版本 **v2.0** 将正式引入 **贴边毛玻璃双模抽屉 (Sidebar Acrylic Drawer)**：
+
+- [x] **v1.0 稳定版**：居中极速浮窗 (`Alt+V`)、全键盘秒贴 (`1~9`)、代码高亮、纯本地 SQLite WAL 存储与图片分治。
+- [ ] **v2.0-alpha**：**贴边毛玻璃抽屉骨架**
+  - 屏幕右边缘自吸附窗口 (宽 360px)，带原生 Windows 亚克力毛玻璃质感与边缘滑入/滑出缓动。
+  - 接入 `WS_EX_NOACTIVATE` 核心样式，点击侧边栏卡片不剥夺主工作窗口光标焦点。
+- [ ] **v2.0-beta**：**双模 Tab 切换与系统快捷磁贴仿生**
+  - 顶部集成 `[ 📋 剪贴板中心 ]` ⇋ `[ 🔔 系统快捷看板 ]` 药丸切换。
+  - 1:1 仿生复刻 Windows 10/11 操作中心快捷开关（网络、蓝牙、屏幕截图、夜间模式、亮度调节）并联动系统协议。
+- [ ] **v2.0 正式版**：**贴边自隐藏 (Auto-Hide) 与拖拽秒贴 (Drag & Drop)**
+  - 鼠标碰触最右侧 2px 感应热区自动呼出，离开自动隐形缩回；支持 📌 图钉置顶锁定。
+  - 支持将侧边栏卡片直接用鼠标拖入任意目标输入框或文件夹。
+
+---
+
 <br/>
 
 # 🇺🇸 English
@@ -219,6 +236,23 @@ D:\CopyBoxData\
 ├── clipboard.db-wal      # SQLite high-performance write-ahead log
 └── images/               # Image cache folder (sha256_hash.png)
 ```
+
+---
+
+## 🗺️ Roadmap (v2.0 Plan)
+
+CopyBox is actively maintained. The upcoming major release **v2.0** will introduce the **Sidebar Acrylic Drawer**:
+
+- [x] **v1.0 Stable**: Centered quick-paste palette (`Alt+V`), keyboard quick paste (`1~9`), syntax highlighting, local SQLite WAL storage.
+- [ ] **v2.0-alpha**: **Sidebar Acrylic Drawer Foundation**
+  - Right-edge docked window (360px wide) with authentic Windows Acrylic blur and smooth slide-in/out easing.
+  - `WS_EX_NOACTIVATE` style integration: clicking cards does not steal focus from your active document.
+- [ ] **v2.0-beta**: **Dual-Mode Tabs & Action Center Tile Emulation**
+  - Top toggle pill: `[ 📋 Clipboard Center ]` ⇋ `[ 🔔 System Quick Actions ]`.
+  - 1:1 emulation of Windows 10/11 Action Center quick tiles (Network, Bluetooth, Snipping Tool, Night light, Brightness slider).
+- [ ] **v2.0 Final**: **Edge Auto-Hide & Drag & Drop**
+  - Edge auto-hide with 2px trigger bar; pin button (📌) for persistent dock.
+  - Direct Drag & Drop of text/code/images into external applications.
 
 ---
 

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>CopyBox v2.0 贴边毛玻璃双模抽屉交互原型</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* 仿 Windows 10/11 Acrylic 毛玻璃效果 */
+    .acrylic-glass {
+      background: rgba(26, 26, 32, 0.78);
+      backdrop-filter: blur(32px) saturate(180%);
+      -webkit-backdrop-filter: blur(32px) saturate(180%);
+      box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45);
+    }
+    .tile-active {
+      background: #0078d7 !important;
+      color: #ffffff !important;
+      border-color: #0088f5 !important;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+    }
+    .drawer-transition {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased font-sans select-none overflow-x-hidden p-2 sm:p-4">
+
+  <!-- 原型外层卡片容器 -->
+  <div class="max-w-5xl mx-auto bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+
+    <!-- 顶部状态栏与控制面板 -->
+    <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800 text-xs">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          CopyBox v2.0 架构原型
+        </span>
+        <span class="text-slate-400 hidden sm:inline">方案 A：1:1 仿生双模抽屉</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="toggleDrawerBtn" onclick="toggleDrawer()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition flex items-center gap-1.5 shadow-sm active:scale-95">
+          <span id="drawerStateIcon">↔️</span> <span id="drawerStateText">收起/展开抽屉</span>
+        </button>
+        <button id="pinBtn" onclick="togglePin()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1 active:scale-95">
+          <span id="pinIcon">📌</span> <span id="pinText">已锁定</span>
+        </button>
+        <button onclick="simulateWinA()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1 active:scale-95" title="模拟按下 Win+A 唤起原版系统面板">
+          🪟 联动 Win+A
+        </button>
+      </div>
+    </div>
+
+    <!-- 模拟桌面环境与右侧抽屉区域 -->
+    <div class="relative w-full h-[520px] rounded-xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-950 flex shadow-inner">
+      
+      <!-- 模拟桌面正在运行的软件（如 Word / 代码编辑器） -->
+      <div class="flex-1 p-6 flex flex-col justify-between text-slate-400 overflow-hidden">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-800/80">
+            <span class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-sm bg-blue-600 flex items-center justify-center text-[9px] text-white font-bold">W</span>
+              Word 办公文档 / 目标输入窗口 (活动焦点持续保持)
+            </span>
+            <span class="text-emerald-400/80 font-mono text-[11px]">⚡ WS_EX_NOACTIVATE 焦点免剥夺生效中</span>
+          </div>
+
+          <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800/60 space-y-2.5 font-mono text-xs">
+            <p class="text-slate-500">// 用户正在此文档中输入内容，光标在此处闪烁...</p>
+            <div class="flex items-center gap-1 text-slate-300">
+              <span class="text-blue-400 font-bold">&gt;</span>
+              <span id="docTargetInput" class="text-white">点击右侧侧边栏条目，内容将秒贴到此处</span>
+              <span class="w-2 h-4 bg-blue-400 animate-pulse inline-block"></span>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-relaxed pt-2">
+              💡 <b>亮点体验</b>：在右侧贴边抽屉中任意点击复制项或切换磁贴，左侧文档的输入焦点<b>完全不丢失</b>，真正实现一边看资料一边顺畅书写！
+            </p>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-slate-500 flex items-center justify-between">
+          <span>屏幕分辨率模拟: 1920×1080 (右侧 360px 吸附)</span>
+          <span class="text-slate-400">贴边热区: 鼠标触碰最右缘即时呼出</span>
+        </div>
+      </div>
+
+      <!-- 右侧贴边抽屉窗口 (Sidebar Window) -->
+      <div id="sidebarDrawer" class="w-[360px] h-full acrylic-glass border-l border-white/10 flex flex-col drawer-transition z-20">
+        
+        <!-- 抽屉顶部头部：双模切换药丸 (核心创新点) -->
+        <div class="p-3 border-b border-white/10 bg-black/20">
+          <div class="grid grid-cols-2 p-1 rounded-xl bg-black/40 border border-white/5 text-xs font-medium">
+            <button id="tabClipboardBtn" onclick="switchDrawerMode('clipboard')" class="py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-sm font-semibold">
+              <span>📋</span> 剪贴板中心
+            </button>
+            <button id="tabSystemBtn" onclick="switchDrawerMode('system')" class="py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+              <span>🔔</span> 系统快捷看板
+            </button>
+          </div>
+        </div>
+
+        <!-- 模式一内容：CopyBox 剪贴板中心 -->
+        <div id="modeClipboardView" class="flex-1 flex flex-col min-h-0">
+          <!-- 搜索与筛选胶囊 -->
+          <div class="p-3 space-y-2 border-b border-white/5">
+            <div class="relative">
+              <input type="text" id="searchInput" oninput="filterCards()" placeholder="🔍 搜索剪贴板历史或按数字秒贴..." class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div class="flex items-center gap-1 text-[11px] overflow-x-auto pb-0.5 custom-scroll">
+              <button onclick="setFilter('all')" class="filter-pill px-2 py-0.5 rounded-md bg-blue-600/30 text-blue-400 border border-blue-500/30 font-medium">全部</button>
+              <button onclick="setFilter('code')" class="filter-pill px-2 py-0.5 rounded-md bg-white/5 text-slate-400 hover:text-white">代码</button>
+              <button onclick="setFilter('img')" class="filter-pill px-2 py-0.5 rounded-md bg-white/5 text-slate-400 hover:text-white">图片</button>
+              <button onclick="setFilter('pin')" class="filter-pill px-2 py-0.5 rounded-md bg-white/5 text-slate-400 hover:text-white">置顶</button>
+            </div>
+          </div>
+
+          <!-- 卡片瀑布流列表 -->
+          <div id="cardList" class="flex-1 p-3 space-y-2.5 overflow-y-auto custom-scroll text-xs">
+            
+            <!-- 卡片 1 (代码带语法高亮与置顶) -->
+            <div onclick="simulatePaste('SELECT * FROM users WHERE status = 1;')" class="clip-card p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 hover:border-blue-500/50 transition cursor-pointer group active:scale-[0.99]">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span class="flex items-center gap-1 text-amber-400 font-semibold">📌 常用 SQL 模板</span>
+                <span class="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono font-bold">[1]</span>
+              </div>
+              <pre class="bg-black/40 p-2 rounded-lg font-mono text-[11px] text-emerald-400 overflow-x-hidden">SELECT * FROM users WHERE status = 1;</pre>
+              <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5">
+                <span>刚刚 · VS Code</span>
+                <span class="text-blue-400 opacity-0 group-hover:opacity-100 transition">点击即贴 ↵</span>
+              </div>
+            </div>
+
+            <!-- 卡片 2 (截图缩略图) -->
+            <div onclick="simulatePaste('[图片] Screenshot_20261013_1920.png')" class="clip-card p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 hover:border-blue-500/50 transition cursor-pointer group active:scale-[0.99]">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span class="text-purple-400 font-semibold">🖼️ 屏幕截图缓存</span>
+                <span class="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono font-bold">[2]</span>
+              </div>
+              <div class="h-14 rounded-lg bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border border-white/5 flex items-center justify-center text-[11px] text-indigo-200">
+                <span>📸 1920×1080 (SHA-256 离线存储)</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5">
+                <span>2分钟前 · 截图工具</span>
+                <span class="text-blue-400 opacity-0 group-hover:opacity-100 transition">支持拖拽 ↗</span>
+              </div>
+            </div>
+
+            <!-- 卡片 3 (长文本) -->
+            <div onclick="simulatePaste('https://github.com/1Than499/CopyBox')" class="clip-card p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 hover:border-blue-500/50 transition cursor-pointer group active:scale-[0.99]">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span class="text-blue-400 font-semibold">🔗 GitHub 开源仓库地址</span>
+                <span class="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono font-bold">[3]</span>
+              </div>
+              <p class="text-slate-200 font-mono text-[11px] truncate">https://github.com/1Than499/CopyBox</p>
+              <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5">
+                <span>5分钟前 · 浏览器</span>
+                <span class="text-blue-400 opacity-0 group-hover:opacity-100 transition">点击即贴 ↵</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 底部状态栏 -->
+          <div class="p-2.5 border-t border-white/10 bg-black/30 flex items-center justify-between text-[10px] text-slate-400">
+            <span>已存 1,280 条 · SQLite WAL</span>
+            <span class="text-slate-300">常驻内存 ~42MB</span>
+          </div>
+        </div>
+
+        <!-- 模式二内容：1:1 仿生 Windows 10 操作中心快捷看板 -->
+        <div id="modeSystemView" class="flex-1 flex flex-col justify-between p-3 hidden min-h-0 text-xs">
+          
+          <!-- 上部：通知列表区 -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-end text-[11px] text-blue-400 hover:underline cursor-pointer">
+              管理通知
+            </div>
+
+            <div class="py-10 text-center text-slate-400 space-y-1">
+              <div class="text-2xl opacity-60">🔔</div>
+              <div class="font-medium text-slate-300">没有新通知</div>
+              <div class="text-[11px] text-slate-400">已接入 Windows 通知监听通道</div>
+            </div>
+          </div>
+
+          <!-- 下部：4x4 快捷磁贴网格 (完全复刻用户截图中的 14 个图标与位置) -->
+          <div class="space-y-2.5 pt-2 border-t border-white/10">
+            <div class="flex items-center justify-between text-[11px] text-blue-400">
+              <span class="cursor-pointer hover:underline">折叠</span>
+              <span class="text-slate-400 text-[10px]">快捷磁贴 (原生轻量联动)</span>
+            </div>
+
+            <!-- 4 列磁贴网格 -->
+            <div class="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+              
+              <!-- Row 1 -->
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">📍</span>
+                <span class="truncate w-full text-slate-200">定位</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">⚡</span>
+                <span class="truncate w-full text-slate-200">节电模式</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded tile-active border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">🔵</span>
+                <span class="truncate w-full font-medium">蓝牙</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">☀️</span>
+                <span class="truncate w-full text-slate-200">夜间模式</span>
+              </div>
+
+              <!-- Row 2 -->
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">📶</span>
+                <span class="truncate w-full text-slate-200">移动热点</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">✈️</span>
+                <span class="truncate w-full text-slate-200">飞行模式</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">📡</span>
+                <span class="truncate w-full text-slate-200">就近共享</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">⚙️</span>
+                <span class="truncate w-full text-slate-200">所有设置</span>
+              </div>
+
+              <!-- Row 3 -->
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">🛜</span>
+                <span class="truncate w-full text-slate-200">网络</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">🖥️</span>
+                <span class="truncate w-full text-slate-200">连接</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">📽️</span>
+                <span class="truncate w-full text-slate-200">投影</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">🛡️</span>
+                <span class="truncate w-full text-slate-200">VPN</span>
+              </div>
+
+              <!-- Row 4 -->
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">🌙</span>
+                <span class="truncate w-full text-slate-200">专注助手</span>
+              </div>
+              <div onclick="toggleTile(this)" class="tile-btn p-2 rounded bg-white/[0.08] hover:bg-white/[0.14] border border-white/5 cursor-pointer flex flex-col items-center justify-center gap-1 transition h-14">
+                <span class="text-sm">✂️</span>
+                <span class="truncate w-full text-slate-200">屏幕截图</span>
+              </div>
+            </div>
+
+            <!-- 底部：屏幕亮度调节滑动条 -->
+            <div class="flex items-center gap-2 pt-1 text-slate-400">
+              <span class="text-xs">🔅</span>
+              <input type="range" min="0" max="100" value="85" class="w-full accent-blue-500 h-1 bg-white/20 rounded cursor-pointer">
+              <span class="text-xs">🔆</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 底部架构解析要点说明 -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-slate-400">
+      <div class="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-1">
+        <div class="text-slate-200 font-semibold flex items-center gap-1">
+          <span>⚡</span> 极致轻量化保障
+        </div>
+        <p class="text-[11px] leading-relaxed text-slate-400">
+          依然采用纯原生 .NET 8 WPF 渲染，零 Chromium/Electron 臃肿负担，常驻内存维持在 35~50MB 级别。
+        </p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-1">
+        <div class="text-slate-200 font-semibold flex items-center gap-1">
+          <span>🎯</span> 无焦点即贴 (WS_EX_NOACTIVATE)
+        </div>
+        <p class="text-[11px] leading-relaxed text-slate-400">
+          点击右侧侧边栏任何卡片或切换开关，当前主应用窗口的光标输入焦点绝不丢失，支持连续秒贴。
+        </p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800 space-y-1">
+        <div class="text-slate-200 font-semibold flex items-center gap-1">
+          <span>🔄</span> 1:1 双模丝滑切换
+        </div>
+        <p class="text-[11px] leading-relaxed text-slate-400">
+          既是 Windows 操作中心快捷开关的像素级延伸，又是全功能剪贴板知识库，两者顶部一键互切。
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let isDrawerOpen = true;
+    let isPinned = true;
+    let currentMode = 'clipboard';
+
+    function toggleDrawer() {
+      const drawer = document.getElementById('sidebarDrawer');
+      const text = document.getElementById('drawerStateText');
+      isDrawerOpen = !isDrawerOpen;
+      if (isDrawerOpen) {
+        drawer.style.transform = 'translateX(0)';
+        drawer.style.opacity = '1';
+        text.innerText = '收起抽屉';
+      } else {
+        drawer.style.transform = 'translateX(340px)';
+        drawer.style.opacity = '0.4';
+        text.innerText = '展开抽屉';
+      }
+    }
+
+    function togglePin() {
+      const pinIcon = document.getElementById('pinIcon');
+      const pinText = document.getElementById('pinText');
+      isPinned = !isPinned;
+      if (isPinned) {
+        pinIcon.innerText = '📌';
+        pinText.innerText = '已锁定';
+      } else {
+        pinIcon.innerText = '🔓';
+        pinText.innerText = '自隐藏';
+      }
+    }
+
+    function switchDrawerMode(mode) {
+      currentMode = mode;
+      const clipBtn = document.getElementById('tabClipboardBtn');
+      const sysBtn = document.getElementById('tabSystemBtn');
+      const clipView = document.getElementById('modeClipboardView');
+      const sysView = document.getElementById('modeSystemView');
+
+      if (mode === 'clipboard') {
+        clipBtn.className = 'py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-sm font-semibold';
+        sysBtn.className = 'py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+        clipView.classList.remove('hidden');
+        sysView.classList.add('hidden');
+      } else {
+        sysBtn.className = 'py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-sm font-semibold';
+        clipBtn.className = 'py-1.5 px-2 rounded-lg transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white';
+        sysView.classList.remove('hidden');
+        clipView.classList.add('hidden');
+      }
+    }
+
+    function toggleTile(element) {
+      element.classList.toggle('tile-active');
+      const title = element.querySelector('span:last-child').innerText;
+      const isActive = element.classList.contains('tile-active');
+      const docInput = document.getElementById('docTargetInput');
+      docInput.innerText = `[系统磁贴联动] ${title} 开关状态已切换为: ${isActive ? '【开启】' : '【关闭】'}`;
+    }
+
+    function simulatePaste(content) {
+      const docInput = document.getElementById('docTargetInput');
+      docInput.innerText = content;
+      docInput.classList.add('text-emerald-400');
+      setTimeout(() => {
+        docInput.classList.remove('text-emerald-400');
+      }, 500);
+    }
+
+    function simulateWinA() {
+      const docInput = document.getElementById('docTargetInput');
+      docInput.innerText = '[Win32 模拟指令] 已触发 Win + A，可联动呼出 Windows 系统原生操作中心！';
+    }
+
+    function filterCards() {
+      // 模拟搜索筛选
+    }
+
+    function setFilter(type) {
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.className = 'filter-pill px-2 py-0.5 rounded-md bg-white/5 text-slate-400 hover:text-white';
+      });
+      event.target.className = 'filter-pill px-2 py-0.5 rounded-md bg-blue-600/30 text-blue-400 border border-blue-500/30 font-medium';
+    }
+  </script>
+</body>
+</html>
