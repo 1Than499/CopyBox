@@ -35,6 +35,7 @@ namespace ClipVault.Views
 
         private string _previousView = "Clipboard";
         private bool _isUpdatingBrightnessUi = false;
+        private bool _isInternalSettingUpdate = false;
 
         public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
@@ -67,10 +68,10 @@ namespace ClipVault.Views
                 });
             };
 
-            // 监听失焦自动收起 (严格遵循用户在设置中配置的 HideOnDeactivate 偏好)
+            // 监听失焦自动收起 (图钉锁定状态下常驻，未锁定状态下失焦自动收起)
             this.Deactivated += (s, e) =>
             {
-                if (_settingsService.CurrentSettings.HideOnDeactivate && this.IsVisible && (AddActionOverlay.Visibility != Visibility.Visible))
+                if (!_isPinned && this.IsVisible && (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
                 {
                     SlideOutAndHide();
                 }
@@ -163,6 +164,7 @@ namespace ClipVault.Views
                 this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
                 this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                 this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
+                this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
             }
             else
             {
@@ -180,23 +182,11 @@ namespace ClipVault.Views
                 this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
                 this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
                 this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
             }
 
-            // 更新药丸按钮激活态前景色和背景色
-            if (ClipboardViewPanel.Visibility == Visibility.Visible)
-            {
-                TabBtnClipboard.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
-                TabBtnClipboard.Foreground = Brushes.White;
-                TabBtnSystem.Background = Brushes.Transparent;
-                TabBtnSystem.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
-            }
-            else if (SystemActionsPanel.Visibility == Visibility.Visible)
-            {
-                TabBtnSystem.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
-                TabBtnSystem.Foreground = Brushes.White;
-                TabBtnClipboard.Background = Brushes.Transparent;
-                TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
-            }
+            // 更新视图切换栏指示与高亮
+            UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
 
             // 重新刷新自定义磁贴列表的色彩
             RefreshCustomActions();
@@ -252,9 +242,11 @@ namespace ClipVault.Views
             if (BtnClearHistory != null) BtnClearHistory.Content = loc.Get("TrayClear");
             if (BtnExitApp != null) BtnExitApp.Content = loc.Get("BtnExitApp");
 
-            // 底部提示
+            // 底部提示与状态
             if (TxtStatusRightTip != null) TxtStatusRightTip.Text = loc.Get("SidebarAltVTip");
             if (TxtStatusLeft != null) TxtStatusLeft.Text = loc.Get("SidebarRecordCount", DisplayCards.Count);
+            if (BtnPin != null) BtnPin.ToolTip = _isPinned ? loc.Get("PinLockedTip") : loc.Get("PinUnlockedTip");
+            UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
         }
 
         #endregion
@@ -370,13 +362,9 @@ namespace ClipVault.Views
             SettingsViewPanel.Visibility = Visibility.Collapsed;
             HeaderNormalBar.Visibility = Visibility.Visible;
             HeaderSettingsBar.Visibility = Visibility.Collapsed;
-            TabSwitcherBorder.Visibility = Visibility.Visible;
+            TabSwitcherRow.Visibility = Visibility.Visible;
 
-            TabBtnClipboard.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
-            TabBtnClipboard.Foreground = Brushes.White;
-
-            TabBtnSystem.Background = Brushes.Transparent;
-            TabBtnSystem.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
+            UpdateTabVisuals(isClipboard: true);
 
             TxtSearch?.Focus();
         }
@@ -389,17 +377,39 @@ namespace ClipVault.Views
             SettingsViewPanel.Visibility = Visibility.Collapsed;
             HeaderNormalBar.Visibility = Visibility.Visible;
             HeaderSettingsBar.Visibility = Visibility.Collapsed;
-            TabSwitcherBorder.Visibility = Visibility.Visible;
+            TabSwitcherRow.Visibility = Visibility.Visible;
 
-            TabBtnSystem.Background = (SolidColorBrush)FindResource("AccentBlueBrush");
-            TabBtnSystem.Foreground = Brushes.White;
-
-            TabBtnClipboard.Background = Brushes.Transparent;
-            TabBtnClipboard.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
+            UpdateTabVisuals(isClipboard: false);
 
             // 切换到看板时立即渲染音源 UI
             UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
+        }
+
+        private void UpdateTabVisuals(bool isClipboard)
+        {
+            var accentBrush = (Brush)FindResource("AccentBlueBrush");
+            var secBrush = (Brush)FindResource("TextSecondaryBrush");
+
+            if (TxtTabBtnClipboard != null)
+            {
+                TxtTabBtnClipboard.Foreground = isClipboard ? accentBrush : secBrush;
+                TxtTabBtnClipboard.FontWeight = isClipboard ? FontWeights.SemiBold : FontWeights.Normal;
+            }
+            if (TabIndicatorClipboard != null)
+            {
+                TabIndicatorClipboard.Visibility = isClipboard ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (TxtTabBtnSystem != null)
+            {
+                TxtTabBtnSystem.Foreground = isClipboard ? secBrush : accentBrush;
+                TxtTabBtnSystem.FontWeight = isClipboard ? FontWeights.Normal : FontWeights.SemiBold;
+            }
+            if (TabIndicatorSystem != null)
+            {
+                TabIndicatorSystem.Visibility = isClipboard ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
 
         /// <summary>
@@ -422,7 +432,7 @@ namespace ClipVault.Views
 
             HeaderNormalBar.Visibility = Visibility.Collapsed;
             HeaderSettingsBar.Visibility = Visibility.Visible;
-            TabSwitcherBorder.Visibility = Visibility.Collapsed;
+            TabSwitcherRow.Visibility = Visibility.Collapsed;
 
             LoadSettingsToSidebarUI();
 
@@ -452,8 +462,25 @@ namespace ClipVault.Views
         private void BtnPin_Click(object sender, RoutedEventArgs e)
         {
             _isPinned = !_isPinned;
-            TxtPinIcon.Text = _isPinned ? "📌" : "🔓";
-            BtnPin.ToolTip = _isPinned ? "图钉已锁定 (常驻不自动隐藏)" : "已解除锁定 (失焦自动贴边隐藏)";
+            if (_settingsService != null)
+            {
+                _settingsService.CurrentSettings.HideOnDeactivate = !_isPinned;
+                _settingsService.SaveSettings();
+            }
+            UpdatePinUiState();
+        }
+
+        private void UpdatePinUiState()
+        {
+            var loc = LocalizationService.Instance;
+            if (TxtPinIcon != null) TxtPinIcon.Text = _isPinned ? "📌" : "🔓";
+            if (BtnPin != null) BtnPin.ToolTip = _isPinned ? loc.Get("PinLockedTip") : loc.Get("PinUnlockedTip");
+            if (ChkHideOnDeactivate2 != null)
+            {
+                _isInternalSettingUpdate = true;
+                ChkHideOnDeactivate2.IsChecked = !_isPinned;
+                _isInternalSettingUpdate = false;
+            }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
@@ -664,7 +691,8 @@ namespace ClipVault.Views
                     ? new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99)) 
                     : (SolidColorBrush)FindResource("TextSecondaryBrush");
 
-                BtnMediaPlayPause.Content = info.IsPlaying ? "⏸" : "▶";
+                if (IconPlay != null) IconPlay.Visibility = info.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+                if (IconPause != null) IconPause.Visibility = info.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
 
                 // 高清封面/软件专属图标展示
                 if (info.Thumbnail != null)
@@ -686,7 +714,8 @@ namespace ClipVault.Views
                 TxtMediaStatusTag.Text = "待机中";
                 BdMediaStatusTag.Background = new SolidColorBrush(Color.FromArgb(0x1A, 0x78, 0xA4, 0xE8));
                 TxtMediaStatusTag.Foreground = (SolidColorBrush)FindResource("TextSecondaryBrush");
-                BtnMediaPlayPause.Content = "▶";
+                if (IconPlay != null) IconPlay.Visibility = Visibility.Visible;
+                if (IconPause != null) IconPause.Visibility = Visibility.Collapsed;
                 ImgMediaThumb.Visibility = Visibility.Collapsed;
                 TxtMediaIconPlaceholder.Visibility = Visibility.Visible;
             }
@@ -942,7 +971,8 @@ namespace ClipVault.Views
                 this.Opacity = Math.Max(0.08, s.WindowOpacity);
             }
 
-            if (ChkHideOnDeactivate2 != null) ChkHideOnDeactivate2.IsChecked = s.HideOnDeactivate;
+            _isPinned = !s.HideOnDeactivate;
+            UpdatePinUiState();
             if (ChkPasteOnDblClick != null) ChkPasteOnDblClick.IsChecked = s.DoubleClickAction == "PasteAndHide";
         }
 
@@ -1003,9 +1033,13 @@ namespace ClipVault.Views
 
         private void ChkHideOnDeactivate_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null || ChkHideOnDeactivate2 == null) return;
-            _settingsService.CurrentSettings.HideOnDeactivate = ChkHideOnDeactivate2.IsChecked == true;
+            if (_isInternalSettingUpdate || _settingsService == null || ChkHideOnDeactivate2 == null) return;
+            bool hide = ChkHideOnDeactivate2.IsChecked == true;
+            _settingsService.CurrentSettings.HideOnDeactivate = hide;
             _settingsService.SaveSettings();
+
+            _isPinned = !hide;
+            UpdatePinUiState();
         }
 
         private void ChkPasteOnDblClick_Changed(object sender, RoutedEventArgs e)

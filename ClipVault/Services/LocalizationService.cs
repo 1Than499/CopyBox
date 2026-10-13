@@ -111,6 +111,8 @@ namespace ClipVault.Services
                 ["SidebarSearchPlaceholder"] = "搜索历史记录或按数字秒贴...",
                 ["SidebarAltVTip"] = "按 Alt+V 秒收",
                 ["SidebarRecordCount"] = "共 {0} 条历史记录",
+                ["PinLockedTip"] = "图钉已锁定 (常驻不自动隐藏)",
+                ["PinUnlockedTip"] = "已解除锁定 (失焦自动贴边收起)",
 
                 // 相对时间
                 ["TimeJustNow"] = "刚刚",
@@ -217,6 +219,8 @@ namespace ClipVault.Services
                 ["SidebarSearchPlaceholder"] = "Search history or press 1-9 to paste...",
                 ["SidebarAltVTip"] = "Press Alt+V to hide",
                 ["SidebarRecordCount"] = "Total {0} records",
+                ["PinLockedTip"] = "Pinned (Keep window open)",
+                ["PinUnlockedTip"] = "Unpinned (Auto hide on blur)",
 
                 // Relative Time
                 ["TimeJustNow"] = "Just now",

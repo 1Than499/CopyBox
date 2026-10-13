@@ -38,6 +38,7 @@
         <SolidColorBrush x:Key="TabContainerBgBrush" Color="#151B26"/>
         <SolidColorBrush x:Key="CodeBoxBgBrush" Color="#11141C"/>
         <SolidColorBrush x:Key="CodeTextBrush" Color="#38BDF8"/>
+        <SolidColorBrush x:Key="SliderTrackBgBrush" Color="#334155"/>
 
         <!-- 细线极简滚动条 -->
         <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
@@ -158,6 +159,104 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 播放器圆形控制按钮样式 (平滑悬浮与微光反馈) -->
+        <Style x:Key="MediaCircleIconBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2578A4E8"/>
+                                <Setter TargetName="bd" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 现代化 Fluent 屏幕亮度与透明度滑动条样式 (保证白天明亮与暗夜深色模式下轨道与进度条均 100% 清晰可见) -->
+        <Style x:Key="ModernFluentSliderStyle" TargetType="{x:Type Slider}">
+            <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlueBrush}"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <!-- 底层未填充完整轨道 (白天模式为浅灰 slate-300，黑夜为深灰 slate-700，绝不丢失) -->
+                            <Border Height="4" CornerRadius="2" 
+                                    Background="{DynamicResource SliderTrackBgBrush}" 
+                                    BorderThickness="0" Margin="5,0"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                <Border Height="4" CornerRadius="2,0,0,2" 
+                                                        Background="{DynamicResource AccentBlueBrush}" 
+                                                        Margin="5,0,0,0"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Grid Width="16" Height="16">
+                                                    <Ellipse x:Name="thumbOuter" Fill="{DynamicResource AccentBlueBrush}" Width="16" Height="16">
+                                                        <Ellipse.Effect>
+                                                            <DropShadowEffect Color="#0078D7" BlurRadius="5" ShadowDepth="1" Opacity="0.35"/>
+                                                        </Ellipse.Effect>
+                                                    </Ellipse>
+                                                    <Ellipse x:Name="thumbInner" Fill="#FFFFFF" Width="6" Height="6"/>
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="thumbOuter" Property="Fill" Value="{DynamicResource AccentBlueHoverBrush}"/>
+                                                        <Setter TargetName="thumbOuter" Property="Width" Value="18"/>
+                                                        <Setter TargetName="thumbOuter" Property="Height" Value="18"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="thumbOuter" Property="Fill" Value="{DynamicResource AccentBlueBrush}"/>
+                                                        <Setter TargetName="thumbInner" Property="Width" Value="8"/>
+                                                        <Setter TargetName="thumbInner" Property="Height" Value="8"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                <Border Height="4" Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 侧边栏外层主体 -->
@@ -215,66 +314,78 @@
                         </Button>
                     </Grid>
 
-                    <!-- 双模切换药丸 (两边绝对居中对齐，鼠标移到每个地方均有丰富 Hover/Click 交互) -->
-                    <Border x:Name="TabSwitcherBorder" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Height="36">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <!-- 双模视图切换栏 (去胶囊包裹，各自半块绝对居中，全区域点击跳转，鼠标悬浮交互) -->
+                    <Grid x:Name="TabSwitcherRow" Height="36" Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                            <!-- Tab 1: 剪贴板中心 (左侧严格水平垂直居中) -->
-                            <Button x:Name="TabBtnClipboard" Grid.Column="0" Click="TabBtnClipboard_Click"
-                                    Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF"
-                                    BorderThickness="0" Cursor="Hand" Margin="1,1,2,1">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="tabBd" Property="Opacity" Value="0.9"/>
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="tabBd" Property="Opacity" Value="0.75"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
+                        <!-- Tab 1: 剪贴板中心 (左侧 50% 区域，整块可点，内容绝对水平垂直居中) -->
+                        <Button x:Name="TabBtnClipboard" Grid.Column="0" Click="TabBtnClipboard_Click"
+                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6" Margin="2,0">
+                                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="tabBd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="tabBd" Property="Opacity" Value="0.75"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="📋" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TxtTabBtnClipboard" Text="剪贴板中心" FontSize="12" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtTabBtnClipboard" Text="剪贴板中心" FontSize="12" FontWeight="SemiBold" 
+                                               Foreground="{DynamicResource AccentBlueBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                            </Button>
+                                <!-- 激活状态下优雅的 Fluent 下划指示线 -->
+                                <Border x:Name="TabIndicatorClipboard" Height="2.5" Width="48" CornerRadius="1.25"
+                                        Background="{DynamicResource AccentBlueBrush}" 
+                                        VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
+                            </Grid>
+                        </Button>
 
-                            <!-- Tab 2: 系统快捷看板 (右侧严格水平垂直居中) -->
-                            <Button x:Name="TabBtnSystem" Grid.Column="1" Click="TabBtnSystem_Click"
-                                    Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}"
-                                    BorderThickness="0" Cursor="Hand" Margin="2,1,1,1">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                                <Setter TargetName="tabBd" Property="Background" Value="#1A78A4E8"/>
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="tabBd" Property="Background" Value="#3078A4E8"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
+                        <!-- Tab 2: 系统快捷看板 (右侧 50% 区域，整块可点，内容绝对水平垂直居中) -->
+                        <Button x:Name="TabBtnSystem" Grid.Column="1" Click="TabBtnSystem_Click"
+                                Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6" Margin="2,0">
+                                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="tabBd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="tabBd" Property="Opacity" Value="0.75"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock Text="⚡" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TxtTabBtnSystem" Text="快捷看板" FontSize="12" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtTabBtnSystem" Text="快捷看板" FontSize="12" FontWeight="Normal" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Border>
+                                <!-- 激活状态下优雅的 Fluent 下划指示线 -->
+                                <Border x:Name="TabIndicatorSystem" Height="2.5" Width="48" CornerRadius="1.25"
+                                        Background="{DynamicResource AccentBlueBrush}" 
+                                        VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -299,9 +410,21 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="🔍" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                                <TextBox x:Name="TxtSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
-                                         Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5" VerticalContentAlignment="Center"
-                                         TextChanged="TxtSearch_TextChanged"/>
+                                <TextBox x:Name="TxtSearch" Grid.Column="1" Style="{x:Null}"
+                                         Background="Transparent" BorderThickness="0"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                         FontSize="11.5" VerticalContentAlignment="Center"
+                                         Padding="2,0" TextChanged="TxtSearch_TextChanged">
+                                    <TextBox.Template>
+                                        <ControlTemplate TargetType="TextBox">
+                                            <Border Background="Transparent" BorderThickness="0">
+                                                <ScrollViewer x:Name="PART_ContentHost" Focusable="False" 
+                                                              HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </TextBox.Template>
+                                </TextBox>
                                 <TextBlock x:Name="TxtSearchPlaceholder" Grid.Column="1" Text="搜索历史记录或按数字秒贴..." 
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11.5" VerticalAlignment="Center" IsHitTestVisible="False"/>
                                 <Button x:Name="BtnClearSearch" Grid.Column="2" Content="✕" Width="20" Height="20" Background="Transparent"
@@ -446,17 +569,23 @@
                                     <TextBlock x:Name="TxtMediaArtist" Text="支持网易云/QQ音乐/抖音/Spotify/Edge等" FontSize="11" 
                                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,6" TextTrimming="CharacterEllipsis"/>
 
-                                    <!-- 播控按钮栏 (带明确交互反馈) -->
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button x:Name="BtnMediaPrev" Style="{StaticResource SidebarTopIconBtn}" Width="28" Height="28" Click="BtnMediaPrev_Click" ToolTip="上一曲">
-                                            <TextBlock Text="⏮" FontSize="12"/>
+                                    <!-- 播控按钮栏 (全新现代化 Fluent 矢量图标与精致悬停微光) -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <!-- 上一曲 -->
+                                        <Button x:Name="BtnMediaPrev" Style="{StaticResource MediaCircleIconBtn}" Width="28" Height="28" Click="BtnMediaPrev_Click" ToolTip="上一曲">
+                                            <Path Data="M 3,3 L 5,3 L 5,13 L 3,13 Z M 13,3 L 5.5,8 L 13,13 Z" Fill="{DynamicResource TextSecondaryBrush}" Stretch="Uniform" Width="10.5" Height="10.5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Button>
-                                        <Button x:Name="BtnMediaPlayPause" Width="32" Height="32" Content="▶" FontSize="13"
-                                                Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF" 
-                                                BorderThickness="0" Cursor="Hand" Margin="6,0,6,0" Click="BtnMediaPlayPause_Click" ToolTip="播放 / 暂停">
+
+                                        <!-- 播放 / 暂停 (高亮强调圆形主控，带柔和微光) -->
+                                        <Button x:Name="BtnMediaPlayPause" Width="32" Height="32"
+                                                Background="{DynamicResource AccentBlueBrush}" 
+                                                BorderThickness="0" Cursor="Hand" Margin="7,0,7,0" Click="BtnMediaPlayPause_Click" ToolTip="播放 / 暂停">
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border x:Name="playBd" Background="{TemplateBinding Background}" CornerRadius="16">
+                                                        <Border.Effect>
+                                                            <DropShadowEffect Color="#0078D7" BlurRadius="6" ShadowDepth="1" Opacity="0.3"/>
+                                                        </Border.Effect>
                                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     </Border>
                                                     <ControlTemplate.Triggers>
@@ -469,9 +598,17 @@
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
                                             </Button.Template>
+                                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Path x:Name="IconPlay" Data="M 4,2.5 L 13.5,8 L 4,13.5 Z" Fill="#FFFFFF" Stretch="Uniform" Width="11" Height="11" 
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" Margin="1.5,0,0,0"/>
+                                                <Path x:Name="IconPause" Data="M 3,2.5 L 6,2.5 L 6,13.5 L 3,13.5 Z M 10,2.5 L 13,2.5 L 13,13.5 L 10,13.5 Z" Fill="#FFFFFF" Stretch="Uniform" Width="10" Height="10" 
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                            </Grid>
                                         </Button>
-                                        <Button x:Name="BtnMediaNext" Style="{StaticResource SidebarTopIconBtn}" Width="28" Height="28" Click="BtnMediaNext_Click" ToolTip="下一曲">
-                                            <TextBlock Text="⏭" FontSize="12"/>
+
+                                        <!-- 下一曲 -->
+                                        <Button x:Name="BtnMediaNext" Style="{StaticResource MediaCircleIconBtn}" Width="28" Height="28" Click="BtnMediaNext_Click" ToolTip="下一曲">
+                                            <Path Data="M 13,3 L 11,3 L 11,13 L 13,13 Z M 3,3 L 10.5,8 L 3,13 Z" Fill="{DynamicResource TextSecondaryBrush}" Stretch="Uniform" Width="10.5" Height="10.5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Button>
                                     </StackPanel>
                                 </StackPanel>
@@ -556,7 +693,7 @@
                                     <TextBlock x:Name="TxtBrightnessTitle" Text="🔅 屏幕亮度 (系统双向同步)" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                     <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="100%" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
                                 </DockPanel>
-                                <Slider x:Name="SliderBrightness" Minimum="0" Maximum="100" Value="100" SmallChange="5" LargeChange="10"
+                                <Slider x:Name="SliderBrightness" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="100" SmallChange="5" LargeChange="10"
                                         ValueChanged="SliderBrightness_ValueChanged"/>
                             </StackPanel>
                         </Border>
@@ -613,7 +750,7 @@
                                     <TextBlock x:Name="TxtSetOpacityTitle" Text="抽屉毛玻璃透明度" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="11" Foreground="{DynamicResource AccentBlueBrush}"/>
                                 </DockPanel>
-                                <Slider x:Name="SliderSideOpacity" Minimum="0" Maximum="100" Value="92" SmallChange="5" LargeChange="10" ValueChanged="SliderSideOpacity_ValueChanged"/>
+                                <Slider x:Name="SliderSideOpacity" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="92" SmallChange="5" LargeChange="10" ValueChanged="SliderSideOpacity_ValueChanged"/>
                             </StackPanel>
                         </Border>
 
