@@ -51,30 +51,16 @@ namespace ClipVault.Services
         private static bool _useWmi = true;
 
         /// <summary>
+        /// 是否支持原生 WMI 硬件背光调节
+        /// </summary>
+        public static bool HasHardwareSupport => _useWmi;
+
+        /// <summary>
         /// 实时读取当前 Windows 系统的真实物理屏幕亮度 (0 ~ 100)，无论用户在键盘 Fn 键还是系统设置中改变，均能即时获取
         /// </summary>
         public static int GetCurrentBrightness()
         {
-            // 1. 优先通过 Windows 电源方案获取 (Windows 原生权威亮度)
-            try
-            {
-                IntPtr pScheme;
-                if (PowerGetActiveScheme(IntPtr.Zero, out pScheme) == 0 && pScheme != IntPtr.Zero)
-                {
-                    Guid scheme = Marshal.PtrToStructure<Guid>(pScheme);
-                    var sub = SubVideo;
-                    var setting = VideoBrightness;
-                    uint val;
-                    if (PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out val) == 0)
-                    {
-                        _lastKnownBrightness = (int)Math.Clamp(val, 0, 100);
-                        return _lastKnownBrightness;
-                    }
-                }
-            }
-            catch { }
-
-            // 2. 其次通过 WMI 查询
+            // 1. 优先通过 WMI 查询 Windows 硬件实时当前亮度 (与 Fn 键及任务栏亮度滑块 100% 毫秒级同步)
             if (_useWmi)
             {
                 try
@@ -93,18 +79,51 @@ namespace ClipVault.Services
                 }
             }
 
+            // 2. 其次通过 Windows 电源方案获取
+            try
+            {
+                IntPtr pScheme;
+                if (PowerGetActiveScheme(IntPtr.Zero, out pScheme) == 0 && pScheme != IntPtr.Zero)
+                {
+                    Guid scheme = Marshal.PtrToStructure<Guid>(pScheme);
+                    var sub = SubVideo;
+                    var setting = VideoBrightness;
+                    uint val;
+                    if (PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out val) == 0)
+                    {
+                        _lastKnownBrightness = (int)Math.Clamp(val, 0, 100);
+                        return _lastKnownBrightness;
+                    }
+                }
+            }
+            catch { }
+
             return _lastKnownBrightness;
         }
 
         /// <summary>
-        /// 设置屏幕亮度 (0 ~ 100)，直接写入 Windows 当前活动电源方案并广播，保证与系统完全一致
+        /// 设置屏幕亮度 (0 ~ 100)，优先调用硬件背光并同步电源方案
         /// </summary>
         public static void SetBrightness(int brightness)
         {
             brightness = Math.Clamp(brightness, 0, 100);
             _lastKnownBrightness = brightness;
 
-            // 1. 写入 Windows 系统活动电源方案 (即时影响系统快速设置滑块和硬件)
+            bool hardwareSuccess = false;
+
+            // 1. 优先调用 WMI 硬件背光驱动设置真实的物理屏幕背光 (与系统完全一致)
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    obj.InvokeMethod("WmiSetBrightness", new object[] { 1, (byte)brightness });
+                    hardwareSuccess = true;
+                }
+            }
+            catch { }
+
+            // 2. 写入 Windows 系统活动电源方案 (即时影响系统快速设置滑块和电源状态)
             try
             {
                 IntPtr pScheme;
@@ -119,29 +138,50 @@ namespace ClipVault.Services
             }
             catch { }
 
-            // 2. 尝试 WMI 硬件背光驱动通知
-            if (_useWmi)
+            // 3. 硬件背光调节成功时强制复位 Gamma Ramp 为标准纯净色，绝不双重压暗导致色彩失真与系统脱节
+            if (hardwareSuccess)
             {
-                try
-                {
-                    using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods");
-                    foreach (ManagementObject obj in searcher.Get())
-                    {
-                        obj.InvokeMethod("WmiSetBrightness", new object[] { 1, (byte)brightness });
-                    }
-                }
-                catch
-                {
-                    _useWmi = false;
-                }
+                ResetGammaRamp();
             }
-
-            // 3. 同时调节 Gamma Ramp，确保在外接显示器/独显直连屏幕上肉眼产生极清晰明暗反馈
-            ApplyVisualBrightness(brightness);
+            else
+            {
+                // 仅在外接无硬件控制的显示器上才回退到 Gamma 软件调光
+                ApplyVisualBrightness(brightness);
+            }
         }
 
         /// <summary>
-        /// 实时应用视觉亮度色彩映射 (使屏幕实际明暗输出与外部系统亮度 100% 保持完全同步)
+        /// 强制将显示色彩恢复为标准线性 Gamma，杜绝残留压暗色彩失真
+        /// </summary>
+        public static void ResetGammaRamp()
+        {
+            try
+            {
+                IntPtr hdc = GetDC(IntPtr.Zero);
+                if (hdc != IntPtr.Zero)
+                {
+                    var ramp = new RAMP
+                    {
+                        Red = new ushort[256],
+                        Green = new ushort[256],
+                        Blue = new ushort[256]
+                    };
+                    for (int i = 0; i < 256; i++)
+                    {
+                        int value = (i * 65535) / 255;
+                        ramp.Red[i] = (ushort)value;
+                        ramp.Green[i] = (ushort)value;
+                        ramp.Blue[i] = (ushort)value;
+                    }
+                    SetDeviceGammaRamp(hdc, ref ramp);
+                    ReleaseDC(IntPtr.Zero, hdc);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 实时应用视觉亮度色彩映射 (仅用于无硬件背光时的回退)
         /// </summary>
         public static void ApplyVisualBrightness(int brightness)
         {

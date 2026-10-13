@@ -113,6 +113,16 @@ namespace ClipVault.Services
                 ["SidebarRecordCount"] = "共 {0} 条历史记录",
                 ["PinLockedTip"] = "图钉已锁定 (常驻不自动隐藏)",
                 ["PinUnlockedTip"] = "已解除锁定 (失焦自动贴边收起)",
+                ["MenuEnqueue"] = "加入连续粘贴队列",
+                ["MenuDequeue"] = "从队列移除",
+                ["ScratchpadTitle"] = "随手记便签",
+                ["ScratchpadPlaceholder"] = "随手记录杂乱文字、草稿或灵感，自动保存...",
+                ["ScratchpadCopy"] = "复制便签",
+                ["ScratchpadClear"] = "清空便签",
+                ["QueueTitle"] = "连续粘贴队列",
+                ["QueueCount"] = "{0} 条待粘",
+                ["QueuePasteNext"] = "粘贴下一条",
+                ["QueueClear"] = "清空队列",
 
                 // 相对时间
                 ["TimeJustNow"] = "刚刚",

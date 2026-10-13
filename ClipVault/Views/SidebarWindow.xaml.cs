@@ -3,9 +3,11 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -27,6 +29,9 @@ namespace ClipVault.Views
 
         public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
 
+        // 连续粘贴队列 (杀手级功能 3：顺序连续流)
+        private readonly ObservableCollection<ClipboardItem> _pasteQueue = new();
+
         private string _currentCategory = "all";
         private bool _isPinned = true;
         private bool _isBluetoothActive = true;
@@ -36,6 +41,50 @@ namespace ClipVault.Views
         private string _previousView = "Clipboard";
         private bool _isUpdatingBrightnessUi = false;
         private bool _isInternalSettingUpdate = false;
+
+        #region Win32 无焦点点击黑科技 (杀手级功能 2：WS_EX_NOACTIVATE)
+
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+        private const int GWL_EXSTYLE = -20;
+        private const int WM_MOUSEACTIVATE = 0x0021;
+        private const int MA_NOACTIVATE = 3;
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    long exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
+                    SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(exStyle | WS_EX_NOACTIVATE));
+
+                    var source = HwndSource.FromHwnd(hwnd);
+                    source?.AddHook(WndProc);
+                }
+            }
+            catch { }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_MOUSEACTIVATE)
+            {
+                // 点击侧边栏绝不抢夺前台打字窗口的键盘与焦点
+                handled = true;
+                return new IntPtr(MA_NOACTIVATE);
+            }
+            return IntPtr.Zero;
+        }
+
+        #endregion
 
         public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
@@ -89,6 +138,9 @@ namespace ClipVault.Views
                 Dispatcher.Invoke(() => UpdateMediaUI(info));
             };
 
+            // 纯净化 Gamma 色彩，杜绝残留压暗色彩失真
+            SystemControlService.ResetGammaRamp();
+
             // 初始化系统亮度双向同步定时器 (每 800ms 检查一次 Windows 系统外部调节)
             _brightnessSyncTimer = new DispatcherTimer
             {
@@ -106,9 +158,17 @@ namespace ClipVault.Views
                             _isUpdatingBrightnessUi = true;
                             SliderBrightness.Value = currentSys;
                             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
-                            // 关键修复：系统外部调高/调低亮度时，实际屏幕视觉亮度立即同步刷新！
-                            SystemControlService.ApplyVisualBrightness(currentSys);
                             _isUpdatingBrightnessUi = false;
+
+                            // 若无硬件背光驱动，才回退到 Gamma；若有硬件背光，保持纯正线性 Gamma，物理背光由 Windows 控制
+                            if (!SystemControlService.HasHardwareSupport)
+                            {
+                                SystemControlService.ApplyVisualBrightness(currentSys);
+                            }
+                            else
+                            {
+                                SystemControlService.ResetGammaRamp();
+                            }
                         }
                     }
                     catch { }
@@ -128,6 +188,18 @@ namespace ClipVault.Views
                     SliderBrightness.Value = sysBrightness;
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                     _isUpdatingBrightnessUi = false;
+                }
+            }
+            catch { }
+
+            // 恢复随手记轻量便签内容 (杀手级功能 4)
+            try
+            {
+                if (TxtScratchpad != null && !string.IsNullOrEmpty(_settingsService.CurrentSettings.ScratchpadContent))
+                {
+                    TxtScratchpad.Text = _settingsService.CurrentSettings.ScratchpadContent;
+                    TxtScratchpad.Visibility = Visibility.Visible;
+                    if (IconScratchpadToggle != null) IconScratchpadToggle.Text = "▾";
                 }
             }
             catch { }
@@ -165,6 +237,10 @@ namespace ClipVault.Views
                 this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                 this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
                 this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFD, 0xFE, 0xFE));
+                this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+                this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
             }
             else
             {
@@ -183,6 +259,10 @@ namespace ClipVault.Views
                 this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
                 this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
                 this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
+                this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x1A, 0x20, 0x2C));
+                this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
+                this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
             }
 
             // 更新视图切换栏指示与高亮
@@ -210,6 +290,14 @@ namespace ClipVault.Views
             if (RadioImages != null) RadioImages.Content = loc.Get("SidebarFilterImage");
             if (RadioCode != null) RadioCode.Content = loc.Get("SidebarFilterCode");
             if (RadioPinned != null) RadioPinned.Content = loc.Get("SidebarFilterPinned");
+
+            // 随手记与连续粘贴队列多语言 (杀手级新功能)
+            if (TxtScratchpadTitle != null) TxtScratchpadTitle.Text = loc.Get("ScratchpadTitle");
+            if (BtnScratchpadCopy != null) BtnScratchpadCopy.ToolTip = loc.Get("ScratchpadCopy");
+            if (BtnScratchpadClear != null) BtnScratchpadClear.ToolTip = loc.Get("ScratchpadClear");
+            if (BtnPasteNextInQueue != null) BtnPasteNextInQueue.Content = loc.Get("QueuePasteNext");
+            if (BtnClearQueue != null) BtnClearQueue.ToolTip = loc.Get("QueueClear");
+            UpdateQueueUi();
 
             // 快捷看板各板块
             if (TxtSectionCoreShortcuts != null) TxtSectionCoreShortcuts.Text = loc.Get("SidebarCoreActions");
@@ -546,6 +634,11 @@ namespace ClipVault.Views
             }
         }
 
+        private void TxtSearch_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            this.Activate();
+        }
+
         private void CardsListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             _cardDragStartPoint = e.GetPosition(null);
@@ -571,10 +664,27 @@ namespace ClipVault.Views
                             if (selectedItem.IsImage && selectedItem.ImagePreview is BitmapSource bmp)
                             {
                                 data.SetImage(bmp);
+                                // 生成临时图片文件供外部软件 (微信/文件夹等) 直接拖拽释放
+                                try
+                                {
+                                    string tempDir = Path.Combine(Path.GetTempPath(), "CopyBoxDrag");
+                                    Directory.CreateDirectory(tempDir);
+                                    string tempPath = Path.Combine(tempDir, $"clip_{DateTime.Now:yyyyMMdd_HHmmss}_{selectedItem.Id}.png");
+                                    using (var fs = new FileStream(tempPath, FileMode.Create))
+                                    {
+                                        var enc = new PngBitmapEncoder();
+                                        enc.Frames.Add(BitmapFrame.Create(bmp));
+                                        enc.Save(fs);
+                                    }
+                                    var files = new System.Collections.Specialized.StringCollection { tempPath };
+                                    data.SetFileDropList(files);
+                                }
+                                catch { }
                             }
                             else if (!string.IsNullOrEmpty(selectedItem.Content))
                             {
                                 data.SetText(selectedItem.Content);
+                                data.SetData(DataFormats.UnicodeText, selectedItem.Content);
                             }
                             DragDrop.DoDragDrop(CardsListBox, data, DragDropEffects.Copy);
                         }
@@ -592,7 +702,6 @@ namespace ClipVault.Views
         {
             if (CardsListBox.SelectedItem is ClipboardItem selected)
             {
-                // 关键修复：选择 PasteAndHide 时，双击必须无条件模拟粘贴并平滑收起抽屉！
                 if (_settingsService.CurrentSettings.DoubleClickAction == "PasteAndHide")
                 {
                     await _pasteSimulator.PasteItemAsync(selected, () =>
@@ -645,6 +754,171 @@ namespace ClipVault.Views
             }
         }
 
+        private void ListBoxItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is ListBoxItem lbi && lbi.DataContext is ClipboardItem item)
+            {
+                CardsListBox.SelectedItem = item;
+            }
+        }
+
+        private void ListBoxItem_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is ListBoxItem lbi && lbi.DataContext is ClipboardItem item)
+            {
+                e.Handled = true;
+                ShowCardContextMenu(item, lbi, isFromRightClick: true);
+            }
+        }
+
+        private void BtnCardMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is int id)
+            {
+                var item = DisplayCards.FirstOrDefault(x => x.Id == id);
+                if (item != null)
+                {
+                    ShowCardContextMenu(item, btn, isFromRightClick: false);
+                }
+            }
+        }
+
+        private void BtnCardEnqueue_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                EnqueueCard(item);
+            }
+        }
+
+        private void ShowCardContextMenu(ClipboardItem item, FrameworkElement placementTarget, bool isFromRightClick)
+        {
+            if (item == null) return;
+            CardsListBox.SelectedItem = item;
+
+            var loc = LocalizationService.Instance;
+            var menu = new ContextMenu();
+            if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle)
+            {
+                menu.Style = ctxStyle;
+            }
+
+            Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+            // 1. 置顶 / 取消置顶 (★)
+            var pinIcon = new TextBlock 
+            { 
+                Text = "★", 
+                Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var pinItem = new MenuItem 
+            { 
+                Icon = pinIcon,
+                Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") 
+            };
+            if (itemStyle != null) pinItem.Style = itemStyle;
+            pinItem.Click += (s, args) =>
+            {
+                _dbService.TogglePin(item.Id);
+                RefreshCards();
+            };
+
+            // 2. 加入连续粘贴队列 (⮑)
+            var queueIcon = new TextBlock 
+            { 
+                Text = "⮑", 
+                Foreground = new SolidColorBrush(Color.FromRgb(96, 165, 250)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var queueItem = new MenuItem 
+            { 
+                Icon = queueIcon,
+                Header = loc.Get("MenuEnqueue") 
+            };
+            if (itemStyle != null) queueItem.Style = itemStyle;
+            queueItem.Click += (s, args) =>
+            {
+                EnqueueCard(item);
+            };
+
+            // 3. 复制到剪贴板 (❐)
+            var copyIcon = new TextBlock 
+            { 
+                Text = "❐", 
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 212)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var copyItem = new MenuItem 
+            { 
+                Icon = copyIcon,
+                Header = loc.Get("MenuCopy") 
+            };
+            if (itemStyle != null) copyItem.Style = itemStyle;
+            copyItem.Click += (s, args) =>
+            {
+                if (!string.IsNullOrEmpty(item.Content))
+                {
+                    Clipboard.SetText(item.Content);
+                }
+                else if (item.IsImage && item.ImagePreview is BitmapSource bmp)
+                {
+                    Clipboard.SetImage(bmp);
+                }
+            };
+
+            // 4. 删除 (✕)
+            var delIcon = new TextBlock 
+            { 
+                Text = "✕", 
+                Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68)), 
+                FontSize = 13, 
+                FontWeight = FontWeights.Bold, 
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var delItem = new MenuItem 
+            { 
+                Icon = delIcon,
+                Header = loc.Get("MenuDelete") 
+            };
+            if (itemStyle != null) delItem.Style = itemStyle;
+            delItem.Click += (s, args) =>
+            {
+                _dbService.DeleteItem(item.Id);
+                RefreshCards();
+            };
+
+            menu.Items.Add(pinItem);
+            menu.Items.Add(queueItem);
+            menu.Items.Add(copyItem);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(delItem);
+
+            if (isFromRightClick)
+            {
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+            }
+            else
+            {
+                menu.PlacementTarget = placementTarget;
+                menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                menu.HorizontalOffset = -130;
+                menu.VerticalOffset = 2;
+            }
+
+            menu.IsOpen = true;
+        }
+
         private void BtnCardPin_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
@@ -670,6 +944,104 @@ namespace ClipVault.Views
                 RefreshCards();
             }
         }
+
+        #region 杀手级功能 3：连续粘贴队列 (Paste Queue / 顺序流)
+
+        private void EnqueueCard(ClipboardItem item)
+        {
+            if (item == null) return;
+            _pasteQueue.Add(item);
+            UpdateQueueUi();
+        }
+
+        private void UpdateQueueUi()
+        {
+            if (PasteQueueBar == null || TxtQueueInfo == null) return;
+            if (_pasteQueue.Count > 0)
+            {
+                PasteQueueBar.Visibility = Visibility.Visible;
+                var loc = LocalizationService.Instance;
+                TxtQueueInfo.Text = $"{loc.Get("QueueTitle")} ({string.Format(loc.Get("QueueCount"), _pasteQueue.Count)})";
+            }
+            else
+            {
+                PasteQueueBar.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private async void BtnPasteNextInQueue_Click(object sender, RoutedEventArgs e)
+        {
+            if (_pasteQueue.Count == 0)
+            {
+                UpdateQueueUi();
+                return;
+            }
+
+            var nextItem = _pasteQueue[0];
+            _pasteQueue.RemoveAt(0);
+            UpdateQueueUi();
+
+            await _pasteSimulator.PasteItemAsync(nextItem, () =>
+            {
+                if (_pasteQueue.Count == 0 && !_isPinned)
+                {
+                    SlideOutAndHide();
+                }
+            });
+        }
+
+        private void BtnClearQueue_Click(object sender, RoutedEventArgs e)
+        {
+            _pasteQueue.Clear();
+            UpdateQueueUi();
+        }
+
+        #endregion
+
+        #region 杀手级功能 4：顶部随手记轻量便签 (Scratchpad)
+
+        private void ScratchpadHeader_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (TxtScratchpad == null || IconScratchpadToggle == null) return;
+            bool willShow = TxtScratchpad.Visibility != Visibility.Visible;
+            TxtScratchpad.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+            IconScratchpadToggle.Text = willShow ? "▾" : "▸";
+            if (willShow)
+            {
+                this.Activate();
+                TxtScratchpad.Focus();
+            }
+        }
+
+        private void TxtScratchpad_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            this.Activate();
+        }
+
+        private void TxtScratchpad_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_settingsService == null || TxtScratchpad == null) return;
+            _settingsService.CurrentSettings.ScratchpadContent = TxtScratchpad.Text;
+            _settingsService.SaveSettings();
+        }
+
+        private void BtnScratchpadCopy_Click(object sender, RoutedEventArgs e)
+        {
+            if (TxtScratchpad != null && !string.IsNullOrEmpty(TxtScratchpad.Text))
+            {
+                Clipboard.SetText(TxtScratchpad.Text);
+            }
+        }
+
+        private void BtnScratchpadClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (TxtScratchpad != null)
+            {
+                TxtScratchpad.Text = string.Empty;
+            }
+        }
+
+        #endregion
 
         #endregion
 

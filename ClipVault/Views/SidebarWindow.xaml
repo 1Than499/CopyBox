@@ -257,6 +257,88 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 现代化 Fluent 右键菜单与弹出层样式 (1:1 传承 1.0 质感，深浅色自适应) -->
+        <SolidColorBrush x:Key="MenuBgBrush" Color="#F21A202C"/>
+        <SolidColorBrush x:Key="MenuBorderBrush" Color="#334155"/>
+        <SolidColorBrush x:Key="MenuTextBrush" Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="SelectedBorderBrush" Color="#0078D7"/>
+
+        <Style x:Key="ModernContextMenuStyle" TargetType="{x:Type ContextMenu}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Grid.IsSharedSizeScope" Value="True"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border Padding="6" Background="Transparent" SnapsToDevicePixels="True">
+                            <Border Background="{DynamicResource MenuBgBrush}" 
+                                    BorderBrush="{DynamicResource MenuBorderBrush}" 
+                                    BorderThickness="1" 
+                                    CornerRadius="10" 
+                                    Padding="4,5"
+                                    MinWidth="160"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.30" Color="#000000"/>
+                                </Border.Effect>
+                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                            </Border>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernMenuItemStyle" TargetType="{x:Type MenuItem}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource MenuTextBrush}"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type MenuItem}">
+                        <Border x:Name="Bd" 
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="6" 
+                                Padding="8,0" 
+                                Margin="1,1" 
+                                SnapsToDevicePixels="True">
+                            <Grid VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="22"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="IconHost" Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="6,0,8,0"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernMenuSeparatorStyle" TargetType="{x:Type Separator}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Separator}">
+                        <Border Background="{DynamicResource CardBorderBrush}" Height="1" Margin="6,3" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 侧边栏外层主体 -->
@@ -415,7 +497,8 @@
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          CaretBrush="{DynamicResource TextPrimaryBrush}"
                                          FontSize="11.5" VerticalContentAlignment="Center"
-                                         Padding="2,0" TextChanged="TxtSearch_TextChanged">
+                                         Padding="2,0" TextChanged="TxtSearch_TextChanged"
+                                         PreviewMouseDown="TxtSearch_PreviewMouseDown">
                                     <TextBox.Template>
                                         <ControlTemplate TargetType="TextBox">
                                             <Border Background="Transparent" BorderThickness="0">
@@ -447,6 +530,70 @@
                                              Style="{StaticResource FilterPillStyle}"/>
                             </StackPanel>
                         </ScrollViewer>
+
+                        <!-- 顶部随手记轻量便签 (Scratchpad，杀手级功能 4) -->
+                        <Border x:Name="ScratchpadCard" Background="{DynamicResource TabContainerBgBrush}" 
+                                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" 
+                                CornerRadius="8" Margin="0,6,0,2" Padding="8,6">
+                            <StackPanel>
+                                <DockPanel LastChildFill="True" Cursor="Hand" MouseLeftButtonUp="ScratchpadHeader_Click">
+                                    <TextBlock Text="📝" FontSize="11" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtScratchpadTitle" Text="随手记便签" FontSize="11" FontWeight="SemiBold" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                                        <Button x:Name="BtnScratchpadCopy" Content="📋" ToolTip="复制便签" 
+                                                Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="20" FontSize="10" 
+                                                Click="BtnScratchpadCopy_Click"/>
+                                        <Button x:Name="BtnScratchpadClear" Content="🗑" ToolTip="清空便签" 
+                                                Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="20" FontSize="10" 
+                                                Click="BtnScratchpadClear_Click"/>
+                                        <TextBlock x:Name="IconScratchpadToggle" Text="▾" FontSize="10" 
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <TextBox x:Name="TxtScratchpad" Visibility="Collapsed"
+                                         Background="Transparent" BorderThickness="0"
+                                         Foreground="{DynamicResource TextPrimaryBrush}"
+                                         CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                         FontSize="11.5" FontFamily="Segoe UI, Microsoft YaHei"
+                                         AcceptsReturn="True" TextWrapping="Wrap"
+                                         MinHeight="56" MaxHeight="120"
+                                         Margin="0,4,0,0" Padding="2"
+                                         VerticalScrollBarVisibility="Auto"
+                                         PreviewMouseDown="TxtScratchpad_PreviewMouseDown"
+                                         TextChanged="TxtScratchpad_TextChanged"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 连续粘贴队列状态指示条 (杀手级功能 3：顺序连续流) -->
+                        <Border x:Name="PasteQueueBar" Visibility="Collapsed" 
+                                Background="#1E2A42" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" 
+                                CornerRadius="8" Margin="0,4,0,2" Padding="10,6">
+                            <DockPanel LastChildFill="True">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="⮑" FontSize="12" Foreground="#60A5FA" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtQueueInfo" Text="连续粘贴队列 (已排队 0 项)" FontSize="11" FontWeight="SemiBold" 
+                                               Foreground="#E2E8F0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                                    <Button x:Name="BtnPasteNextInQueue" Content="粘贴下一项" 
+                                            Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF" BorderThickness="0" 
+                                            FontSize="10.5" FontWeight="SemiBold" Padding="8,3" Cursor="Hand" Margin="0,0,6,0" 
+                                            Click="BtnPasteNextInQueue_Click">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button x:Name="BtnClearQueue" Content="✕" ToolTip="清空队列" 
+                                            Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="20" FontSize="10" 
+                                            Click="BtnClearQueue_Click"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
                     </StackPanel>
 
                     <!-- 历史卡片列表 -->
@@ -463,10 +610,33 @@
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="Margin" Value="0,0,0,7"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"/>
+                                <EventSetter Event="MouseRightButtonUp" Handler="ListBoxItem_MouseRightButtonUp"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter/>
+                                            <Border x:Name="CardItemBorder" 
+                                                    Background="{DynamicResource CardBgBrush}" 
+                                                    BorderBrush="{DynamicResource CardBorderBrush}" 
+                                                    BorderThickness="1" 
+                                                    CornerRadius="8" 
+                                                    Padding="10,8" 
+                                                    Cursor="Hand"
+                                                    SnapsToDevicePixels="True">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="CardItemBorder" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                                    <Setter TargetName="CardItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="CardItemBorder" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                                    <Setter TargetName="CardItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
+                                                    <Setter TargetName="CardItemBorder" Property="BorderThickness" Value="1.5"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
@@ -475,31 +645,60 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border x:Name="CardBorder" Background="{DynamicResource CardBgBrush}" 
-                                        BorderBrush="{DynamicResource CardBorderBrush}" 
-                                        BorderThickness="1" CornerRadius="8" Padding="10,8" Cursor="Hand">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- 顶栏：类型/来源/星号/三点菜单 -->
+                                        <RowDefinition Height="*"/>    <!-- 内容：文本/代码/图片 -->
+                                        <RowDefinition Height="Auto"/> <!-- 底栏：摘要与快捷操作 -->
+                                    </Grid.RowDefinitions>
 
-                                    <StackPanel>
-                                        <!-- 卡片顶栏：快捷贴数字徽标、时间与应用源 -->
-                                        <DockPanel LastChildFill="True" Margin="0,0,0,4">
-                                            <Border DockPanel.Dock="Left" Background="#260078D7" CornerRadius="4" Padding="5,1" Margin="0,0,6,0"
-                                                    Visibility="{Binding DisplayBadge, Converter={StaticResource BoolToVis}}">
+                                    <!-- 卡片顶栏 (1:1 像 1.0 一样精致，右侧三点菜单 ··· 与置顶金星 ★) -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- 左侧类型徽标与数字秒贴徽标 -->
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- 数字快捷徽标 -->
+                                            <Border Background="#260078D7" CornerRadius="4" Padding="5,1" Margin="0,0,6,0"
+                                                    Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding DisplayBadge}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                                             </Border>
-                                            <TextBlock Text="{Binding SourceApp}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
-                                        </DockPanel>
+                                            <!-- 代码专属金黄花括号 -->
+                                            <TextBlock Text="{}{" Foreground="#F59E0B" FontWeight="Bold" FontSize="12" FontFamily="Cascadia Code, Consolas"
+                                                       Visibility="{Binding IsCode, Converter={StaticResource BoolToVis}}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <!-- 图片专属相框图标 -->
+                                            <TextBlock Text="🖼" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" 
+                                                       Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <!-- 文本专属双引号 -->
+                                            <TextBlock Text="❝" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" 
+                                                       Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" Margin="0,-2,4,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
 
+                                        <!-- 中间来源应用名称 -->
+                                        <TextBlock Grid.Column="1" Text="{Binding SourceApp}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                                        <!-- 右侧：置顶金星角标 ★ + 时间 + 三点菜单按钮 ··· (1:1 还原 1.0) -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- 置顶高雅实心金星 ★ -->
+                                            <TextBlock Text="★" Foreground="#F59E0B" FontSize="11" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                       Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}"/>
+                                            <!-- 复制时间 -->
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <!-- 1.0 经典三点交互按钮 ··· -->
+                                            <Button Content="···" Tag="{Binding Id}" Click="BtnCardMenu_Click" 
+                                                    Background="Transparent" BorderThickness="0" 
+                                                    Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                    FontSize="12" FontWeight="Bold" Cursor="Hand" Padding="2,0" 
+                                                    ToolTip="更多选项 (右键菜单)"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- 卡片主体内容 -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,5">
                                         <!-- 1. 普通文本内容预览 -->
                                         <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
                                                    TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis" LineHeight="16"
@@ -517,18 +716,19 @@
                                                 Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}">
                                             <Image Source="{Binding ImagePreview}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
+                                    </Grid>
 
-                                        <!-- 卡片底栏操作小按钮 (置顶/复制/删除，带悬浮高亮) -->
-                                        <Grid Margin="0,4,0,0">
-                                            <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
-                                                <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
-                                                <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
+                                    <!-- 卡片底栏操作小按钮 (置顶/进队列/复制/删除) -->
+                                    <Grid Grid.Row="2" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
+                                            <Button Content="⮑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardEnqueue_Click" ToolTip="加入连续粘贴队列"/>
+                                            <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
+                                            <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

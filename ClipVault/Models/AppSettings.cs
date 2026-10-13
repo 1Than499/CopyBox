@@ -40,6 +40,9 @@ namespace ClipVault.Models
         public bool StartWithWindows { get; set; } = false; // 开机自启
         public bool PortableMode { get; set; } = false; // 便携模式
 
+        // 顶部随手记临时便签内容
+        public string ScratchpadContent { get; set; } = string.Empty;
+
         // 用户自定义快捷动作列表 (系统操作中心扩展磁贴)
         public System.Collections.Generic.List<CustomActionItem> CustomActions { get; set; } = new()
         {
