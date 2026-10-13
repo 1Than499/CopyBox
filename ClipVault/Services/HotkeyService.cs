@@ -10,9 +10,11 @@ namespace ClipVault.Services
     {
         private HwndSource? _hwndSource;
         private const int HOTKEY_ID = 9001;
+        private const int SIDEBAR_HOTKEY_ID = 9002;
         private readonly SettingsService _settingsService;
 
         public event Action? HotkeyPressed;
+        public event Action? SidebarHotkeyPressed;
 
         public HotkeyService(SettingsService settingsService)
         {
@@ -36,6 +38,17 @@ namespace ClipVault.Services
             _hwndSource.AddHook(HwndHook);
 
             RegisterDefaultHotkey();
+            RegisterSidebarHotkey();
+        }
+
+        private void RegisterSidebarHotkey()
+        {
+            if (_hwndSource == null) return;
+
+            // 侧边栏专属快捷键：Alt + Shift + V
+            uint modifier = NativeMethods.MOD_ALT | NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT;
+            uint vk = (uint)KeyInterop.VirtualKeyFromKey(Key.V);
+            NativeMethods.RegisterHotKey(_hwndSource.Handle, SIDEBAR_HOTKEY_ID, modifier, vk);
         }
 
         private void RegisterDefaultHotkey()
@@ -69,10 +82,19 @@ namespace ClipVault.Services
 
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            if (msg == NativeMethods.WM_HOTKEY)
             {
-                handled = true;
-                HotkeyPressed?.Invoke();
+                int id = wParam.ToInt32();
+                if (id == HOTKEY_ID)
+                {
+                    handled = true;
+                    HotkeyPressed?.Invoke();
+                }
+                else if (id == SIDEBAR_HOTKEY_ID)
+                {
+                    handled = true;
+                    SidebarHotkeyPressed?.Invoke();
+                }
             }
             return IntPtr.Zero;
         }
@@ -82,6 +104,7 @@ namespace ClipVault.Services
             if (_hwndSource != null)
             {
                 NativeMethods.UnregisterHotKey(_hwndSource.Handle, HOTKEY_ID);
+                NativeMethods.UnregisterHotKey(_hwndSource.Handle, SIDEBAR_HOTKEY_ID);
                 _hwndSource.RemoveHook(HwndHook);
                 _hwndSource.Dispose();
                 _hwndSource = null;

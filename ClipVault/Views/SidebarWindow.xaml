@@ -1,0 +1,521 @@
+<Window x:Class="ClipVault.Views.SidebarWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:ClipVault.Helpers"
+        mc:Ignorable="d"
+        Title="CopyBox 侧边栏"
+        Width="360"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextHintingMode="Fixed"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <!-- 动态色板与毛玻璃材质 -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <SolidColorBrush x:Key="SidebarBgBrush" Color="#E8161922"/>
+        <SolidColorBrush x:Key="SidebarBorderBrush" Color="#2E3A4E"/>
+        <SolidColorBrush x:Key="HeaderBgBrush" Color="#D911141C"/>
+        <SolidColorBrush x:Key="CardBgBrush" Color="#1E2432"/>
+        <SolidColorBrush x:Key="CardHoverBgBrush" Color="#2A3346"/>
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#2F3B4F"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F1F5F9"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#94A3B8"/>
+        <SolidColorBrush x:Key="AccentBlueBrush" Color="#0078D7"/>
+        <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="#1E88E5"/>
+        <SolidColorBrush x:Key="TileBgBrush" Color="#222A3A"/>
+        <SolidColorBrush x:Key="TileHoverBgBrush" Color="#2F3B52"/>
+
+        <!-- 细线极简滚动条 -->
+        <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
+            <Setter Property="OverridesDefaultStyle" Value="true"/>
+            <Setter Property="IsTabStop" Value="false"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Rectangle Fill="#475569" RadiusX="2" RadiusY="2" Width="4"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="5"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Track x:Name="PART_Track" IsDirectionReversed="true">
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource MinimalScrollThumb}"/>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 顶部小图标按钮样式 -->
+        <Style x:Key="SidebarTopIconBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#CBD5E1"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#25FFFFFF"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 仿生操作中心磁贴按钮基础样式 -->
+        <Style x:Key="ActionCenterTileStyle" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource TileBgBrush}"/>
+            <Setter Property="BorderBrush" Value="#1AFFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Height" Value="54"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="tileBd" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="4" Padding="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="tileBd" Property="Background" Value="{StaticResource TileHoverBgBrush}"/>
+                                <Setter TargetName="tileBd" Property="BorderBrush" Value="#40FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="tileBd" Property="Background" Value="#455A7D"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- 侧边栏外层主体，带滑入/滑出平移动画支持 -->
+    <Border x:Name="RootBorder" 
+            Background="{StaticResource SidebarBgBrush}" 
+            BorderBrush="{StaticResource SidebarBorderBrush}" 
+            BorderThickness="1,0,0,0">
+        <Border.RenderTransform>
+            <TranslateTransform x:Name="WindowTranslate" X="0"/>
+        </Border.RenderTransform>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 顶栏与双模切换 Tab -->
+                <RowDefinition Height="*"/>    <!-- 核心视图区域 (剪贴板 / 操作中心) -->
+                <RowDefinition Height="Auto"/> <!-- 底部状态栏 -->
+            </Grid.RowDefinitions>
+
+            <!-- ================= 第一行：顶栏与双模切换药丸 ================= -->
+            <Border Grid.Row="0" Background="{StaticResource HeaderBgBrush}" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1" Padding="12,10,12,10">
+                <StackPanel>
+                    <!-- 窗口标题与控制图标 -->
+                    <Grid Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="18" Height="18" CornerRadius="4" Background="{StaticResource AccentBlueBrush}" Margin="0,0,6,0">
+                                <TextBlock Text="📋" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <Border Margin="6,0,0,0" Padding="4,1" CornerRadius="3" Background="#1A0078D7">
+                                <TextBlock Text="v2.0 抽屉" FontSize="9.5" Foreground="#60A5FA" FontWeight="SemiBold"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 右侧按钮：图钉锁定、设置、收起 -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="BtnPin" Style="{StaticResource SidebarTopIconBtn}" Click="BtnPin_Click" ToolTip="切换贴边自隐藏 / 图钉锁定常驻">
+                                <TextBlock x:Name="TxtPinIcon" Text="📌" FontSize="11"/>
+                            </Button>
+                            <Button x:Name="BtnSettings" Style="{StaticResource SidebarTopIconBtn}" Click="BtnSettings_Click" ToolTip="打开偏好设置">
+                                <TextBlock Text="⚙" FontSize="11"/>
+                            </Button>
+                            <Button x:Name="BtnClose" Style="{StaticResource SidebarTopIconBtn}" Click="BtnClose_Click" ToolTip="收起侧边栏">
+                                <TextBlock Text="✕" FontSize="10"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 双模切换药丸 (核心创新点) -->
+                    <Border Background="#1C222E" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Tab 1: 剪贴板中心 -->
+                            <Button x:Name="TabBtnClipboard" Grid.Column="0" Click="TabBtnClipboard_Click"
+                                    Background="{StaticResource AccentBlueBrush}" Foreground="#FFFFFF"
+                                    BorderThickness="0" Height="28" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="📋" FontSize="11" Margin="0,0,4,0"/>
+                                                <TextBlock Text="剪贴板中心" FontSize="11" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <!-- Tab 2: 系统快捷看板 -->
+                            <Button x:Name="TabBtnSystem" Grid.Column="1" Click="TabBtnSystem_Click"
+                                    Background="Transparent" Foreground="{StaticResource TextSecondaryBrush}"
+                                    BorderThickness="0" Height="28" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="tabBd" Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Text="🔔" FontSize="11" Margin="0,0,4,0"/>
+                                                <TextBlock Text="系统快捷看板" FontSize="11" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ================= 第二行：核心内容区域 ================= -->
+            <Grid Grid.Row="1">
+                
+                <!-- 【模式一：CopyBox 剪贴板中心】 -->
+                <Grid x:Name="ClipboardViewPanel" Visibility="Visible">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- 搜索框与分类胶囊 -->
+                        <RowDefinition Height="*"/>    <!-- 卡片瀑布流 -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 搜索栏与分类筛选胶囊 -->
+                    <StackPanel Grid.Row="0" Margin="12,10,12,6">
+                        <!-- 搜索框 -->
+                        <Border Background="#121620" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="6" Height="32">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="🔍" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                <TextBox x:Name="TxtSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
+                                         Foreground="{StaticResource TextPrimaryBrush}" FontSize="11.5" VerticalContentAlignment="Center"
+                                         TextChanged="TxtSearch_TextChanged"/>
+                                <TextBlock x:Name="TxtSearchPlaceholder" Grid.Column="1" Text="搜索历史记录或按数字秒贴..." 
+                                           Foreground="#64748B" FontSize="11.5" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                <Button x:Name="BtnClearSearch" Grid.Column="2" Content="✕" Width="20" Height="20" Background="Transparent"
+                                        BorderThickness="0" Foreground="#64748B" Cursor="Hand" Click="BtnClearSearch_Click" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- 分类筛选胶囊 -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="RadioAll" Content="全部" IsChecked="True" Checked="Filter_Checked" Tag="all"
+                                             Style="{StaticResource {x:Type ToggleButton}}" Margin="0,0,4,0"/>
+                                <RadioButton x:Name="RadioText" Content="文本" Checked="Filter_Checked" Tag="text"
+                                             Style="{StaticResource {x:Type ToggleButton}}" Margin="0,0,4,0"/>
+                                <RadioButton x:Name="RadioImages" Content="图片" Checked="Filter_Checked" Tag="image"
+                                             Style="{StaticResource {x:Type ToggleButton}}" Margin="0,0,4,0"/>
+                                <RadioButton x:Name="RadioCode" Content="代码" Checked="Filter_Checked" Tag="code"
+                                             Style="{StaticResource {x:Type ToggleButton}}" Margin="0,0,4,0"/>
+                                <RadioButton x:Name="RadioPinned" Content="置顶" Checked="Filter_Checked" Tag="pinned"
+                                             Style="{StaticResource {x:Type ToggleButton}}"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </StackPanel>
+
+                    <!-- 剪贴板卡片列表 (开启 UI 虚拟化与极速秒贴) -->
+                    <ListBox x:Name="CardsListBox" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             VirtualizingStackPanel.IsVirtualizing="True"
+                             VirtualizingStackPanel.VirtualizationMode="Recycling"
+                             Padding="12,4,12,8"
+                             SelectionMode="Single"
+                             MouseDoubleClick="CardsListBox_MouseDoubleClick"
+                             PreviewKeyDown="CardsListBox_PreviewKeyDown">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,7"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource CardBgBrush}" 
+                                        BorderBrush="{StaticResource CardBorderBrush}" 
+                                        BorderThickness="1" CornerRadius="7" Padding="10"
+                                        Cursor="Hand" ToolTip="单击直接秒贴入目标软件 · 支持按住鼠标左键直接拖拽"
+                                        MouseDown="Card_MouseDown"
+                                        MouseMove="Card_MouseMove">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource CardHoverBgBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+
+                                    <StackPanel>
+                                        <!-- 卡片顶行：置顶标识、应用来源、快捷键徽标 -->
+                                        <Grid Margin="0,0,0,4">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="📌 " FontSize="10" Foreground="#F59E0B" Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}"/>
+                                                <TextBlock Text="{Binding SourceApp}" FontSize="10.5" Foreground="#64748B"/>
+                                                <TextBlock Text=" • " FontSize="10" Foreground="#475569"/>
+                                                <TextBlock Text="{Binding FormattedTime}" FontSize="10" Foreground="#64748B"/>
+                                            </StackPanel>
+
+                                            <!-- 快速粘贴徽标与类型标记 -->
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Border Background="#1A0078D7" CornerRadius="3" Padding="4,1" Margin="0,0,4,0" Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="{Binding DisplayBadge}" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold" FontFamily="Consolas"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding ItemType}" FontSize="10" Foreground="#94A3B8"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- 内容展示 (文本 / 代码 / 图片) -->
+                                        <!-- 1. 纯文本 -->
+                                        <TextBlock Text="{Binding Content}" FontSize="11.5" Foreground="{StaticResource TextPrimaryBrush}"
+                                                   TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"
+                                                   LineHeight="16" Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}"/>
+
+                                        <!-- 2. 代码高亮块 -->
+                                        <Border Background="#11141C" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="5" Padding="6"
+                                                Visibility="{Binding IsCode, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding Content}" FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11" 
+                                                       Foreground="#38BDF8" TextWrapping="Wrap" MaxHeight="70" TextTrimming="CharacterEllipsis"/>
+                                        </Border>
+
+                                        <!-- 3. 图片缩略图 -->
+                                        <Border Height="64" CornerRadius="5" Background="#11141C" 
+                                                Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}">
+                                            <Image Source="{Binding ImagePreview}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- 卡片底栏操作小按钮 (置顶/复制/删除) -->
+                                        <Grid Margin="0,4,0,0">
+                                            <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="#64748B" VerticalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="18" FontSize="9" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
+                                                <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="18" FontSize="9" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
+                                                <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="18" FontSize="9" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <!-- 【模式二：1:1 仿生 Windows 10/11 系统操作中心快捷看板】 -->
+                <Grid x:Name="SystemActionsPanel" Visibility="Collapsed" Margin="12,10,12,10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- 管理通知链接 -->
+                        <RowDefinition Height="*"/>    <!-- 通知流区域 -->
+                        <RowDefinition Height="Auto"/> <!-- 仿生 4x4 快捷磁贴网格与亮度调节 -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 管理通知 -->
+                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
+                        <TextBlock Text="通知与操作中心" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Button DockPanel.Dock="Right" Content="管理通知" Background="Transparent" BorderThickness="0" 
+                                Foreground="#60A5FA" FontSize="11" Cursor="Hand" Click="BtnManageNotifications_Click"/>
+                    </DockPanel>
+
+                    <!-- 通知聚合区 -->
+                    <Border Grid.Row="1" Background="#141822" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="🔔" FontSize="26" HorizontalAlignment="Center" Foreground="#475569" Margin="0,0,0,8"/>
+                            <TextBlock Text="没有新通知" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Windows 系统操作中心已就绪" FontSize="10.5" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                            <Button Content="🪟 呼出原版 Win+A" Background="#1E293B" Foreground="#94A3B8" BorderThickness="0"
+                                    Margin="0,14,0,0" Padding="12,5" FontSize="10.5" Cursor="Hand" Click="BtnTriggerWinA_Click"
+                                    ToolTip="模拟触发 Windows 原版操作中心快捷键"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 底部：4×4 经典仿生磁贴网格与亮度调节 -->
+                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                        <DockPanel Margin="0,0,0,8">
+                            <TextBlock Text="折叠" Foreground="#60A5FA" FontSize="11" Cursor="Hand" MouseDown="BtnCollapseTiles_MouseDown"/>
+                            <TextBlock Text="快捷磁贴" DockPanel.Dock="Right" Foreground="#64748B" FontSize="10"/>
+                        </DockPanel>
+
+                        <!-- 4 列网格磁贴 (完全对齐用户上传截图) -->
+                        <UniformGrid x:Name="TilesGrid" Columns="4" Rows="4">
+                            <!-- 行 1 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileLocation_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="📍" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="定位" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileBatterySaver_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="⚡" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="节电模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- 蓝牙默认亮起蓝色 -->
+                            <Button x:Name="TileBluetooth" Style="{StaticResource ActionCenterTileStyle}" Background="{StaticResource AccentBlueBrush}" Margin="2" Click="TileBluetooth_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="🔵" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="蓝牙" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center" Foreground="#FFFFFF"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNightLight_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="☀️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="夜间模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 行 2 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileHotspot_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="📶" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="移动热点" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileAirplane_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="✈️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="飞行模式" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNearbySharing_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="📡" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="就近共享" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileSettings_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="⚙️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="所有设置" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 行 3 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileNetwork_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="🛜" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="网络" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileConnect_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="🖥️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="连接" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileProject_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="📽️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="投影" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileVPN_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="🛡️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="VPN" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 行 4 -->
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileFocusAssist_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="🌙" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="专注助手" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Margin="2" Click="TileScreenClip_Click">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="✂️" FontSize="13" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="屏幕截图" FontSize="10" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+
+                        <!-- 亮度调节滑动条 -->
+                        <Grid Margin="4,8,4,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="🔅" FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="80" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="🔆" FontSize="12" Foreground="#64748B" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+
+            </Grid>
+
+            <!-- ================= 第三行：底部状态栏 ================= -->
+            <Border Grid.Row="2" Background="{StaticResource HeaderBgBrush}" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" Padding="12,6">
+                <Grid>
+                    <TextBlock x:Name="TxtStatusLeft" Text="已存 0 条 · SQLite WAL" FontSize="10" Foreground="#64748B" VerticalAlignment="Center"/>
+                    <TextBlock Text="常驻轻量 ~40MB" FontSize="10" Foreground="#475569" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</Window>

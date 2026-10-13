@@ -69,6 +69,7 @@ namespace ClipVault.Services
                 // 托盘菜单与提示
                 ["TrayTooltip"] = "CopyBox - 剪贴板安全保管箱 (Alt+V)",
                 ["TrayShow"] = "唤起 CopyBox 主界面 (Alt+V)",
+                ["TraySidebar"] = "打开贴边双模抽屉 (Alt+Shift+V)",
                 ["TrayPause"] = "暂停剪贴板监听",
                 ["TrayResume"] = "恢复剪贴板监听",
                 ["TrayClear"] = "清空剪贴板历史...",
@@ -149,6 +150,7 @@ namespace ClipVault.Services
                 // Tray Menu and ToolTip
                 ["TrayTooltip"] = "CopyBox - Secure Local Clipboard Manager (Alt+V)",
                 ["TrayShow"] = "Show CopyBox (Alt+V)",
+                ["TraySidebar"] = "Open Sidebar Drawer (Alt+Shift+V)",
                 ["TrayPause"] = "Pause Clipboard Monitoring",
                 ["TrayResume"] = "Resume Clipboard Monitoring",
                 ["TrayClear"] = "Clear Clipboard History...",

@@ -17,6 +17,7 @@ namespace ClipVault
         private HotkeyService? _hotkeyService;
 
         private MainWindow? _mainWindow;
+        private ClipVault.Views.SidebarWindow? _sidebarWindow;
         private System.Windows.Forms.NotifyIcon? _notifyIcon;
         private Icon? _appIcon;
 
@@ -59,10 +60,11 @@ namespace ClipVault
                 _monitorService.Start();
                 _hotkeyService.Start();
 
-                // 3. 初始化统一的现代 Fluent 双列卡片主窗口 (完全还原设计图)
+                // 3. 初始化主窗口 与 v2.0 贴边毛玻璃双模抽屉
                 _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
+                _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
 
-                // 4. 绑定全局热键 Alt + V
+                // 4. 绑定全局热键: Alt + V 唤起主面板; Alt + Shift + V 唤起贴边双模抽屉
                 _hotkeyService.HotkeyPressed += () =>
                 {
                     Dispatcher.Invoke(() =>
@@ -76,6 +78,24 @@ namespace ClipVault
                             else
                             {
                                 _mainWindow.ShowAndActivate();
+                            }
+                        }
+                    });
+                };
+
+                _hotkeyService.SidebarHotkeyPressed += () =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (_sidebarWindow != null)
+                        {
+                            if (_sidebarWindow.IsVisible)
+                            {
+                                _sidebarWindow.SlideOutAndHide();
+                            }
+                            else
+                            {
+                                _sidebarWindow.ShowDocked();
                             }
                         }
                     });
@@ -148,6 +168,7 @@ namespace ClipVault
         }
 
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuQuick;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuSidebar;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuPause;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuClear;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuSettings;
@@ -171,6 +192,9 @@ namespace ClipVault
                 _trayMenuQuick = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuQuick.Font = new Font(_trayMenuQuick.Font, System.Drawing.FontStyle.Bold);
                 _trayMenuQuick.Click += (s, e) => Dispatcher.Invoke(() => _mainWindow?.ShowAndActivate());
+
+                _trayMenuSidebar = new System.Windows.Forms.ToolStripMenuItem();
+                _trayMenuSidebar.Click += (s, e) => Dispatcher.Invoke(() => _sidebarWindow?.ShowDocked());
 
                 _trayMenuPause = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuPause.Click += (s, e) =>
@@ -206,6 +230,7 @@ namespace ClipVault
                 _trayMenuExit.Click += (s, e) => Dispatcher.Invoke(() => ExitApplication());
 
                 contextMenu.Items.Add(_trayMenuQuick);
+                contextMenu.Items.Add(_trayMenuSidebar);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
                 contextMenu.Items.Add(_trayMenuPause);
                 contextMenu.Items.Add(_trayMenuClear);
@@ -244,6 +269,7 @@ namespace ClipVault
             _notifyIcon.Text = loc.Get("TrayTooltip");
 
             if (_trayMenuQuick != null) _trayMenuQuick.Text = "🚀 " + loc.Get("TrayShow");
+            if (_trayMenuSidebar != null) _trayMenuSidebar.Text = "📱 " + loc.Get("TraySidebar");
             if (_trayMenuClear != null) _trayMenuClear.Text = "🗑️ " + loc.Get("TrayClear");
             if (_trayMenuSettings != null) _trayMenuSettings.Text = "⚙️ " + loc.Get("TraySettings");
             if (_trayMenuExit != null) _trayMenuExit.Text = "🛑 " + loc.Get("TrayExit");
