@@ -37,6 +37,7 @@ namespace ClipVault.Views
         private bool _isBluetoothActive = true;
         private Point _cardDragStartPoint;
         private bool _isDraggingCard = false;
+        private ClipboardItem? _draggedItem;
 
         private string _previousView = "Clipboard";
         private bool _isUpdatingBrightnessUi = false;
@@ -198,7 +199,7 @@ namespace ClipVault.Views
                 if (TxtScratchpad != null && !string.IsNullOrEmpty(_settingsService.CurrentSettings.ScratchpadContent))
                 {
                     TxtScratchpad.Text = _settingsService.CurrentSettings.ScratchpadContent;
-                    TxtScratchpad.Visibility = Visibility.Visible;
+                    if (BdScratchpadInput != null) BdScratchpadInput.Visibility = Visibility.Visible;
                     if (IconScratchpadToggle != null) IconScratchpadToggle.Text = "▾";
                 }
             }
@@ -241,6 +242,9 @@ namespace ClipVault.Views
                 this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
                 this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
                 this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
             }
             else
             {
@@ -263,6 +267,9 @@ namespace ClipVault.Views
                 this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
                 this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
                 this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x15, 0x1F));
+                this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x2C, 0x3D));
+                this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x2A, 0x42));
             }
 
             // 更新视图切换栏指示与高亮
@@ -643,11 +650,28 @@ namespace ClipVault.Views
         {
             _cardDragStartPoint = e.GetPosition(null);
             _isDraggingCard = false;
+            _draggedItem = null;
+
+            // 检查点击的源控件：如果是操作按钮（置顶、进队列、复制、删除、三点菜单），不捕获拖拽
+            var original = e.OriginalSource as DependencyObject;
+            if (FindVisualParent<Button>(original) != null)
+            {
+                return;
+            }
+
+            // 从点击源向上查找到所在的 ListBoxItem 与 ClipboardItem
+            var lbi = FindVisualParent<ListBoxItem>(original);
+            if (lbi != null && lbi.DataContext is ClipboardItem item)
+            {
+                _draggedItem = item;
+                lbi.IsSelected = true;
+                CardsListBox.SelectedItem = item;
+            }
         }
 
         private void CardsListBox_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed && !_isDraggingCard)
+            if (e.LeftButton == MouseButtonState.Pressed && !_isDraggingCard && _draggedItem != null)
             {
                 Point currentPos = e.GetPosition(null);
                 Vector diff = _cardDragStartPoint - currentPos;
@@ -655,44 +679,50 @@ namespace ClipVault.Views
                 if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
                     Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
                 {
-                    if (CardsListBox.SelectedItem is ClipboardItem selectedItem)
+                    var targetItem = _draggedItem;
+                    _isDraggingCard = true;
+                    try
                     {
-                        _isDraggingCard = true;
-                        try
+                        var data = new DataObject();
+                        if (targetItem.IsImage && targetItem.ImagePreview is BitmapSource bmp)
                         {
-                            var data = new DataObject();
-                            if (selectedItem.IsImage && selectedItem.ImagePreview is BitmapSource bmp)
+                            // 1. 标准图片位图格式 (供 Word/富文本/图形设计软件直接接收)
+                            data.SetImage(bmp);
+
+                            // 2. 物理临时文件格式 (供微信、QQ、浏览器文件上传、桌面/文件夹直接释放)
+                            try
                             {
-                                data.SetImage(bmp);
-                                // 生成临时图片文件供外部软件 (微信/文件夹等) 直接拖拽释放
-                                try
+                                string tempDir = Path.Combine(Path.GetTempPath(), "CopyBoxDrag");
+                                Directory.CreateDirectory(tempDir);
+                                string tempPath = Path.Combine(tempDir, $"clip_{DateTime.Now:yyyyMMdd_HHmmss}_{targetItem.Id}.png");
+                                using (var fs = new FileStream(tempPath, FileMode.Create))
                                 {
-                                    string tempDir = Path.Combine(Path.GetTempPath(), "CopyBoxDrag");
-                                    Directory.CreateDirectory(tempDir);
-                                    string tempPath = Path.Combine(tempDir, $"clip_{DateTime.Now:yyyyMMdd_HHmmss}_{selectedItem.Id}.png");
-                                    using (var fs = new FileStream(tempPath, FileMode.Create))
-                                    {
-                                        var enc = new PngBitmapEncoder();
-                                        enc.Frames.Add(BitmapFrame.Create(bmp));
-                                        enc.Save(fs);
-                                    }
-                                    var files = new System.Collections.Specialized.StringCollection { tempPath };
-                                    data.SetFileDropList(files);
+                                    var enc = new PngBitmapEncoder();
+                                    enc.Frames.Add(BitmapFrame.Create(bmp));
+                                    enc.Save(fs);
                                 }
-                                catch { }
+                                var files = new System.Collections.Specialized.StringCollection { tempPath };
+                                data.SetFileDropList(files);
                             }
-                            else if (!string.IsNullOrEmpty(selectedItem.Content))
-                            {
-                                data.SetText(selectedItem.Content);
-                                data.SetData(DataFormats.UnicodeText, selectedItem.Content);
-                            }
-                            DragDrop.DoDragDrop(CardsListBox, data, DragDropEffects.Copy);
+                            catch { }
                         }
-                        catch { }
-                        finally
+                        else if (!string.IsNullOrEmpty(targetItem.Content))
                         {
-                            _isDraggingCard = false;
+                            // 1. Unicode 纯文本格式 (供所有现代应用、VS Code、记事本、浏览器、聊天窗口接收)
+                            data.SetText(targetItem.Content, TextDataFormat.UnicodeText);
+                            data.SetData(DataFormats.UnicodeText, targetItem.Content);
+                            data.SetData(DataFormats.Text, targetItem.Content);
+                            data.SetData(DataFormats.StringFormat, targetItem.Content);
                         }
+
+                        // 执行系统级 OLE 拖拽 (支持 Copy 与 Move)
+                        DragDrop.DoDragDrop(CardsListBox, data, DragDropEffects.Copy | DragDropEffects.Move);
+                    }
+                    catch { }
+                    finally
+                    {
+                        _isDraggingCard = false;
+                        _draggedItem = null;
                     }
                 }
             }
@@ -901,8 +931,18 @@ namespace ClipVault.Views
             menu.Items.Add(pinItem);
             menu.Items.Add(queueItem);
             menu.Items.Add(copyItem);
-            menu.Items.Add(new Separator());
+
+            var sep = new Separator();
+            if (TryFindResource("ModernMenuSeparatorStyle") is Style sepStyle)
+            {
+                sep.Style = sepStyle;
+            }
+            menu.Items.Add(sep);
             menu.Items.Add(delItem);
+
+            // 关键：确保右键点击卡片弹出的面板与点击三点菜单完全一致 (毛玻璃圆角、主题色、阴影)
+            menu.PlacementTarget = placementTarget;
+            menu.Resources = this.Resources;
 
             if (isFromRightClick)
             {
@@ -910,7 +950,6 @@ namespace ClipVault.Views
             }
             else
             {
-                menu.PlacementTarget = placementTarget;
                 menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
                 menu.HorizontalOffset = -130;
                 menu.VerticalOffset = 2;
@@ -1002,9 +1041,9 @@ namespace ClipVault.Views
 
         private void ScratchpadHeader_Click(object sender, MouseButtonEventArgs e)
         {
-            if (TxtScratchpad == null || IconScratchpadToggle == null) return;
-            bool willShow = TxtScratchpad.Visibility != Visibility.Visible;
-            TxtScratchpad.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
+            if (BdScratchpadInput == null || IconScratchpadToggle == null || TxtScratchpad == null) return;
+            bool willShow = BdScratchpadInput.Visibility != Visibility.Visible;
+            BdScratchpadInput.Visibility = willShow ? Visibility.Visible : Visibility.Collapsed;
             IconScratchpadToggle.Text = willShow ? "▾" : "▸";
             if (willShow)
             {
@@ -1457,6 +1496,20 @@ namespace ClipVault.Views
             {
                 app.ExitApplication();
             }
+        }
+
+        #endregion
+
+        #region 视觉树辅助函数
+
+        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T parent) return parent;
+                child = VisualTreeHelper.GetParent(child);
+            }
+            return null;
         }
 
         #endregion

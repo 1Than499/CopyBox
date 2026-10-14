@@ -39,6 +39,9 @@
         <SolidColorBrush x:Key="CodeBoxBgBrush" Color="#11141C"/>
         <SolidColorBrush x:Key="CodeTextBrush" Color="#38BDF8"/>
         <SolidColorBrush x:Key="SliderTrackBgBrush" Color="#334155"/>
+        <SolidColorBrush x:Key="ScratchpadInputBgBrush" Color="#11151F"/>
+        <SolidColorBrush x:Key="ScratchpadInputBorderBrush" Color="#232C3D"/>
+        <SolidColorBrush x:Key="QueueBarBgBrush" Color="#1E2A42"/>
 
         <!-- 细线极简滚动条 -->
         <Style x:Key="MinimalScrollThumb" TargetType="{x:Type Thumb}">
@@ -551,23 +554,39 @@
                                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="4,0,0,0"/>
                                     </StackPanel>
                                 </DockPanel>
-                                <TextBox x:Name="TxtScratchpad" Visibility="Collapsed"
-                                         Background="Transparent" BorderThickness="0"
-                                         Foreground="{DynamicResource TextPrimaryBrush}"
-                                         CaretBrush="{DynamicResource TextPrimaryBrush}"
-                                         FontSize="11.5" FontFamily="Segoe UI, Microsoft YaHei"
-                                         AcceptsReturn="True" TextWrapping="Wrap"
-                                         MinHeight="56" MaxHeight="120"
-                                         Margin="0,4,0,0" Padding="2"
-                                         VerticalScrollBarVisibility="Auto"
-                                         PreviewMouseDown="TxtScratchpad_PreviewMouseDown"
-                                         TextChanged="TxtScratchpad_TextChanged"/>
+                                <!-- 便签编辑区域 (圆角底盒 + 完全消除系统黑块与底线，白天/深色完美同步) -->
+                                <Border x:Name="BdScratchpadInput" Visibility="Collapsed"
+                                        Background="{DynamicResource ScratchpadInputBgBrush}"
+                                        BorderBrush="{DynamicResource ScratchpadInputBorderBrush}"
+                                        BorderThickness="1" CornerRadius="6"
+                                        Margin="0,6,0,0" Padding="6,4">
+                                    <TextBox x:Name="TxtScratchpad" Style="{x:Null}"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"
+                                             CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                             FontSize="11.5" FontFamily="Segoe UI, Microsoft YaHei"
+                                             AcceptsReturn="True" TextWrapping="Wrap"
+                                             MinHeight="56" MaxHeight="130"
+                                             VerticalScrollBarVisibility="Auto"
+                                             PreviewMouseDown="TxtScratchpad_PreviewMouseDown"
+                                             TextChanged="TxtScratchpad_TextChanged">
+                                        <TextBox.Template>
+                                            <ControlTemplate TargetType="TextBox">
+                                                <Border Background="Transparent" BorderThickness="0">
+                                                    <ScrollViewer x:Name="PART_ContentHost" Focusable="False" 
+                                                                  HorizontalScrollBarVisibility="Hidden" 
+                                                                  VerticalScrollBarVisibility="Auto"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </TextBox.Template>
+                                    </TextBox>
+                                </Border>
                             </StackPanel>
                         </Border>
 
                         <!-- 连续粘贴队列状态指示条 (杀手级功能 3：顺序连续流) -->
                         <Border x:Name="PasteQueueBar" Visibility="Collapsed" 
-                                Background="#1E2A42" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" 
+                                Background="{DynamicResource QueueBarBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" 
                                 CornerRadius="8" Margin="0,4,0,2" Padding="10,6">
                             <DockPanel LastChildFill="True">
                                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
