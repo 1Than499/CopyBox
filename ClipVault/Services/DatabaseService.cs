@@ -239,16 +239,16 @@ namespace ClipVault.Services
                         cmd.Parameters.AddWithValue("$search", $"%{search}%");
                     }
 
-                    if (!string.IsNullOrWhiteSpace(category) && category != "all")
+                    if (!string.IsNullOrWhiteSpace(category) && !category.Equals("all", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (category == "pinned")
+                        if (category.Equals("pinned", StringComparison.OrdinalIgnoreCase))
                         {
                             conditions.Add("IsPinned = 1");
                         }
                         else
                         {
-                            conditions.Add("ItemType = $cat");
-                            cmd.Parameters.AddWithValue("$cat", category);
+                            conditions.Add("LOWER(ItemType) = LOWER($cat)");
+                            cmd.Parameters.AddWithValue("$cat", category.Trim());
                         }
                     }
 

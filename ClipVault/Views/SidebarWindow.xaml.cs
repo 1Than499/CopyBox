@@ -44,46 +44,128 @@ namespace ClipVault.Views
         private bool _isUpdatingVolumeUi = false;
         private bool _isInternalSettingUpdate = false;
 
-        #region Win32 无焦点点击黑科技 (杀手级功能 2：WS_EX_NOACTIVATE)
+        #region 全局外部点击监听与智能失焦收起 (图钉锁定/解锁即刻生效核心引擎)
 
-        private const int WS_EX_NOACTIVATE = 0x08000000;
-        private const int GWL_EXSTYLE = -20;
-        private const int WM_MOUSEACTIVATE = 0x0021;
-        private const int MA_NOACTIVATE = 3;
+        private const int WH_MOUSE_LL = 14;
+        private const int WM_LBUTTONDOWN = 0x0201;
+        private const int WM_RBUTTONDOWN = 0x0204;
+        private const int WM_NCLBUTTONDOWN = 0x00A1;
+        private const int WM_NCRBUTTONDOWN = 0x00A4;
 
-        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
-        private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private LowLevelMouseProc? _mouseProc;
+        private IntPtr _mouseHookHandle = IntPtr.Zero;
 
-        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
-        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        protected override void OnSourceInitialized(EventArgs e)
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
         {
-            base.OnSourceInitialized(e);
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MSLLHOOKSTRUCT
+        {
+            public POINT pt;
+            public uint mouseData;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        private void StartGlobalMouseHook()
+        {
+            if (_mouseHookHandle != IntPtr.Zero) return;
             try
             {
-                IntPtr hwnd = new WindowInteropHelper(this).Handle;
-                if (hwnd != IntPtr.Zero)
-                {
-                    long exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
-                    SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(exStyle | WS_EX_NOACTIVATE));
-
-                    var source = HwndSource.FromHwnd(hwnd);
-                    source?.AddHook(WndProc);
-                }
+                _mouseProc = HookCallback;
+                using var curProcess = System.Diagnostics.Process.GetCurrentProcess();
+                using var curModule = curProcess.MainModule;
+                IntPtr hMod = curModule != null ? GetModuleHandle(curModule.ModuleName) : IntPtr.Zero;
+                _mouseHookHandle = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc, hMod, 0);
             }
             catch { }
         }
 
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private void StopGlobalMouseHook()
         {
-            if (msg == WM_MOUSEACTIVATE)
+            if (_mouseHookHandle != IntPtr.Zero)
             {
-                // 点击侧边栏绝不抢夺前台打字窗口的键盘与焦点
-                handled = true;
-                return new IntPtr(MA_NOACTIVATE);
+                UnhookWindowsHookEx(_mouseHookHandle);
+                _mouseHookHandle = IntPtr.Zero;
+                _mouseProc = null;
             }
-            return IntPtr.Zero;
+        }
+
+        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                int msg = wParam.ToInt32();
+                if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_NCLBUTTONDOWN || msg == WM_NCRBUTTONDOWN)
+                {
+                    // 仅当侧边栏可见且为未锁定状态时进行检测
+                    if (this.IsVisible && !_isPinned)
+                    {
+                        var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                        int clickX = hookStruct.pt.x;
+                        int clickY = hookStruct.pt.y;
+
+                        IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                        if (hwnd != IntPtr.Zero && GetWindowRect(hwnd, out RECT rect))
+                        {
+                            bool inside = clickX >= rect.Left && clickX <= rect.Right && clickY >= rect.Top && clickY <= rect.Bottom;
+                            if (!inside)
+                            {
+                                // 点击落在侧边栏物理边界外部，且当前没有模态或自定义动作弹窗
+                                Dispatcher.InvokeAsync(() =>
+                                {
+                                    if (this.IsVisible && !_isPinned)
+                                    {
+                                        if (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible)
+                                        {
+                                            SlideOutAndHide();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            StopGlobalMouseHook();
+            base.OnClosed(e);
         }
 
         #endregion
@@ -143,10 +225,10 @@ namespace ClipVault.Views
             // 纯净化 Gamma 色彩，杜绝残留压暗色彩失真
             SystemControlService.ResetGammaRamp();
 
-            // 初始化系统亮度双向同步定时器 (每 800ms 检查一次 Windows 系统外部调节)
+            // 初始化系统亮度与系统主音量双向同步定时器 (每 600ms 检查一次 Windows 系统外部调节，双向无缝对齐)
             _brightnessSyncTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(800)
+                Interval = TimeSpan.FromMilliseconds(600)
             };
             _brightnessSyncTimer.Tick += (s, e) =>
             {
@@ -174,6 +256,7 @@ namespace ClipVault.Views
                                     SystemControlService.ResetGammaRamp();
                                 }
                             }
+                            if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = currentSys < 50 ? "🔅" : "🔆";
                         }
                         catch { }
                     }
@@ -192,7 +275,10 @@ namespace ClipVault.Views
                                 _isUpdatingVolumeUi = false;
                             }
                             bool isMuted = SystemControlService.GetIsMuted();
-                            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔇" : "🔊");
+                            if (TxtVolumeIcon != null)
+                            {
+                                TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔈" : (currentVol < 50 ? "🔉" : "🔊"));
+                            }
                         }
                         catch { }
                     }
@@ -213,6 +299,7 @@ namespace ClipVault.Views
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                     _isUpdatingBrightnessUi = false;
                 }
+                if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
 
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
@@ -223,7 +310,10 @@ namespace ClipVault.Views
                     _isUpdatingVolumeUi = false;
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
-                if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔇" : "🔊");
+                if (TxtVolumeIcon != null)
+                {
+                    TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔈" : (sysVol < 50 ? "🔉" : "🔊"));
+                }
             }
             catch { }
 
@@ -345,8 +435,8 @@ namespace ClipVault.Views
             if (TxtSectionCustomActions != null) TxtSectionCustomActions.Text = loc.Get("SidebarCustomActions");
             if (TxtTipRightClickDelete != null) TxtTipRightClickDelete.Text = loc.Get("SidebarRightClickDelete");
             if (TxtBtnAddAction != null) TxtBtnAddAction.Text = loc.Get("SidebarAddAction");
-            if (TxtBrightnessTitle != null) TxtBrightnessTitle.Text = "🔅 " + loc.Get("SidebarBrightness");
-            if (TxtVolumeTitle != null) TxtVolumeTitle.Text = loc.Get("SidebarVolume") + " (" + loc.Get("SidebarVolumeSync") + ")";
+            if (TxtBrightnessTitle != null) TxtBrightnessTitle.Text = loc.Get("SidebarBrightness");
+            if (TxtVolumeTitle != null) TxtVolumeTitle.Text = loc.Get("SidebarVolume");
 
             // 偏好设置页面
             if (TxtSettingsHeaderTitle != null) TxtSettingsHeaderTitle.Text = loc.Get("SidebarPreferences");
@@ -422,12 +512,8 @@ namespace ClipVault.Views
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                     _isUpdatingBrightnessUi = false;
                 }
-            }
-            catch { }
+                if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
 
-            // 同步当前系统真实主音量
-            try
-            {
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
                 {
@@ -437,11 +523,19 @@ namespace ClipVault.Views
                     _isUpdatingVolumeUi = false;
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
-                if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔇" : "🔊");
+                if (TxtVolumeIcon != null)
+                {
+                    TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔈" : (sysVol < 50 ? "🔉" : "🔊"));
+                }
             }
             catch { }
 
             _brightnessSyncTimer.Start();
+
+            if (!_isPinned)
+            {
+                StartGlobalMouseHook();
+            }
 
             this.Show();
             this.Activate();
@@ -468,6 +562,7 @@ namespace ClipVault.Views
         /// </summary>
         public void SlideOutAndHide()
         {
+            StopGlobalMouseHook();
             _brightnessSyncTimer.Stop();
 
             double currentOp = this.Opacity;
@@ -621,6 +716,18 @@ namespace ClipVault.Views
                 _settingsService.SaveSettings();
             }
             UpdatePinUiState();
+
+            if (this.IsVisible)
+            {
+                if (!_isPinned)
+                {
+                    StartGlobalMouseHook();
+                }
+                else
+                {
+                    StopGlobalMouseHook();
+                }
+            }
         }
 
         private void UpdatePinUiState()
@@ -672,6 +779,31 @@ namespace ClipVault.Views
                 {
                     TxtStatusLeft.Text = LocalizationService.Instance.Get("SidebarRecordCount", DisplayCards.Count);
                 }
+
+                // 智能空状态反馈
+                if (EmptyCardsStatePanel != null)
+                {
+                    EmptyCardsStatePanel.Visibility = DisplayCards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    if (TxtEmptyCategoryTip != null)
+                    {
+                        if (!string.IsNullOrEmpty(query))
+                        {
+                            TxtEmptyCategoryTip.Text = "未找到与搜索匹配的内容";
+                        }
+                        else
+                        {
+                            string catName = _currentCategory.ToLowerInvariant() switch
+                            {
+                                "text" => "文本",
+                                "image" => "图片",
+                                "code" => "代码",
+                                "pinned" => "置顶",
+                                _ => "全部"
+                            };
+                            TxtEmptyCategoryTip.Text = $"当前【{catName}】分类暂无记录";
+                        }
+                    }
+                }
             }
             catch { }
         }
@@ -696,6 +828,10 @@ namespace ClipVault.Views
             {
                 _currentCategory = rb.Tag.ToString() ?? "all";
                 RefreshCards();
+                if (CardsListBox != null && CardsListBox.Items.Count > 0)
+                {
+                    CardsListBox.ScrollIntoView(CardsListBox.Items[0]);
+                }
             }
         }
 
@@ -1240,6 +1376,24 @@ namespace ClipVault.Views
             int val = (int)e.NewValue;
             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{val}%";
             SystemControlService.SetBrightness(val);
+            if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = val < 50 ? "🔅" : "🔆";
+        }
+
+        private void TxtBrightnessIcon_Click(object sender, MouseButtonEventArgs e)
+        {
+            int current = SystemControlService.GetCurrentBrightness();
+            int target = current >= 90 ? 50 : 100;
+            if (SliderBrightness != null) SliderBrightness.Value = target;
+        }
+
+        private void SliderBrightness_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            int delta = e.Delta > 0 ? 5 : -5;
+            if (SliderBrightness != null)
+            {
+                SliderBrightness.Value = Math.Clamp(SliderBrightness.Value + delta, 0, 100);
+            }
+            e.Handled = true;
         }
 
         // 系统主音量真实滑动调节 (与系统双向保持一致，范围 0~100)
@@ -1249,16 +1403,32 @@ namespace ClipVault.Views
             int val = (int)e.NewValue;
             if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{val}%";
             SystemControlService.SetMasterVolume(val);
-            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = val == 0 ? "🔇" : "🔊";
+            if (TxtVolumeIcon != null)
+            {
+                TxtVolumeIcon.Text = val == 0 ? "🔇" : (val < 50 ? "🔉" : "🔊");
+            }
+        }
+
+        private void SliderVolume_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            int delta = e.Delta > 0 ? 2 : -2;
+            if (SliderVolume != null)
+            {
+                SliderVolume.Value = Math.Clamp(SliderVolume.Value + delta, 0, 100);
+            }
+            e.Handled = true;
         }
 
         private void TxtVolumeIcon_Click(object sender, MouseButtonEventArgs e)
         {
             bool isMuted = SystemControlService.ToggleMute();
-            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : "🔊";
+            int currentVol = SystemControlService.GetMasterVolume();
+            if (TxtVolumeIcon != null)
+            {
+                TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔈" : (currentVol < 50 ? "🔉" : "🔊"));
+            }
             if (!isMuted && SliderVolume != null)
             {
-                int currentVol = SystemControlService.GetMasterVolume();
                 _isUpdatingVolumeUi = true;
                 SliderVolume.Value = currentVol;
                 if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
@@ -1529,6 +1699,18 @@ namespace ClipVault.Views
             _settingsService.SaveSettings();
 
             UpdatePinUiState();
+
+            if (this.IsVisible)
+            {
+                if (!_isPinned)
+                {
+                    StartGlobalMouseHook();
+                }
+                else
+                {
+                    StopGlobalMouseHook();
+                }
+            }
         }
 
         private void ChkPasteOnDblClick_Changed(object sender, RoutedEventArgs e)

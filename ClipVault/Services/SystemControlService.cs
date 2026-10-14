@@ -316,24 +316,39 @@ namespace ClipVault.Services
             [PreserveSig] int GetVolumeRange(out float pflVolumeMindB, out float pflVolumeMaxdB, out float pflVolumeIncrementdB);
         }
 
+        private static IAudioEndpointVolume? _cachedEndpointVolume = null;
+        private static readonly object _audioLock = new object();
+
         private static IAudioEndpointVolume? GetAudioEndpointVolume()
         {
-            try
+            lock (_audioLock)
             {
-                var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
-                // eRender = 0, eMultimedia = 1
-                if (enumerator.GetDefaultAudioEndpoint(0, 1, out IMMDevice dev) == 0 && dev != null)
+                if (_cachedEndpointVolume != null)
                 {
-                    Guid iid = typeof(IAudioEndpointVolume).GUID;
-                    // CLSCTX_ALL = 23
-                    if (dev.Activate(ref iid, 23, IntPtr.Zero, out object epvObj) == 0 && epvObj is IAudioEndpointVolume epv)
+                    return _cachedEndpointVolume;
+                }
+
+                try
+                {
+                    var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+                    // eRender = 0, eMultimedia = 1
+                    if (enumerator.GetDefaultAudioEndpoint(0, 1, out IMMDevice dev) == 0 && dev != null)
                     {
-                        return epv;
+                        Guid iid = typeof(IAudioEndpointVolume).GUID;
+                        // CLSCTX_ALL = 23
+                        if (dev.Activate(ref iid, 23, IntPtr.Zero, out object epvObj) == 0 && epvObj is IAudioEndpointVolume epv)
+                        {
+                            _cachedEndpointVolume = epv;
+                            return _cachedEndpointVolume;
+                        }
                     }
                 }
+                catch 
+                {
+                    _cachedEndpointVolume = null;
+                }
+                return null;
             }
-            catch { }
-            return null;
         }
 
         /// <summary>

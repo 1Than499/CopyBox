@@ -96,7 +96,7 @@ namespace ClipVault.Services
                 ["SidebarCoreActions"] = "核心系统快捷",
                 ["SidebarCustomActions"] = "自定义快捷动作",
                 ["SidebarRightClickDelete"] = "右键可删除",
-                ["SidebarBrightness"] = "屏幕亮度 (系统双向同步)",
+                ["SidebarBrightness"] = "屏幕亮度",
                 ["SidebarVolume"] = "系统主音量",
                 ["SidebarVolumeSync"] = "系统双向同步",
                 ["PinSettingTitle"] = "图钉锁定常驻 (点击外部不自动收起)",
