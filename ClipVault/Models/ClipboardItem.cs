@@ -42,21 +42,71 @@ namespace ClipVault.Models
 
         public string FullImagePath { get; set; } = string.Empty;
 
+        /// <summary>
+        /// 具备全路径智能探测与自愈能力的图片物理路径解析器
+        /// </summary>
+        public string ResolvedImagePath
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(FullImagePath) && File.Exists(FullImagePath))
+                    return FullImagePath;
+
+                if (string.IsNullOrEmpty(Content)) return string.Empty;
+
+                if (Path.IsPathRooted(Content) && File.Exists(Content))
+                    return Content;
+
+                try
+                {
+                    string fileName = Path.GetFileName(Content);
+                    var candidates = new[]
+                    {
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClipVault", "Data"),
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Data"),
+                        AppDomain.CurrentDomain.BaseDirectory
+                    };
+
+                    foreach (var root in candidates)
+                    {
+                        string test1 = Path.Combine(root, Content);
+                        if (File.Exists(test1)) return test1;
+
+                        string test2 = Path.Combine(root, "images", fileName);
+                        if (File.Exists(test2)) return test2;
+                    }
+                }
+                catch { }
+
+                return FullImagePath;
+            }
+        }
+
         private System.Windows.Media.ImageSource? _cachedImage;
         public System.Windows.Media.ImageSource? ImagePreview
         {
             get
             {
                 if (_cachedImage != null) return _cachedImage;
-                if (!IsImage || string.IsNullOrEmpty(FullImagePath) || !File.Exists(FullImagePath)) return null;
+                if (!IsImage) return null;
+
+                string imgPath = ResolvedImagePath;
+                if (string.IsNullOrEmpty(imgPath) || !File.Exists(imgPath)) return null;
+
                 try
                 {
+                    // 使用非排他 FileShare.ReadWrite 读取内存流，彻底杜绝文件锁死并提升加载性能
+                    using var fs = new FileStream(imgPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    var ms = new MemoryStream();
+                    fs.CopyTo(ms);
+                    ms.Position = 0;
+
                     var bmp = new System.Windows.Media.Imaging.BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bmp.UriSource = new Uri(FullImagePath, UriKind.Absolute);
+                    bmp.StreamSource = ms;
                     bmp.EndInit();
-                    bmp.Freeze();
+                    bmp.Freeze(); // 允许跨线程安全访问与极速渲染
                     _cachedImage = bmp;
                     return _cachedImage;
                 }

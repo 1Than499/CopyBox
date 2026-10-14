@@ -41,6 +41,7 @@ namespace ClipVault.Views
 
         private string _previousView = "Clipboard";
         private bool _isUpdatingBrightnessUi = false;
+        private bool _isUpdatingVolumeUi = false;
         private bool _isInternalSettingUpdate = false;
 
         #region Win32 无焦点点击黑科技 (杀手级功能 2：WS_EX_NOACTIVATE)
@@ -149,37 +150,59 @@ namespace ClipVault.Views
             };
             _brightnessSyncTimer.Tick += (s, e) =>
             {
-                if (this.IsVisible && SystemActionsPanel.Visibility == Visibility.Visible && !_isUpdatingBrightnessUi)
+                if (this.IsVisible && SystemActionsPanel.Visibility == Visibility.Visible)
                 {
-                    try
+                    // 1. 同步系统屏幕真实亮度
+                    if (!_isUpdatingBrightnessUi)
                     {
-                        int currentSys = SystemControlService.GetCurrentBrightness();
-                        if (Math.Abs(currentSys - (int)SliderBrightness.Value) >= 1)
+                        try
                         {
-                            _isUpdatingBrightnessUi = true;
-                            SliderBrightness.Value = currentSys;
-                            if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
-                            _isUpdatingBrightnessUi = false;
+                            int currentSys = SystemControlService.GetCurrentBrightness();
+                            if (Math.Abs(currentSys - (int)SliderBrightness.Value) >= 1)
+                            {
+                                _isUpdatingBrightnessUi = true;
+                                SliderBrightness.Value = currentSys;
+                                if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
+                                _isUpdatingBrightnessUi = false;
 
-                            // 若无硬件背光驱动，才回退到 Gamma；若有硬件背光，保持纯正线性 Gamma，物理背光由 Windows 控制
-                            if (!SystemControlService.HasHardwareSupport)
-                            {
-                                SystemControlService.ApplyVisualBrightness(currentSys);
-                            }
-                            else
-                            {
-                                SystemControlService.ResetGammaRamp();
+                                if (!SystemControlService.HasHardwareSupport)
+                                {
+                                    SystemControlService.ApplyVisualBrightness(currentSys);
+                                }
+                                else
+                                {
+                                    SystemControlService.ResetGammaRamp();
+                                }
                             }
                         }
+                        catch { }
                     }
-                    catch { }
+
+                    // 2. 同步系统真实主音量
+                    if (!_isUpdatingVolumeUi)
+                    {
+                        try
+                        {
+                            int currentVol = SystemControlService.GetMasterVolume();
+                            if (SliderVolume != null && Math.Abs(currentVol - (int)SliderVolume.Value) >= 1)
+                            {
+                                _isUpdatingVolumeUi = true;
+                                SliderVolume.Value = currentVol;
+                                if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
+                                _isUpdatingVolumeUi = false;
+                            }
+                            bool isMuted = SystemControlService.GetIsMuted();
+                            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔇" : "🔊");
+                        }
+                        catch { }
+                    }
                 }
             };
 
             // 加载自定义动作磁贴
             RefreshCustomActions();
 
-            // 实时同步当前系统屏幕真实亮度
+            // 实时同步当前系统屏幕真实亮度与系统真实主音量
             try
             {
                 int sysBrightness = SystemControlService.GetCurrentBrightness();
@@ -190,6 +213,17 @@ namespace ClipVault.Views
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                     _isUpdatingBrightnessUi = false;
                 }
+
+                int sysVol = SystemControlService.GetMasterVolume();
+                if (SliderVolume != null)
+                {
+                    _isUpdatingVolumeUi = true;
+                    SliderVolume.Value = sysVol;
+                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
+                    _isUpdatingVolumeUi = false;
+                }
+                bool isMuted = SystemControlService.GetIsMuted();
+                if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔇" : "🔊");
             }
             catch { }
 
@@ -312,10 +346,7 @@ namespace ClipVault.Views
             if (TxtTipRightClickDelete != null) TxtTipRightClickDelete.Text = loc.Get("SidebarRightClickDelete");
             if (TxtBtnAddAction != null) TxtBtnAddAction.Text = loc.Get("SidebarAddAction");
             if (TxtBrightnessTitle != null) TxtBrightnessTitle.Text = "🔅 " + loc.Get("SidebarBrightness");
-            if (TxtVolumeTitle != null) TxtVolumeTitle.Text = "🔊 " + loc.Get("SidebarVolume");
-            if (BtnVolDown != null) BtnVolDown.Content = loc.Get("SidebarVolDown");
-            if (BtnVolMute != null) BtnVolMute.Content = loc.Get("SidebarVolMute");
-            if (BtnVolUp != null) BtnVolUp.Content = loc.Get("SidebarVolUp");
+            if (TxtVolumeTitle != null) TxtVolumeTitle.Text = loc.Get("SidebarVolume") + " (" + loc.Get("SidebarVolumeSync") + ")";
 
             // 偏好设置页面
             if (TxtSettingsHeaderTitle != null) TxtSettingsHeaderTitle.Text = loc.Get("SidebarPreferences");
@@ -332,7 +363,11 @@ namespace ClipVault.Views
             if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
             if (TxtSetInteractionTitle != null) TxtSetInteractionTitle.Text = loc.Get("DoubleClickTitle");
-            if (ChkHideOnDeactivate2 != null) ChkHideOnDeactivate2.Content = loc.Get("DeactivateTitle");
+            if (ChkHideOnDeactivate2 != null)
+            {
+                ChkHideOnDeactivate2.Content = "📌 " + loc.Get("PinSettingTitle");
+                ChkHideOnDeactivate2.ToolTip = loc.Get("PinSettingTooltip");
+            }
             if (ChkPasteOnDblClick != null) ChkPasteOnDblClick.Content = loc.Get("DoubleClickPaste");
             if (BtnClearHistory != null) BtnClearHistory.Content = loc.Get("TrayClear");
             if (BtnExitApp != null) BtnExitApp.Content = loc.Get("BtnExitApp");
@@ -369,6 +404,13 @@ namespace ClipVault.Views
             UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
 
+            // 实时校准图钉状态与设置项保持绝对一致
+            if (_settingsService != null)
+            {
+                _isPinned = !_settingsService.CurrentSettings.HideOnDeactivate;
+                UpdatePinUiState();
+            }
+
             // 同步当前系统真实亮度
             try
             {
@@ -383,13 +425,29 @@ namespace ClipVault.Views
             }
             catch { }
 
+            // 同步当前系统真实主音量
+            try
+            {
+                int sysVol = SystemControlService.GetMasterVolume();
+                if (SliderVolume != null)
+                {
+                    _isUpdatingVolumeUi = true;
+                    SliderVolume.Value = sysVol;
+                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
+                    _isUpdatingVolumeUi = false;
+                }
+                bool isMuted = SystemControlService.GetIsMuted();
+                if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔇" : "🔊");
+            }
+            catch { }
+
             _brightnessSyncTimer.Start();
 
             this.Show();
             this.Activate();
 
             // 顺畅渐变显现，动画完成后解除时钟绑定，使滑块手动调节实时生效
-            double finalOpacity = Math.Max(0.08, _settingsService.CurrentSettings.WindowOpacity);
+            double finalOpacity = Math.Max(0.08, _settingsService?.CurrentSettings?.WindowOpacity ?? 1.0);
             this.Opacity = 0;
             var anim = new DoubleAnimation(0, finalOpacity, TimeSpan.FromMilliseconds(200));
             anim.Completed += (s, e) =>
@@ -573,7 +631,7 @@ namespace ClipVault.Views
             if (ChkHideOnDeactivate2 != null)
             {
                 _isInternalSettingUpdate = true;
-                ChkHideOnDeactivate2.IsChecked = !_isPinned;
+                ChkHideOnDeactivate2.IsChecked = _isPinned;
                 _isInternalSettingUpdate = false;
             }
         }
@@ -1184,10 +1242,29 @@ namespace ClipVault.Views
             SystemControlService.SetBrightness(val);
         }
 
-        // 系统音量调节
-        private void BtnVolDown_Click(object sender, RoutedEventArgs e) => SystemControlService.VolumeDown();
-        private void BtnVolMute_Click(object sender, RoutedEventArgs e) => SystemControlService.VolumeMute();
-        private void BtnVolUp_Click(object sender, RoutedEventArgs e) => SystemControlService.VolumeUp();
+        // 系统主音量真实滑动调节 (与系统双向保持一致，范围 0~100)
+        private void SliderVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isUpdatingVolumeUi) return;
+            int val = (int)e.NewValue;
+            if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{val}%";
+            SystemControlService.SetMasterVolume(val);
+            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = val == 0 ? "🔇" : "🔊";
+        }
+
+        private void TxtVolumeIcon_Click(object sender, MouseButtonEventArgs e)
+        {
+            bool isMuted = SystemControlService.ToggleMute();
+            if (TxtVolumeIcon != null) TxtVolumeIcon.Text = isMuted ? "🔇" : "🔊";
+            if (!isMuted && SliderVolume != null)
+            {
+                int currentVol = SystemControlService.GetMasterVolume();
+                _isUpdatingVolumeUi = true;
+                SliderVolume.Value = currentVol;
+                if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
+                _isUpdatingVolumeUi = false;
+            }
+        }
 
         #endregion
 
@@ -1225,8 +1302,8 @@ namespace ClipVault.Views
 
             var template = new ControlTemplate(typeof(Button));
             var borderFactory = new FrameworkElementFactory(typeof(Border));
-            borderFactory.SetValue(Border.BackgroundProperty, (SolidColorBrush)FindResource("TileBgBrush"));
-            borderFactory.SetValue(Border.BorderBrushProperty, (SolidColorBrush)FindResource("CardBorderBrush"));
+            borderFactory.SetResourceReference(Border.BackgroundProperty, "TileBgBrush");
+            borderFactory.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
             borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
             borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
 
@@ -1237,13 +1314,14 @@ namespace ClipVault.Views
             var iconTxt = new FrameworkElementFactory(typeof(TextBlock));
             iconTxt.SetValue(TextBlock.TextProperty, string.IsNullOrEmpty(action.Icon) ? "🚀" : action.Icon);
             iconTxt.SetValue(TextBlock.FontSizeProperty, 16.0);
+            iconTxt.SetResourceReference(TextBlock.ForegroundProperty, "AccentBlueBrush");
             iconTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
 
             var nameTxt = new FrameworkElementFactory(typeof(TextBlock));
             nameTxt.SetValue(TextBlock.TextProperty, action.Name);
             nameTxt.SetValue(TextBlock.FontSizeProperty, 10.5);
             nameTxt.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
-            nameTxt.SetValue(TextBlock.ForegroundProperty, (SolidColorBrush)FindResource("TextPrimaryBrush"));
+            nameTxt.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
             nameTxt.SetValue(TextBlock.MarginProperty, new Thickness(0, 3, 0, 0));
             nameTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             nameTxt.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
@@ -1445,11 +1523,11 @@ namespace ClipVault.Views
         private void ChkHideOnDeactivate_Changed(object sender, RoutedEventArgs e)
         {
             if (_isInternalSettingUpdate || _settingsService == null || ChkHideOnDeactivate2 == null) return;
-            bool hide = ChkHideOnDeactivate2.IsChecked == true;
-            _settingsService.CurrentSettings.HideOnDeactivate = hide;
+            bool isPinned = ChkHideOnDeactivate2.IsChecked == true;
+            _isPinned = isPinned;
+            _settingsService.CurrentSettings.HideOnDeactivate = !_isPinned;
             _settingsService.SaveSettings();
 
-            _isPinned = !hide;
             UpdatePinUiState();
         }
 

@@ -266,6 +266,159 @@ namespace ClipVault.Services
             keybd_event(VK_VOLUME_MUTE, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
+        #region Windows 原生 CoreAudio 主音量高精度调度 (IAudioEndpointVolume)
+
+        [ComImport]
+        [Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+        private class MMDeviceEnumeratorComObject { }
+
+        [ComImport]
+        [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IMMDeviceEnumerator
+        {
+            [PreserveSig]
+            int EnumAudioEndpoints(int dataFlow, int dwStateMask, out IntPtr ppDevices);
+
+            [PreserveSig]
+            int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppEndpoint);
+        }
+
+        [ComImport]
+        [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IMMDevice
+        {
+            [PreserveSig]
+            int Activate(ref Guid iid, uint dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+        }
+
+        [ComImport]
+
+        [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IAudioEndpointVolume
+        {
+            [PreserveSig] int RegisterControlChangeNotify(IntPtr pNotify);
+            [PreserveSig] int UnregisterControlChangeNotify(IntPtr pNotify);
+            [PreserveSig] int GetChannelCount(out uint pnChannelCount);
+            [PreserveSig] int SetMasterVolumeLevel(float fLevelDB, ref Guid pguidEventContext);
+            [PreserveSig] int SetMasterVolumeLevelScalar(float fLevel, ref Guid pguidEventContext);
+            [PreserveSig] int GetMasterVolumeLevel(out float pfLevelDB);
+            [PreserveSig] int GetMasterVolumeLevelScalar(out float pfLevel);
+            [PreserveSig] int SetChannelVolumeLevel(uint nChannel, float fLevelDB, ref Guid pguidEventContext);
+            [PreserveSig] int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, ref Guid pguidEventContext);
+            [PreserveSig] int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
+            [PreserveSig] int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
+            [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, ref Guid pguidEventContext);
+            [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool pbMute);
+            [PreserveSig] int GetVolumeStepInfo(out uint pnStep, out uint pnStepCount);
+            [PreserveSig] int VolumeStepUp(ref Guid pguidEventContext);
+            [PreserveSig] int VolumeStepDown(ref Guid pguidEventContext);
+            [PreserveSig] int QueryHardwareSupport(out uint pdwHardwareSupportMask);
+            [PreserveSig] int GetVolumeRange(out float pflVolumeMindB, out float pflVolumeMaxdB, out float pflVolumeIncrementdB);
+        }
+
+        private static IAudioEndpointVolume? GetAudioEndpointVolume()
+        {
+            try
+            {
+                var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+                // eRender = 0, eMultimedia = 1
+                if (enumerator.GetDefaultAudioEndpoint(0, 1, out IMMDevice dev) == 0 && dev != null)
+                {
+                    Guid iid = typeof(IAudioEndpointVolume).GUID;
+                    // CLSCTX_ALL = 23
+                    if (dev.Activate(ref iid, 23, IntPtr.Zero, out object epvObj) == 0 && epvObj is IAudioEndpointVolume epv)
+                    {
+                        return epv;
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// 实时获取 Windows 系统主音量 (0 ~ 100)
+        /// </summary>
+        public static int GetMasterVolume()
+        {
+            try
+            {
+                var epv = GetAudioEndpointVolume();
+                if (epv != null)
+                {
+                    if (epv.GetMasterVolumeLevelScalar(out float level) == 0)
+                    {
+                        return (int)Math.Clamp(Math.Round(level * 100f), 0, 100);
+                    }
+                }
+            }
+            catch { }
+            return 50;
+        }
+
+        /// <summary>
+        /// 毫秒级调节 Windows 系统真实主音量 (0 ~ 100)
+        /// </summary>
+        public static void SetMasterVolume(int volume)
+        {
+            try
+            {
+                var epv = GetAudioEndpointVolume();
+                if (epv != null)
+                {
+                    float level = Math.Clamp(volume, 0, 100) / 100.0f;
+                    Guid empty = Guid.Empty;
+                    epv.SetMasterVolumeLevelScalar(level, ref empty);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 获取当前主音量静音状态
+        /// </summary>
+        public static bool GetIsMuted()
+        {
+            try
+            {
+                var epv = GetAudioEndpointVolume();
+                if (epv != null)
+                {
+                    if (epv.GetMute(out bool isMuted) == 0)
+                    {
+                        return isMuted;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// 切换系统静音状态
+        /// </summary>
+        public static bool ToggleMute()
+        {
+            try
+            {
+                var epv = GetAudioEndpointVolume();
+                if (epv != null)
+                {
+                    if (epv.GetMute(out bool isMuted) == 0)
+                    {
+                        Guid empty = Guid.Empty;
+                        epv.SetMute(!isMuted, ref empty);
+                        return !isMuted;
+                    }
+                }
+            }
+            catch { }
+            VolumeMute();
+            return false;
+        }
+
+        #endregion
+
         #endregion
 
         #region Windows 原生面板联动 (WiFi / 蓝牙 / 系统设置)

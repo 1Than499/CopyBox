@@ -716,37 +716,42 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- 卡片主体内容 -->
-                                    <Grid Grid.Row="1" Margin="0,0,0,5">
-                                        <!-- 1. 普通文本内容预览 -->
-                                        <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
-                                                   TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis" LineHeight="16"
-                                                   Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
-
-                                        <!-- 2. 代码高亮块 (主题色自适应) -->
-                                        <Border Background="{DynamicResource CodeBoxBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="5" Padding="6"
-                                                Visibility="{Binding IsCode, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="{Binding Content}" FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11" 
-                                                       Foreground="{DynamicResource CodeTextBrush}" TextWrapping="Wrap" MaxHeight="70" TextTrimming="CharacterEllipsis"/>
+                                    <!-- 卡片主体内容 (文本/代码/图片严格物理隔离与尺寸限制，彻底杜绝重叠穿透) -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,8">
+                                        <!-- 1. 普通文本内容预览 (严格限制在 IsText 时显现，最大高度截断并带省略号) -->
+                                        <Border Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" ClipToBounds="True">
+                                            <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
+                                                       TextWrapping="Wrap" MaxHeight="52" TextTrimming="CharacterEllipsis"/>
                                         </Border>
 
-                                        <!-- 3. 图片缩略图 -->
-                                        <Border Height="64" CornerRadius="5" Background="{DynamicResource CodeBoxBgBrush}" 
-                                                Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}">
-                                            <Image Source="{Binding ImagePreview}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <!-- 2. 代码高亮块 (主题色自适应，严格在 IsCode 时显现) -->
+                                        <Border Background="{DynamicResource CodeBoxBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" 
+                                                BorderThickness="1" CornerRadius="5" Padding="6,4"
+                                                Visibility="{Binding IsCode, Converter={StaticResource BoolToVis}}" ClipToBounds="True">
+                                            <TextBlock Text="{Binding Content}" FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11" 
+                                                       Foreground="{DynamicResource CodeTextBrush}" TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"/>
+                                        </Border>
+
+                                        <!-- 3. 图片缩略图 (严格在 IsImage 时显现，高清平滑渲染) -->
+                                        <Border MaxHeight="85" CornerRadius="6" Background="{DynamicResource CodeBoxBgBrush}" 
+                                                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="4"
+                                                Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Center" ClipToBounds="True">
+                                            <Image Source="{Binding ImagePreview}" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
                                         </Border>
                                     </Grid>
 
-                                    <!-- 卡片底栏操作小按钮 (置顶/进队列/复制/删除) -->
-                                    <Grid Grid.Row="2" Margin="0,2,0,0">
-                                        <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <!-- 卡片底栏操作小按钮 (置顶/进队列/复制/删除，独立排版，绝对不与内容冲突) -->
+                                    <DockPanel Grid.Row="2" LastChildFill="True" MinHeight="22" VerticalAlignment="Center">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
                                             <Button Content="⮑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardEnqueue_Click" ToolTip="加入连续粘贴队列"/>
                                             <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
                                             <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
                                         </StackPanel>
-                                    </Grid>
+                                        <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" 
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                                    </DockPanel>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -917,16 +922,19 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 5. 系统音量快捷调节 -->
+                        <!-- 5. 统一的系统主音量真实滑动调节 (与系统双向保持一致，范围 0~100) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
-                            <DockPanel>
-                                <TextBlock x:Name="TxtVolumeTitle" Text="🔊 系统主音量" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button x:Name="BtnVolDown" Content="🔉 减小" Style="{StaticResource ActionCenterTileStyle}" Height="30" Padding="10,2" Margin="2,0" FontSize="11" Click="BtnVolDown_Click"/>
-                                    <Button x:Name="BtnVolMute" Content="🔇 静音" Style="{StaticResource ActionCenterTileStyle}" Height="30" Padding="10,2" Margin="2,0" FontSize="11" Click="BtnVolMute_Click"/>
-                                    <Button x:Name="BtnVolUp" Content="🔊 增大" Style="{StaticResource ActionCenterTileStyle}" Height="30" Padding="10,2" Margin="2,0" FontSize="11" Click="BtnVolUp_Click"/>
-                                </StackPanel>
-                            </DockPanel>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtVolumeIcon" Text="🔊" FontSize="11.5" Margin="0,0,4,0" Cursor="Hand" ToolTip="点击切换静音" PreviewMouseLeftButtonUp="TxtVolumeIcon_Click"/>
+                                        <TextBlock x:Name="TxtVolumeTitle" Text="系统主音量 (系统双向同步)" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="TxtVolumeValue" DockPanel.Dock="Right" Text="50%" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
+                                </DockPanel>
+                                <Slider x:Name="SliderVolume" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="50" SmallChange="2" LargeChange="10"
+                                        ValueChanged="SliderVolume_ValueChanged"/>
+                            </StackPanel>
                         </Border>
 
                     </StackPanel>
@@ -987,7 +995,7 @@
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock x:Name="TxtSetInteractionTitle" Text="⚡ 交互细节" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
-                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="点击窗口外部时自动收起" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="📌 图钉锁定常驻 (点击外部不自动收起)" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="勾选：图钉锁定常驻，外部操作不收起；未勾选：失焦自动贴边收起"/>
                                 <CheckBox x:Name="ChkPasteOnDblClick" Content="双击直接模拟粘贴并收起" Checked="ChkPasteOnDblClick_Changed" Unchecked="ChkPasteOnDblClick_Changed" Foreground="{DynamicResource TextPrimaryBrush}"/>
                             </StackPanel>
                         </Border>
