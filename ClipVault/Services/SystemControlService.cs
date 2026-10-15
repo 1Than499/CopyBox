@@ -351,6 +351,8 @@ namespace ClipVault.Services
             }
         }
 
+        private static int _lastKnownMasterVolume = -1;
+
         /// <summary>
         /// 实时获取 Windows 系统主音量 (0 ~ 100)
         /// </summary>
@@ -361,14 +363,33 @@ namespace ClipVault.Services
                 var epv = GetAudioEndpointVolume();
                 if (epv != null)
                 {
-                    if (epv.GetMasterVolumeLevelScalar(out float level) == 0)
+                    int hr = epv.GetMasterVolumeLevelScalar(out float level);
+                    if (hr == 0)
                     {
-                        return (int)Math.Clamp(Math.Round(level * 100f), 0, 100);
+                        int vol = (int)Math.Clamp(Math.Round(level * 100f), 0, 100);
+                        _lastKnownMasterVolume = vol;
+                        return vol;
+                    }
+                    else
+                    {
+                        // 接口句柄失效，清空缓存并重试一次
+                        _cachedEndpointVolume = null;
+                        var retryEpv = GetAudioEndpointVolume();
+                        if (retryEpv != null && retryEpv.GetMasterVolumeLevelScalar(out float retryLevel) == 0)
+                        {
+                            int vol = (int)Math.Clamp(Math.Round(retryLevel * 100f), 0, 100);
+                            _lastKnownMasterVolume = vol;
+                            return vol;
+                        }
                     }
                 }
             }
-            catch { }
-            return 50;
+            catch 
+            {
+                _cachedEndpointVolume = null;
+            }
+
+            return _lastKnownMasterVolume >= 0 ? _lastKnownMasterVolume : 50;
         }
 
         /// <summary>

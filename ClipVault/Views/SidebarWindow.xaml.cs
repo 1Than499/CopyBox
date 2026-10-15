@@ -40,8 +40,8 @@ namespace ClipVault.Views
         private ClipboardItem? _draggedItem;
 
         private string _previousView = "Clipboard";
-        private bool _isUpdatingBrightnessUi = false;
-        private bool _isUpdatingVolumeUi = false;
+        private bool _isUpdatingBrightnessUi = true;
+        private bool _isUpdatingVolumeUi = true;
         private bool _isInternalSettingUpdate = false;
 
         #region 全局外部点击监听与智能失焦收起 (图钉锁定/解锁即刻生效核心引擎)
@@ -242,10 +242,16 @@ namespace ClipVault.Views
                             int currentSys = SystemControlService.GetCurrentBrightness();
                             if (Math.Abs(currentSys - (int)SliderBrightness.Value) >= 1)
                             {
-                                _isUpdatingBrightnessUi = true;
-                                SliderBrightness.Value = currentSys;
-                                if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
-                                _isUpdatingBrightnessUi = false;
+                                try
+                                {
+                                    _isUpdatingBrightnessUi = true;
+                                    SliderBrightness.Value = currentSys;
+                                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
+                                }
+                                finally
+                                {
+                                    _isUpdatingBrightnessUi = false;
+                                }
 
                                 if (!SystemControlService.HasHardwareSupport)
                                 {
@@ -269,10 +275,16 @@ namespace ClipVault.Views
                             int currentVol = SystemControlService.GetMasterVolume();
                             if (SliderVolume != null && Math.Abs(currentVol - (int)SliderVolume.Value) >= 1)
                             {
-                                _isUpdatingVolumeUi = true;
-                                SliderVolume.Value = currentVol;
-                                if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
-                                _isUpdatingVolumeUi = false;
+                                try
+                                {
+                                    _isUpdatingVolumeUi = true;
+                                    SliderVolume.Value = currentVol;
+                                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
+                                }
+                                finally
+                                {
+                                    _isUpdatingVolumeUi = false;
+                                }
                             }
                             bool isMuted = SystemControlService.GetIsMuted();
                             if (TxtVolumeIcon != null)
@@ -288,26 +300,25 @@ namespace ClipVault.Views
             // 加载自定义动作磁贴
             RefreshCustomActions();
 
-            // 实时同步当前系统屏幕真实亮度与系统真实主音量
+            // 实时同步当前系统屏幕真实亮度与系统真实主音量 (首次启动 100% 贴合系统当前真实值)
             try
             {
+                _isUpdatingBrightnessUi = true;
+                _isUpdatingVolumeUi = true;
+
                 int sysBrightness = SystemControlService.GetCurrentBrightness();
                 if (SliderBrightness != null)
                 {
-                    _isUpdatingBrightnessUi = true;
                     SliderBrightness.Value = sysBrightness;
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
-                    _isUpdatingBrightnessUi = false;
                 }
                 if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
 
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
                 {
-                    _isUpdatingVolumeUi = true;
                     SliderVolume.Value = sysVol;
                     if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
-                    _isUpdatingVolumeUi = false;
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
                 if (TxtVolumeIcon != null)
@@ -316,6 +327,11 @@ namespace ClipVault.Views
                 }
             }
             catch { }
+            finally
+            {
+                _isUpdatingBrightnessUi = false;
+                _isUpdatingVolumeUi = false;
+            }
 
             // 恢复随手记轻量便签内容 (杀手级功能 4)
             try
@@ -501,26 +517,25 @@ namespace ClipVault.Views
                 UpdatePinUiState();
             }
 
-            // 同步当前系统真实亮度
+            // 同步当前系统真实亮度与主音量
             try
             {
+                _isUpdatingBrightnessUi = true;
+                _isUpdatingVolumeUi = true;
+
                 int sysBrightness = SystemControlService.GetCurrentBrightness();
                 if (SliderBrightness != null)
                 {
-                    _isUpdatingBrightnessUi = true;
                     SliderBrightness.Value = sysBrightness;
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
-                    _isUpdatingBrightnessUi = false;
                 }
                 if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
 
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
                 {
-                    _isUpdatingVolumeUi = true;
                     SliderVolume.Value = sysVol;
                     if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
-                    _isUpdatingVolumeUi = false;
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
                 if (TxtVolumeIcon != null)
@@ -529,6 +544,11 @@ namespace ClipVault.Views
                 }
             }
             catch { }
+            finally
+            {
+                _isUpdatingBrightnessUi = false;
+                _isUpdatingVolumeUi = false;
+            }
 
             _brightnessSyncTimer.Start();
 

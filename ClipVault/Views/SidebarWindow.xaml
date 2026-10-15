@@ -926,9 +926,9 @@
                                         <TextBlock x:Name="TxtBrightnessIcon" Text="🔆" FontSize="12" Margin="0,0,6,0" Cursor="Hand" ToolTip="点击快捷切换 50% / 100% 亮度" PreviewMouseLeftButtonUp="TxtBrightnessIcon_Click"/>
                                         <TextBlock x:Name="TxtBrightnessTitle" Text="屏幕亮度" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="100%" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
+                                    <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="--" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
                                 </DockPanel>
-                                <Slider x:Name="SliderBrightness" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="100" SmallChange="2" LargeChange="10"
+                                <Slider x:Name="SliderBrightness" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" SmallChange="2" LargeChange="10"
                                         ValueChanged="SliderBrightness_ValueChanged" PreviewMouseWheel="SliderBrightness_MouseWheel" Margin="0,0,0,10"/>
 
                                 <!-- 分割微线 -->
@@ -940,9 +940,9 @@
                                         <TextBlock x:Name="TxtVolumeIcon" Text="🔊" FontSize="12" Margin="0,0,6,0" Cursor="Hand" ToolTip="点击切换静音" PreviewMouseLeftButtonUp="TxtVolumeIcon_Click"/>
                                         <TextBlock x:Name="TxtVolumeTitle" Text="系统主音量" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="TxtVolumeValue" DockPanel.Dock="Right" Text="50%" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
+                                    <TextBlock x:Name="TxtVolumeValue" DockPanel.Dock="Right" Text="--" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
                                 </DockPanel>
-                                <Slider x:Name="SliderVolume" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="50" SmallChange="2" LargeChange="10"
+                                <Slider x:Name="SliderVolume" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" SmallChange="2" LargeChange="10"
                                         ValueChanged="SliderVolume_ValueChanged" PreviewMouseWheel="SliderVolume_MouseWheel"/>
                             </StackPanel>
                         </Border>
