@@ -487,11 +487,11 @@ namespace ClipVault.Views
                     this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
                     this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
-                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
                     this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
@@ -702,8 +702,6 @@ namespace ClipVault.Views
             if (RadioLangZh2 != null) RadioLangZh2.Content = loc.Get("LangZh");
             if (RadioLangEn2 != null) RadioLangEn2.Content = loc.Get("LangEn");
             if (TxtSetThemeTitle != null) TxtSetThemeTitle.Text = loc.Get("AppearanceTitle");
-            if (RadioThemeDark2 != null) RadioThemeDark2.Content = loc.Get("ThemeDark");
-            if (RadioThemeLight2 != null) RadioThemeLight2.Content = loc.Get("ThemeLight");
             if (TxtSetOpacityTitle != null) TxtSetOpacityTitle.Text = loc.Get("OpacityLabel");
             if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
