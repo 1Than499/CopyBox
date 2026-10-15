@@ -1,64 +1,101 @@
 <div align="center">
 
-# CopyBox 📦
+# CopyBox 📦 v2.0
 
-**面向 Windows 10 / 11 的现代化、100% 纯本地离线、隐私优先剪贴板管理器。**  
-*A blazingly fast, privacy-first, 100% local clipboard manager for Windows 10/11 built with modern .NET 8 & Fluent Design.*
+**面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
+*A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
+[![Release](https://img.shields.io/badge/Release-v2.0.0-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **简体中文** ](#-简体中文) | [ **English** ](#-english)
+[ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
 
 ---
 
 <p align="center">
-  <img src="assets/preview.png" alt="CopyBox Preview" width="560" />
+  <img src="assets/v2_clipboard.png" alt="CopyBox v2.0 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v2_dashboard.png" alt="CopyBox v2.0 快捷看板" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+</p>
+<p align="center">
+  <em>左图：v2.0 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.0 快捷看板（音乐播放控制、系统快捷、自定义动作、屏幕亮度/音量调节）</em>
 </p>
 
 ---
 
 # 🇨🇳 简体中文
 
-## 🌟 为什么选择 CopyBox？
+## 🌟 为什么选择 CopyBox 2.0？
 
-Windows 自带的剪贴板历史经常在关键时刻呼出迟缓、图片加载卡顿、缺少快速搜索和常用内容置顶功能；而市面上许多第三方剪贴板工具要么体积庞大（基于 Electron 动辄占用 200MB+ 内存），要么强制捆绑云端同步，让密码、Token、代码凭证等高敏感数据面临泄露风险。
+在日常使用 Windows 时，自带的剪贴板历史经常呼出迟缓、图片加载卡顿、缺少快速搜索和常用内容置顶功能；而市面上大多数第三方剪贴板工具不仅体积臃肿（基于 Electron 动辄占用几百兆内存），甚至强制捆绑云端同步，让密码、API Token、私信记录等极度敏感的数据面临泄露风险。
 
-**CopyBox 的设计初衷：**
-1. **绝对隐私，100% 本地离线**：不发起任何网络请求、不收集任何遥测数据，所有剪贴板记录物理留存于用户本地磁盘。
-2. **用户自选保存路径**：你可以自由指定本地存储位置。将路径设置为你的 **OneDrive / Dropbox / 坚果云** 目录，即可零门槛享受私有且安全的跨端同步！
-3. **原生 Windows 11/10 现代美学**：1:1 还原 Fluent 现代卡片设计，双列卡片布局、自适应明亮与暗黑主题、精致微阴影。
-4. **毫秒级弹出与全键盘流**：微型低占用常驻进程，按下 `Alt + V` 瞬间唤醒，支持数字键 `1~9` 直接秒贴。
-5. **完整双语国际化支持**：原生内置简体中文与 English，界面、设置与提示无缝即时切换。
+**CopyBox 2.0 破局而生**，它不仅是一个极速轻量的离线剪贴板，更进化为 Windows 桌面右侧优雅的 **多合一生产力抽屉**：
+1. **绝对隐私，100% 纯本地离线**：不发起任何网络请求、不收集任何用户遥测，所有历史数据物理留存在用户本地磁盘；
+2. **自由指定本地路径，零成本私有云同步**：支持将数据目录自由绑定到你的 **OneDrive / Dropbox / 坚果云** 目录，无需依赖第三方云服务即可安全多端同步；
+3. **全新贴边毛玻璃抽屉与经典居中双模无缝切换**：屏幕右侧边缘亚克力智能抽屉（支持失焦即收与图钉常驻），也可在设置中随时切换回经典居中卡片面板；
+4. **双重视图架构**：集成 `[ 📋 剪贴板中心 ]` 与 `[ ⚡ 快捷看板 ]` 药丸切换，办公提效与系统控制触手可及；
+5. **极速性能与刀锋级画质**：原生 .NET 8 + WPF 渲染引擎，冷启动飞快，常驻内存极低，毫秒级响应。
 
 ---
 
-## ✨ 核心特性
+## ✨ 核心特性一览
 
-- **🗂️ 1:1 现代双列卡片排版**：
-  - **代码片段**：内置 Cascadia Code / Consolas 语法高亮卡片质感，自动识别 JSON 与各类程序语言。
-  - **图片预览**：圆角缩略图自适应显示，截图高清无缝预览。
-  - **纯文本**：优雅段落排版与来源程序低调标识。
-- **🖱️ 丝滑便捷的交互体验**：
-  - **右键上下文菜单**：在任意卡片上右键单击即可立即高亮选中，并在光标处呼出功能菜单。
-  - **右上角快捷操作**：与卡片右上角“···”按钮功能 100% 同步，向左内收展开，完美贴合卡片。
-  - **核心操作三合一**：
-    - `★` **置顶 / 取消置顶**：暖金星号高亮，置顶卡片始终优先排列在顶部。
-    - `❐` **复制到剪贴板**：一键写入系统剪贴板，带有智能防循环过滤与轻量 Toast 提示。
-    - `✕` **删除此条记录**：从本地 SQLite 数据库中物理删除。
-- **⚙️ 规整且可独立拖拽的设置面板**：
-  - **窗口内自由拖拽**：按住设置面板标题栏抓手，即可在主窗口内部自由移动，内置智能边界算法，绝不超出窗口可视边缘。
-  - **三层式固定架构**：固顶拖拽栏 + 中间紧凑滚动区 + 固底操作栏，“完成”与“彻底退出”按钮永远可见，绝不被截断。
-  - **刀锋级高清文本渲染**：分离阴影层与内容层，彻底消除 WPF Shader 造成的文字发虚发糊，文字享受原生 ClearType 亚像素级超清显示。
-- **🌐 深度国际化 (i18n)**：
-  - 完美适配 `简体中文` 与 `English`，支持在设置面板中实时一键切换。
-- **💾 高性能本地引擎**：
-  - 采用 **SQLite + WAL 并发日志模式**，高频复制写入时悬浮窗零卡顿、零锁死。
-  - 图片与数据库分治存储：数据库仅存元数据与哈希索引，图片独立存放，轻盈且检索飞快。
+### 1. 🗂️ 剪贴板中心 (Clipboard Center)
+- **智能内容格式化呈现**：
+  - **代码片段**：自动识别 JSON、各类编程语言，采用代码高亮卡片排版；
+  - **图片与截图**：自动解析图片分辨率与尺寸（如 `444 × 90 px`），提供圆角自适应缩略图；
+  - **多行文本**：优雅段落排版，智能标注复制来源应用（如 Weixin、Word、Chrome 等）；
+- **数字键极限秒贴 (`1~9` / `Alt+1~9`)**：无需移动鼠标，按下对应序号即可瞬间将内容粘入目标光标处；
+- **智能分类药丸**：提供 `全部`、`文本`、`图片`、`代码`、`置顶` 快速过滤筛选；
+- **即时交互体系**：
+  - **右键上下文菜单**：卡片上单击右键立即呼出上下文菜单；
+  - **右上角 `···` 快捷按钮**：平滑展开置顶、连续粘贴、复制与删除；
+  - **钉住置顶**：置顶项目始终固定在最前部；
+
+### 2. ⚡ 快捷看板 (Quick Dashboard)
+- **正在播放流媒体控制 (Media Controls)**：
+  - 深度集成 Windows SMTC 协议，实时同步当前播放器（网易云音乐、QQ音乐、Spotify 等）的歌曲名、歌手与播放状态，支持上一曲、播放/暂停、下一曲即时操控；
+- **核心系统快捷磁贴**：
+  - WLAN / 网络设置、蓝牙设备面板、Windows 设置、原生屏幕截图一键触达；
+- **自定义快捷动作网格 (Custom Actions)**：
+  - 用户可自由添加常用软件、网址、批处理脚本或终端命令，带有自适应图标；
+  - 支持右键点击动作卡片瞬间删除，随心整理工作流；
+- **真实系统屏幕亮度双向滑动调节**：
+  - 范围 0%~100%，与 Windows 真实亮度保持双向同步；采用独立微胶囊底座与高明度暖金黄太阳矢量图标（`#F59E0B`），在暗夜中清晰醒目；
+- **真实系统主音量双向滑动调节与静音控制**：
+  - 采用 Windows 原生 `Segoe MDL2 Assets` 矢量字体，支持静音（`\uE74F`）、低音量（`\uE993`）、中音量（`\uE994`）、高音量（`\uE767`）图标动态状态切换，高亮天蓝着色。
+
+---
+
+## 🏆 4 项杀手级生产力功能
+
+| 杀手级特性 | 亮点说明 |
+| :--- | :--- |
+| 🖱️ **全局拖拽直接粘贴** | 直接按住侧边栏中任意卡片，拖动到聊天框、Word、浏览器、代码编辑器甚至 Windows 资源管理器目录，**松手即自动粘贴或复制文件**，跨窗口交互丝滑流畅。 |
+| 🪟 **图钉锁定与外部失焦秒收** | 采用底层全局鼠标挂钩与物理边界算法。未锁定状态下，**点击侧边栏外部任何物理区域瞬间智能收起**，毫不打扰；开启顶栏 📌 图钉后则稳定常驻于桌面最前端。 |
+| 📑 **顺序连续粘贴流** | 点击卡片上的“连续粘贴”图标即可将多张卡片加入流水线队列。切换到目标文档后，**只需连续按下 `Ctrl + V`**，便会按加入顺序依次粘贴出每一条内容，批量填表与整理文档的终极利器！ |
+| 📝 **快捷看板随手记便签** | 侧边栏常驻轻量随手记草稿板。随手记录临时密码、备忘电话、零碎灵感，**软件关闭或电脑重启后自动持久化恢复**，无需频繁新建记事本。 |
+
+---
+
+## 🎨 6 大高级预设主题与自定义壁纸磨砂系统
+
+CopyBox 2.0 拥有精心打磨的 Fluent 视觉系统，在内置设置中心提供 3×2 网格主题卡片选择：
+
+1. 🌙 **深色模式 (Dark)**：经典极夜蓝黑，深沉护眼，高对比度；
+2. ☀️ **明亮模式 (Light)**：象牙冷白，纯净素雅，浅灰底盘彻底告别黑块；
+3. 🌌 **极光夜空 (Aurora)**：孔雀墨蓝底色与荧光极光绿（`#10B981`）强调色；
+4. 🌆 **暮色霞光 (Sunset)**：落日深紫底色与绯橙（`#F97316`）霞光强调色；
+5. 🌊 **深海之渊 (Ocean)**：深邃渊蓝底色与天青碧海（`#06B6D4`）强调色；
+6. 🖼️ **壁纸模式 (CustomImage)**：
+   - **自主上传本地图片**：支持用户选择本地图片作为背景壁纸，自动安全复制至本地持久化目录；
+   - **磨砂遮罩浓度自由调节 (30% ~ 95%)**：可根据壁纸明暗随意调节遮罩浓度，确保前景纯白文字（`#FFFFFF`）刀锋级清晰度，兼具通透感与 100% 文本可读性；
+   - **半透明亚克力磨砂卡片**：全 UI 控件（剪贴板卡片、顶栏、便签框）自适应磨砂亚克力层级；
+   - **内置暗夜流光壁纸**：免配置内置生成高质感渐变星辉壁纸，开箱即美。
 
 ---
 
@@ -66,24 +103,29 @@ Windows 自带的剪贴板历史经常在关键时刻呼出迟缓、图片加载
 
 | 快捷键 | 作用说明 |
 | :--- | :--- |
-| `Alt + V` | 全局任意界面快速呼出 / 隐藏 CopyBox |
+| `Alt + V` | 全局任意界面快速唤醒 / 隐藏 CopyBox |
 | `1` ~ `9` 或 `Alt + 1~9` | 直接秒贴前 1~9 条对应历史内容 |
 | `↑` / `↓` | 在卡片列表中上下快速导航移动 |
 | `Enter` | 选定当前卡片并自动贴入目标窗口光标处 |
-| `Del` | 物理删除当前选中的历史条目 |
+| `Del` | 从本地数据库物理删除当前选中的历史条目 |
 | `P` | 将当前条目切换置顶状态 (Pin / Unpin) |
-| `Apps` 或 `Shift + F10` | 呼出当前选中卡片的功能菜单 |
+| `鼠标右键` 或 `Apps` | 呼出卡片功能上下文菜单 |
 | `Esc` | 瞬间收起并隐藏窗口 |
 
 ---
 
-## 🛠️ 技术栈
+## 🛠️ 技术栈与底层架构
 
-- **开发平台**：[.NET 8.0 SDK](https://dotnet.microsoft.com/)
-- **UI 框架**：WPF (.NET 8 Windows Desktop)
-- **底层互操作**：Win32 API (`AddClipboardFormatListener`, `RegisterHotKey`, `SendInput`, `SetForegroundWindow`)
-- **本地数据库**：`Microsoft.Data.Sqlite` (WAL 并发模式)
-- **系统托盘**：原生 Windows Forms `NotifyIcon` 托盘集成
+- **运行平台**：[.NET 8.0 SDK](https://dotnet.microsoft.com/) (Windows Desktop)
+- **UI 框架**：WPF (.NET 8 Windows 10/11)
+- **底层互操作**：
+  - `AddClipboardFormatListener`：系统剪贴板高频异步监听
+  - `RegisterHotKey`：全局 `Alt + V` 低延迟唤醒
+  - `WS_EX_NOACTIVATE`：侧边栏无侵入展示（点击卡片不夺取工作窗口光标焦点）
+  - `SetWindowsHookEx` (WH_MOUSE_LL)：智能外部物理边界失焦点击识别
+  - `Windows.Media.Control` (SMTC)：原生流媒体全局播放会话控制
+- **本地存储**：`Microsoft.Data.Sqlite`（开启 **WAL 并发预写日志模式**）
+- **打包模式**：单文件自包含独立免安装运行文件 (Single-File Binary)
 
 ---
 
@@ -99,42 +141,25 @@ cd CopyBox/ClipVault
 dotnet build -c Release
 ```
 
-### 3. 发布单文件免安装便携版 (Single-File Release)
+### 3. 发布单文件便携免安装版
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ../publish/
 ```
-生成的单文件独立运行程序将输出至 `publish/CopyBox.exe`。
+生成的单文件可执行程序位于 `publish/CopyBox.exe`（直接双击即可运行，绿色免安装）。
 
 ---
 
-## 📁 本地数据目录结构
+## 📁 本地数据目录规范
 
-当你自定义保存路径（例如 `D:\CopyBoxData\`）后，CopyBox 会在本地维护以下清晰结构：
+当你自定义保存路径（例如 `D:\CopyBoxData\`）后，CopyBox 会在本地维护清晰的数据拓扑：
 
 ```text
 D:\CopyBoxData\
 ├── clipboard.db          # SQLite 索引与元数据 (文本内容、来源应用、字符数、置顶标记等)
 ├── clipboard.db-shm      # SQLite WAL 共享内存索引
-├── clipboard.db-wal      # SQLite 高性能预写日志
+├── clipboard.db-wal      # SQLite 高性能并发预写日志
 └── images/               # 截图与图片独立缓存目录 (sha256_hash.png)
 ```
-
----
-
-## 🗺️ 路线图 (Roadmap & v2.0 规划)
-
-CopyBox 正处于活跃迭代中，下一代大版本 **v2.0** 将正式引入 **贴边毛玻璃双模抽屉 (Sidebar Acrylic Drawer)**：
-
-- [x] **v1.0 稳定版**：居中极速浮窗 (`Alt+V`)、全键盘秒贴 (`1~9`)、代码高亮、纯本地 SQLite WAL 存储与图片分治。
-- [ ] **v2.0-alpha**：**贴边毛玻璃抽屉骨架**
-  - 屏幕右边缘自吸附窗口 (宽 360px)，带原生 Windows 亚克力毛玻璃质感与边缘滑入/滑出缓动。
-  - 接入 `WS_EX_NOACTIVATE` 核心样式，点击侧边栏卡片不剥夺主工作窗口光标焦点。
-- [ ] **v2.0-beta**：**双模 Tab 切换与系统快捷磁贴仿生**
-  - 顶部集成 `[ 📋 剪贴板中心 ]` ⇋ `[ 🔔 系统快捷看板 ]` 药丸切换。
-  - 1:1 仿生复刻 Windows 10/11 操作中心快捷开关（网络、蓝牙、屏幕截图、夜间模式、亮度调节）并联动系统协议。
-- [ ] **v2.0 正式版**：**贴边自隐藏 (Auto-Hide) 与拖拽秒贴 (Drag & Drop)**
-  - 鼠标碰触最右侧 2px 感应热区自动呼出，离开自动隐形缩回；支持 📌 图钉置顶锁定。
-  - 支持将侧边栏卡片直接用鼠标拖入任意目标输入框或文件夹。
 
 ---
 
@@ -142,41 +167,57 @@ CopyBox 正处于活跃迭代中，下一代大版本 **v2.0** 将正式引入 *
 
 # 🇺🇸 English
 
-## 🌟 Why CopyBox?
+## 🌟 Why CopyBox 2.0?
 
-Windows' built-in clipboard history often suffers from slow popups, laggy image rendering, and a lack of search and pinning features. Meanwhile, many third-party clipboard utilities are either bloated (Electron-based apps consuming 200MB+ RAM) or force cloud synchronization, exposing sensitive passwords, tokens, and code snippets to leakage risks.
+Windows' built-in clipboard history frequently suffers from sluggish popups, slow thumbnail loading, and a lack of quick search or pinning capabilities. Most third-party alternatives are bloated Electron apps that consume hundreds of megabytes of RAM while forcing mandatory cloud synchronization—exposing sensitive credentials, private notes, and source code tokens to potential data leaks.
 
-**CopyBox is built with clear principles:**
-1. **100% Offline & Private**: Zero network requests, zero telemetry tracking. All clipboard data physically resides on your local device.
-2. **User-Configurable Storage Path**: Freedom to store your data wherever you want. Setting the storage directory to **OneDrive / Dropbox / Nutstore** gives you private, self-hosted cross-device sync with zero configuration!
-3. **Native Windows 11/10 Fluent Aesthetics**: 1:1 pixel-accurate modern Fluent card design, two-column layout, adaptive light/dark themes, and delicate soft shadows.
-4. **Sub-millisecond Popup & Full-Keyboard Flow**: Lightweight background daemon. Press `Alt + V` for instant wake-up; use number keys `1~9` for instant pasting.
-5. **Full Bilingual Support**: Native Simplified Chinese and English support with instantaneous switching.
+**CopyBox 2.0 changes the game**: it is not just a lightweight, 100% offline clipboard manager, but has evolved into an elegant, **docked productivity drawer** on your Windows desktop.
+
+1. **100% Offline & Private**: Zero network connections, zero telemetry, zero analytics. All your history stays securely on your physical disk;
+2. **Custom Storage Path & Private Cloud Sync**: Freely specify any local folder. Pointing it to your **OneDrive / Dropbox / Google Drive / Synology** directory gives you zero-config, encrypted multi-device sync;
+3. **Dual Window Modes**: Seamlessly toggle between the right-edge **Sidebar Acrylic Drawer** and the classic **Centered Palette**;
+4. **Dual-View Architecture**: Toggle effortlessly between `[ 📋 Clipboard Center ]` and `[ ⚡ Quick Dashboard ]`;
+5. **Blazing Native Performance**: Powered by modern .NET 8 and WPF with razor-sharp ClearType rendering.
 
 ---
 
-## ✨ Key Features
+## ✨ Key Capabilities
 
-- **🗂️ 1:1 Modern Two-Column Card Layout**:
-  - **Code Snippets**: Built-in Cascadia Code / Consolas syntax highlighting with code card styling. Automatic JSON and language detection.
-  - **Image Previews**: Adaptive rounded thumbnails for instant image inspection.
-  - **Plain Text**: Elegant multi-line typography with discreet source process badges.
-- **🖱️ Smooth & Intuitive Interactions**:
-  - **Right-Click Context Menu**: Right-click any card to select with glow feedback and summon the menu at your cursor.
-  - **Top-Right Quick Actions**: 100% synchronized with the card's top-right `···` button, expanding smoothly without overlapping adjacent cards.
-  - **Three Core Actions**:
-    - `★` **Pin / Unpin**: Warm golden star highlight; pinned cards always stay at the top.
-    - `❐` **Copy to Clipboard**: Copy with self-monitoring loop protection and subtle toast alerts.
-    - `✕` **Delete Item**: Permanently remove from the local SQLite database.
-- **⚙️ Draggable & Well-Organized Settings Overlay**:
-  - **In-Window Free Dragging**: Grab the title bar handle to move the settings panel anywhere inside the client area with intelligent boundary protection.
-  - **Three-Tier Fixed Architecture**: Pinned header + compact scroll body + pinned footer. Action buttons ("Done" and "Exit") are never cropped.
-  - **Razor-Sharp ClearType Text Rendering**: Separated shadow layer and content container, eliminating blur caused by WPF pixel shaders.
-- **🌐 Seamless Internationalization (i18n)**:
-  - Full translations for `简体中文` (Simplified Chinese) and `English`.
-- **💾 High-Performance Local Engine**:
-  - Powered by **SQLite with WAL (Write-Ahead Logging)** mode for lightning-fast concurrent read/write.
-  - Segregated image storage: High-resolution bitmaps are stored separately by SHA-256 hash, keeping database files light and fast.
+### 1. 🗂️ Clipboard Center
+- **Smart Formatting**: Automatic syntax-highlighted code cards (JSON/C#/Python/JS/etc.), image thumbnails with auto-calculated resolution tags (e.g. `444 × 90 px`), and multi-line text with source app badges;
+- **Instant Number-Key Pasting (`1~9` / `Alt+1~9`)**: Paste the top items without ever touching your mouse;
+- **Category Filter Pills**: Fast filter tabs for `All`, `Text`, `Images`, `Code`, and `Pinned`;
+- **Interactive Rich Context**: Right-click context menus, expandable `···` action bars, warm golden pin badges, and one-click copying/deletion.
+
+### 2. ⚡ Quick Dashboard
+- **Now Playing Media Controls**: Deep integration with Windows SMTC (System Media Transport Controls) to view track titles and control Play/Pause/Skip for Spotify, Netease Cloud Music, QQ Music, etc.;
+- **Core System Quick Tiles**: Instant access to WLAN, Bluetooth devices, Windows Settings, and Screen Snipping;
+- **Custom Quick Action Grid**: Add your own tools, websites, scripts, or terminal commands; right-click to delete anytime;
+- **System Display Brightness Slider**: Smooth bidirectional sync with your hardware display, featuring a pill-badge base and a warm-yellow sun icon (`#F59E0B`) for night-time visibility;
+- **System Master Volume Slider & Mute Toggle**: Windows native `Segoe MDL2 Assets` vector icons with dynamic volume level states and accent blue styling.
+
+---
+
+## 🏆 4 Killer Productivity Features
+
+1. 🖱️ **Global Drag & Drop Direct Paste**: Drag any clipboard card directly into WeChat, Word, browser textareas, VS Code, or Windows Explorer folders—**release to paste or copy the file instantly**!
+2. 🪟 **Pin Docking & Smart Auto-Dismiss**: Built with low-level global mouse hooks. When unpinned, clicking outside the drawer instantly and silently hides it; pin it (📌) to keep it permanently on top.
+3. 📑 **Sequential Continuous Paste Queue**: Queue multiple items by clicking the "Continuous Paste" button. Switch to your target document and **simply press `Ctrl + V` repeatedly** to paste each queued item in sequence.
+4. 📝 **Persistent Scratchpad**: Built-in notepad right inside the drawer for temporary passwords, phone numbers, or code snippets—automatically preserved across app restarts.
+
+---
+
+## 🎨 6 High-End Themes & Acrylic Wallpaper Customization
+
+- 🌙 **Dark Mode**: Midnight blue-black palette, clean and glare-free;
+- ☀️ **Light Mode**: Ivory cool white with delicate slate borders;
+- 🌌 **Aurora**: Deep peacock dark green with vibrant emerald accents (`#10B981`);
+- 🌆 **Sunset**: Twilight purple with warm sunset orange accents (`#F97316`);
+- 🌊 **Ocean**: Abyssal ocean blue with cyan accents (`#06B6D4`);
+- 🖼️ **Custom Wallpaper Mode**:
+  - Upload your own wallpaper image (auto-saved to `%LocalAppData%/CopyBox/Wallpapers/`);
+  - Adjustable acrylic overlay opacity (30% to 95%) ensures **100% razor-sharp white text contrast** regardless of the image brightness;
+  - Built-in dynamic starry night gradient wallpaper generator.
 
 ---
 
@@ -184,78 +225,29 @@ Windows' built-in clipboard history often suffers from slow popups, laggy image 
 
 | Shortcut | Description |
 | :--- | :--- |
-| `Alt + V` | Globally toggle / hide CopyBox from any window |
+| `Alt + V` | Globally toggle / dismiss CopyBox from anywhere |
 | `1` ~ `9` or `Alt + 1~9` | Instantly paste items #1 through #9 |
-| `↑` / `↓` | Navigate smoothly between cards |
+| `↑` / `↓` | Navigate smoothly through cards |
 | `Enter` | Select and paste item directly into active cursor position |
-| `Del` | Physically delete selected item |
+| `Del` | Permanently delete the selected item from database |
 | `P` | Toggle item pin status (Pin / Unpin) |
-| `Apps` or `Shift + F10` | Open the context menu for selected item |
-| `Esc` | Instantly dismiss and hide window |
+| `Right Click` or `Apps` | Open context menu |
+| `Esc` | Instantly dismiss and hide the drawer |
 
 ---
 
-## 🛠️ Technology Stack
+## 🚀 Build from Source
 
-- **Platform**: [.NET 8.0 SDK](https://dotnet.microsoft.com/)
-- **UI Framework**: WPF (.NET 8 Windows Desktop)
-- **Win32 Interop**: `AddClipboardFormatListener`, `RegisterHotKey`, `SendInput`, `SetForegroundWindow`
-- **Database**: `Microsoft.Data.Sqlite` (WAL concurrency mode)
-- **Tray Integration**: Native Windows Forms `NotifyIcon`
-
----
-
-## 🚀 Getting Started & Local Build
-
-### 1. Prerequisites
-Ensure [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) is installed on your machine.
-
-### 2. Clone and Build
 ```bash
 git clone https://github.com/1Than499/CopyBox.git
 cd CopyBox/ClipVault
-dotnet build -c Release
-```
-
-### 3. Publish Single-File Portable Release
-```bash
 dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ../publish/
 ```
-The self-contained executable will be generated at `publish/CopyBox.exe`.
 
----
-
-## 📁 Local Data Directory Structure
-
-When specifying a custom path (e.g. `D:\CopyBoxData\`), CopyBox organizes files as follows:
-
-```text
-D:\CopyBoxData\
-├── clipboard.db          # SQLite index & metadata (content, source app, timestamps, pin status)
-├── clipboard.db-shm      # SQLite WAL shared memory index
-├── clipboard.db-wal      # SQLite high-performance write-ahead log
-└── images/               # Image cache folder (sha256_hash.png)
-```
-
----
-
-## 🗺️ Roadmap (v2.0 Plan)
-
-CopyBox is actively maintained. The upcoming major release **v2.0** will introduce the **Sidebar Acrylic Drawer**:
-
-- [x] **v1.0 Stable**: Centered quick-paste palette (`Alt+V`), keyboard quick paste (`1~9`), syntax highlighting, local SQLite WAL storage.
-- [ ] **v2.0-alpha**: **Sidebar Acrylic Drawer Foundation**
-  - Right-edge docked window (360px wide) with authentic Windows Acrylic blur and smooth slide-in/out easing.
-  - `WS_EX_NOACTIVATE` style integration: clicking cards does not steal focus from your active document.
-- [ ] **v2.0-beta**: **Dual-Mode Tabs & Action Center Tile Emulation**
-  - Top toggle pill: `[ 📋 Clipboard Center ]` ⇋ `[ 🔔 System Quick Actions ]`.
-  - 1:1 emulation of Windows 10/11 Action Center quick tiles (Network, Bluetooth, Snipping Tool, Night light, Brightness slider).
-- [ ] **v2.0 Final**: **Edge Auto-Hide & Drag & Drop**
-  - Edge auto-hide with 2px trigger bar; pin button (📌) for persistent dock.
-  - Direct Drag & Drop of text/code/images into external applications.
+Single-file portable executable will be generated at `publish/CopyBox.exe`.
 
 ---
 
 ## 🤝 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is open-sourced under the [MIT License](LICENSE).

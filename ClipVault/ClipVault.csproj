@@ -12,6 +12,10 @@
     <AssemblyName>CopyBox</AssemblyName>
     <Product>CopyBox</Product>
     <AssemblyTitle>CopyBox</AssemblyTitle>
+    <Version>2.0.0</Version>
+    <FileVersion>2.0.0.0</FileVersion>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Description>CopyBox - 现代化、100% 纯本地离线、高颜值的 Windows 剪贴板与效率抽屉助手</Description>
   </PropertyGroup>
 
   <ItemGroup>
