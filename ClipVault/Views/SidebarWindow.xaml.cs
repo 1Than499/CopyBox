@@ -172,6 +172,7 @@ namespace ClipVault.Views
 
         public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
+            _isInternalSettingUpdate = true;
             InitializeComponent();
             _dbService = dbService;
             _settingsService = settingsService;
@@ -344,6 +345,8 @@ namespace ClipVault.Views
 
             // 首次应用多语言
             UpdateLocalizedTexts();
+
+            _isInternalSettingUpdate = false;
         }
 
         private void UpdateBrightnessIconText(int brightness)
@@ -1996,6 +1999,7 @@ namespace ClipVault.Views
         {
             if (_isInternalSettingUpdate || _settingsService == null) return;
             if (sender is not RadioButton rb || rb.Tag is not string tag) return;
+            if (rb.IsChecked != true) return;
 
             _settingsService.CurrentSettings.ThemeMode = tag;
             _settingsService.SaveSettings();

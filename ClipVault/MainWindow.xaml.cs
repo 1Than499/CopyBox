@@ -27,9 +27,11 @@ namespace ClipVault
         private bool _isDraggingSettings = false;
         private Point _dragStartMousePos;
         private Point _dragStartOffset;
+        private bool _isInternalSettingUpdate = false;
 
         public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
+            _isInternalSettingUpdate = true;
             InitializeComponent();
             _dbService = dbService;
             _settingsService = settingsService;
@@ -86,67 +88,80 @@ namespace ClipVault
                     this.Hide();
                 }
             };
+
+            _isInternalSettingUpdate = false;
         }
 
         private void LoadSettingsToUI()
         {
-            var s = _settingsService.CurrentSettings;
-            TxtSettingsStoragePath.Text = s.StorageDirectory;
-
-            // 0. 语言选择加载
-            if (s.Language == "en-US")
+            _isInternalSettingUpdate = true;
+            try
             {
-                RadioLangEn.IsChecked = true;
+                var s = _settingsService.CurrentSettings;
+                TxtSettingsStoragePath.Text = s.StorageDirectory;
+
+                // 0. 语言选择加载
+                if (s.Language == "en-US")
+                {
+                    RadioLangEn.IsChecked = true;
+                }
+                else
+                {
+                    RadioLangZh.IsChecked = true;
+                }
+
+                // 0.5 界面展示形态偏好加载
+                if (s.WindowMode == "Centered")
+                {
+                    RadioModeCentered.IsChecked = true;
+                }
+                else
+                {
+                    RadioModeSidebar.IsChecked = true;
+                }
+
+                // 1. 关闭行为加载
+                if (s.CloseAction == "ExitApp")
+                {
+                    RadioCloseExit.IsChecked = true;
+                }
+                else
+                {
+                    RadioCloseMinimize.IsChecked = true;
+                }
+
+                // 2. 双击卡片行为加载 (默认仅复制且保持窗口开启)
+                if (s.DoubleClickAction == "PasteAndHide")
+                {
+                    RadioDoubleClickPaste.IsChecked = true;
+                }
+                else
+                {
+                    RadioDoubleClickCopy.IsChecked = true;
+                }
+
+                // 3. 点击外部是否收起加载 (默认 false，点击外部不隐藏)
+                ChkHideOnDeactivate.IsChecked = s.HideOnDeactivate;
+
+                // 4. 主题与透明度加载
+                bool isDark = s.ThemeMode != "Light";
+                if (RadioThemeDark != null && RadioThemeLight != null)
+                {
+                    if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+                }
+
+                SliderOpacity.Value = Math.Clamp(s.WindowOpacity, 0.55, 1.00);
+                TxtOpacityValue.Text = $"{(int)(SliderOpacity.Value * 100)}%";
+
+                ApplyTheme(s.ThemeMode);
+                ApplyOpacity(SliderOpacity.Value);
+
+                UpdateStorageInfo();
             }
-            else
+            finally
             {
-                RadioLangZh.IsChecked = true;
+                _isInternalSettingUpdate = false;
             }
-
-            // 0.5 界面展示形态偏好加载
-            if (s.WindowMode == "Centered")
-            {
-                RadioModeCentered.IsChecked = true;
-            }
-            else
-            {
-                RadioModeSidebar.IsChecked = true;
-            }
-
-            // 1. 关闭行为加载
-            if (s.CloseAction == "ExitApp")
-            {
-                RadioCloseExit.IsChecked = true;
-            }
-            else
-            {
-                RadioCloseMinimize.IsChecked = true;
-            }
-
-            // 2. 双击卡片行为加载 (默认仅复制且保持窗口开启)
-            if (s.DoubleClickAction == "PasteAndHide")
-            {
-                RadioDoubleClickPaste.IsChecked = true;
-            }
-            else
-            {
-                RadioDoubleClickCopy.IsChecked = true;
-            }
-
-            // 3. 点击外部是否收起加载 (默认 false，点击外部不隐藏)
-            ChkHideOnDeactivate.IsChecked = s.HideOnDeactivate;
-
-            // 4. 主题与透明度加载
-            bool isDark = s.ThemeMode != "Light";
-            if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
-
-            SliderOpacity.Value = Math.Clamp(s.WindowOpacity, 0.55, 1.00);
-            TxtOpacityValue.Text = $"{(int)(SliderOpacity.Value * 100)}%";
-
-            ApplyTheme(isDark);
-            ApplyOpacity(SliderOpacity.Value);
-
-            UpdateStorageInfo();
         }
 
         public void UpdateAllLocalizedTexts()
@@ -320,17 +335,32 @@ namespace ClipVault
 
         // ================= 外观：白天/夜间主题与透明度 =================
 
-        private void ApplyTheme(bool isDark)
+        private void ApplyTheme(string themeMode)
         {
-            _settingsService.CurrentSettings.ThemeMode = isDark ? "Dark" : "Light";
-            _settingsService.SaveSettings();
+            bool isLight = themeMode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            bool isDark = !isLight;
 
             var loc = LocalizationService.Instance;
-            BtnQuickTheme.Content = isDark ? "☀️" : "🌙";
-            BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
-            if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+            if (BtnQuickTheme != null)
+            {
+                BtnQuickTheme.Content = isDark ? "☀️" : "🌙";
+                BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
+            }
+            if (!_isInternalSettingUpdate && RadioThemeDark != null && RadioThemeLight != null)
+            {
+                bool prev = _isInternalSettingUpdate;
+                _isInternalSettingUpdate = true;
+                try
+                {
+                    if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+                }
+                finally
+                {
+                    _isInternalSettingUpdate = prev;
+                }
+            }
 
-            byte alpha = (byte)(_settingsService.CurrentSettings.WindowOpacity * 255);
+            byte alpha = (byte)((_settingsService?.CurrentSettings.WindowOpacity ?? 0.95) * 255);
             MainBorder.Background = isDark 
                 ? new SolidColorBrush(Color.FromArgb(alpha, 22, 25, 34)) 
                 : new SolidColorBrush(Color.FromArgb(alpha, 248, 250, 252));
@@ -434,14 +464,23 @@ namespace ClipVault
 
         private void BtnQuickTheme_Click(object sender, RoutedEventArgs e)
         {
-            bool willBeDark = _settingsService.CurrentSettings.ThemeMode == "Light";
-            ApplyTheme(willBeDark);
+            if (_settingsService == null) return;
+            string newTheme = _settingsService.CurrentSettings.ThemeMode == "Light" ? "Dark" : "Light";
+            _settingsService.CurrentSettings.ThemeMode = newTheme;
+            _settingsService.SaveSettings();
+            ApplyTheme(newTheme);
         }
 
         private void ThemeRadio_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
-            ApplyTheme(RadioThemeDark.IsChecked == true);
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newTheme = RadioThemeDark.IsChecked == true ? "Dark" : "Light";
+            if (_settingsService.CurrentSettings.ThemeMode != newTheme)
+            {
+                _settingsService.CurrentSettings.ThemeMode = newTheme;
+                _settingsService.SaveSettings();
+                ApplyTheme(newTheme);
+            }
         }
 
         private void SliderOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
