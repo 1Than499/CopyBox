@@ -34,6 +34,7 @@
       position: relative;
       overflow: hidden;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 100px rgba(0, 120, 212, 0.18);
+      transition: filter 0.15s ease-out;
     }
 
     /* 全屏满画幅渲染模式：1920x1080 满画幅 */
@@ -135,7 +136,89 @@
       overflow: hidden;
     }
 
-    /* 左侧：Windows 11 模拟代码与文档工作区 (占 64% 宽度) */
+    /* ===== CopyBox 1.0 经典居中悬浮窗容器 ===== */
+    .v1-window-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 530px;
+      background: rgba(22, 27, 36, 0.96);
+      backdrop-filter: blur(30px);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      padding: 18px;
+      gap: 12px;
+      z-index: 300;
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .v1-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #FBBF24;
+      font-size: 11.5px;
+      font-weight: 700;
+      align-self: flex-start;
+    }
+    .v1-search {
+      height: 38px;
+      background: #11151F;
+      border: 1px solid #283344;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      color: #64748B;
+      font-size: 12.5px;
+      gap: 8px;
+    }
+    .v1-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .v1-card {
+      background: #171E2B;
+      border: 1px solid #283344;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #E2E8F0;
+    }
+
+    /* 蜕变光波指示条 */
+    .evolution-banner {
+      position: absolute;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: linear-gradient(135deg, #0284C7, #0078D4);
+      border: 1px solid #38BDF8;
+      box-shadow: 0 10px 30px rgba(0, 120, 212, 0.5);
+      padding: 8px 24px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: 0.5px;
+      z-index: 400;
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .evolution-banner.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* 左侧：Windows 11 模拟代码与文档工作区 */
     .desktop-workarea {
       flex: 1;
       height: 100%;
@@ -222,7 +305,6 @@
     .fn { color: #38BDF8; }
     .str { color: #34D399; }
     .cmt { color: #64748B; font-style: italic; }
-    .prop { color: #FBBF24; }
 
     .target-insertion {
       display: inline-block;
@@ -265,7 +347,7 @@
       padding: 0 14px;
     }
 
-    /* 右侧：CopyBox v2.0 贴边毛玻璃双模抽屉 (420px 宽度) */
+    /* 右侧：CopyBox v2.0 贴边毛玻璃双模抽屉 (430px 宽度) */
     .sidebar-drawer {
       width: 430px;
       height: 100%;
@@ -284,7 +366,6 @@
     .sidebar-drawer.open {
       transform: translateX(0);
     }
-    /* 主题动态变色 */
     .sidebar-drawer.theme-aurora {
       background: rgba(10, 30, 28, 0.88) !important;
       border-left-color: rgba(52, 211, 153, 0.35) !important;
@@ -294,11 +375,6 @@
       background: rgba(36, 18, 24, 0.88) !important;
       border-left-color: rgba(251, 146, 60, 0.35) !important;
       box-shadow: -15px 0 50px rgba(124, 45, 18, 0.5) !important;
-    }
-    .sidebar-drawer.theme-ocean {
-      background: rgba(8, 26, 44, 0.88) !important;
-      border-left-color: rgba(56, 189, 248, 0.35) !important;
-      box-shadow: -15px 0 50px rgba(3, 105, 161, 0.5) !important;
     }
     .sidebar-drawer.theme-wallpaper {
       background: linear-gradient(135deg, rgba(30, 27, 75, 0.82), rgba(15, 23, 42, 0.90)), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="800" viewBox="0 0 400 800"%3E%3Cdefs%3E%3ClinearGradient id="g" x1="0" y1="0" x2="1" y2="1"%3E%3Cstop offset="0" stop-color="%23818cf8" stop-opacity="0.25"/%3E%3Cstop offset="1" stop-color="%23c084fc" stop-opacity="0.1"/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx="350" cy="200" r="180" fill="url(%23g)"/%3E%3Ccircle cx="50" cy="600" r="150" fill="url(%23g)"/%3E%3C/svg%3E') !important;
@@ -381,7 +457,7 @@
       position: relative;
     }
 
-    /* 1. 快捷状态与智能播控看板 (Quick Dashboard) */
+    /* 1. 快捷看板 */
     .quick-dashboard {
       background: rgba(15, 20, 29, 0.65);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -415,8 +491,8 @@
       height: 100%;
       background: linear-gradient(90deg, #0078D4, #38BDF8);
       border-radius: 4px;
-      width: 70%;
-      transition: width 0.25s ease;
+      width: 75%;
+      transition: width 0.15s ease;
     }
     .slider-val {
       font-size: 11.5px;
@@ -623,7 +699,7 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* 4. 内嵌设置面板 (从抽屉右侧滑入覆层) */
+    /* 4. 内嵌设置面板 */
     .embedded-settings {
       position: absolute;
       inset: 0;
@@ -740,42 +816,7 @@
       height: 65px;
     }
 
-    /* 6. 快捷键唤起指示小气泡 */
-    .shortcut-badge-toast {
-      position: absolute;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-20px);
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 120, 212, 0.3);
-      padding: 8px 18px;
-      border-radius: 30px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13.5px;
-      font-weight: 600;
-      color: #F8FAFC;
-      z-index: 100;
-      opacity: 0;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .shortcut-badge-toast.visible {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-    }
-    .kbd-tag {
-      background: #1E293B;
-      border: 1px solid #475569;
-      padding: 2px 7px;
-      border-radius: 5px;
-      color: #38BDF8;
-      font-family: monospace;
-      font-size: 12px;
-    }
-
-    /* 7. 终幕精美 GitHub 开源卡片 */
+    /* 6. 终幕精美 GitHub 开源卡片 */
     .github-end-card {
       position: absolute;
       top: 50%;
@@ -938,13 +979,9 @@
     <!-- 背景流光 -->
     <div class="bg-bloom"></div>
 
-    <!-- 快捷键唤醒 Toast -->
-    <div class="shortcut-badge-toast" id="shortcutToast">
-      <span>✨ 按下</span>
-      <span class="kbd-tag">Alt</span>
-      <span>+</span>
-      <span class="kbd-tag">V</span>
-      <span>呼出 CopyBox 2.0 贴边抽屉</span>
+    <!-- 蜕变进化指示横幅 -->
+    <div class="evolution-banner" id="evolutionBanner">
+      <span>🚀 全面蜕变 • 进化至 CopyBox v2.0 贴边双模抽屉</span>
     </div>
 
     <!-- 虚拟鼠标 -->
@@ -957,6 +994,37 @@
     <!-- 主舞台场景 -->
     <div class="stage">
       
+      <!-- CopyBox 1.0 经典居中悬浮窗 (第1幕展示，随后平滑蜕变) -->
+      <div class="v1-window-overlay" id="v1Window">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="v1-badge">📦 CopyBox v1.0 • 经典居中时代</div>
+          <span style="font-size:11px; color:#94A3B8;">Alt + V 快速唤起</span>
+        </div>
+        <div class="v1-search">
+          <span>🔍</span>
+          <span>搜索剪贴板历史记录...</span>
+        </div>
+        <div class="v1-cards">
+          <div class="v1-card" style="border-left: 3px solid #38BDF8;">
+            <div style="font-size:10px; color:#38BDF8; font-weight:700; margin-bottom:3px;">代码片段 • JSON</div>
+            <div style="font-family:monospace; color:#94A3B8;">{ "version": "1.0", "mode": "center", "status": "active" }</div>
+          </div>
+          <div class="v1-card" style="border-left: 3px solid #F59E0B;">
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#FBBF24; font-weight:700; margin-bottom:3px;">
+              <span>⭐ 已置顶常用项</span>
+              <span>2分钟前</span>
+            </div>
+            <div style="color:#CBD5E1;">极简纯净，100% 本地物理离线安全。</div>
+          </div>
+          <div class="v1-card" style="border-left: 3px solid #EC4899;">
+            <div style="font-size:10px; color:#F472B6; font-weight:700; margin-bottom:3px;">高清截图预览</div>
+            <div style="height:36px; background:#0B101B; border-radius:4px; display:flex; align-items:center; justify-content:center; color:#64748B; font-size:11px;">
+              🌄 桌面工作流截图 (1920×1080)
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 左侧：Windows 11 现代代码与文本工作区 (焦点免抢占演示) -->
       <div class="desktop-workarea">
         <div class="editor-window">
@@ -1008,7 +1076,7 @@
           <div class="drawer-brand">
             <div class="brand-icon">📦</div>
             <span class="brand-text">CopyBox</span>
-            <span class="brand-badge">v2.0</span>
+            <span class="brand-badge">v2.0 抽屉</span>
           </div>
           <div class="header-actions">
             <div class="action-btn active" id="btnPin" title="图钉锁定">📌</div>
@@ -1020,23 +1088,23 @@
         <!-- 抽屉核心内容区 -->
         <div class="drawer-content">
           
-          <!-- 1. 快捷状态与智能播控看板 -->
+          <!-- 1. 快捷状态看板 -->
           <div class="quick-dashboard" id="quickDashboard">
             <!-- 亮度滑块 -->
             <div class="slider-row">
               <span class="slider-icon">☀️</span>
               <div class="slider-track">
-                <div class="slider-fill" id="brightFill" style="width: 65%;"></div>
+                <div class="slider-fill" id="brightFill" style="width: 75%;"></div>
               </div>
-              <span class="slider-val" id="brightVal">65%</span>
+              <span class="slider-val" id="brightVal">75%</span>
             </div>
             <!-- 音量滑块 -->
             <div class="slider-row">
               <span class="slider-icon vol">🔊</span>
               <div class="slider-track">
-                <div class="slider-fill" id="volFill" style="width: 50%;"></div>
+                <div class="slider-fill" id="volFill" style="width: 60%;"></div>
               </div>
-              <span class="slider-val" id="volVal">50%</span>
+              <span class="slider-val" id="volVal">60%</span>
             </div>
             <!-- 正在播放卡片 -->
             <div class="media-card" id="mediaCard">
@@ -1194,17 +1262,17 @@
   <!-- 底部控制器 (调试预览时显示) -->
   <div class="control-panel">
     <button class="play-btn" id="playBtnCtrl">▶ 播放演示</button>
-    <input type="range" class="time-slider" id="timeSlider" min="0" max="30" step="0.05" value="0">
-    <div class="time-display" id="timeDisplay">00:00 / 00:30</div>
+    <input type="range" class="time-slider" id="timeSlider" min="0" max="36" step="0.05" value="0">
+    <div class="time-display" id="timeDisplay">00:00 / 00:36</div>
   </div>
 
   <script>
-    // 页面交互元素获取
     const viewport = document.getElementById('viewport');
     const cursor = document.getElementById('cursor');
     const ripple = document.getElementById('ripple');
     const dragGhost = document.getElementById('dragGhost');
-    const shortcutToast = document.getElementById('shortcutToast');
+    const evolutionBanner = document.getElementById('evolutionBanner');
+    const v1Window = document.getElementById('v1Window');
     const sidebarDrawer = document.getElementById('sidebarDrawer');
     const brightFill = document.getElementById('brightFill');
     const brightVal = document.getElementById('brightVal');
@@ -1235,24 +1303,13 @@
     const starBtnText = document.getElementById('starBtnText');
 
     let currentTime = 0;
-    const DURATION = 30.0;
+    const DURATION = 36.0;
     let isPlaying = false;
-    let playTimer = null;
-
-    // 播放点击波纹
-    function triggerClickRipple(x, y) {
-      ripple.style.left = x + 'px';
-      ripple.style.top = y + 'px';
-      ripple.classList.remove('animate');
-      void ripple.offsetWidth;
-      ripple.classList.add('animate');
-    }
 
     // 毫秒级时间轴驱动：由外部或自身定时器精确控制
     function jumpToTime(t) {
       currentTime = Math.max(0, Math.min(DURATION, t));
 
-      // 1. 视口尺寸参考 (以满画幅 1920x1080 坐标为基准)
       const rect = viewport.getBoundingClientRect();
       const scaleX = rect.width / 1920;
       const scaleY = rect.height / 1080;
@@ -1262,8 +1319,10 @@
         cursor.style.top = (baseY * scaleY) + 'px';
       }
 
-      // 阶段 1 (0.0s - 5.0s): 快捷键唤醒与贴边抽屉展开
-      if (currentTime < 5.0) {
+      // ==========================================
+      // 第 1 幕 (0.0s - 6.0s): 从 1.0 经典到 2.0 蜕变展开
+      // ==========================================
+      if (currentTime < 6.0) {
         githubEndCard.classList.remove('visible');
         embeddedSettings.classList.remove('show');
         quickNoteModal.classList.remove('open');
@@ -1271,106 +1330,157 @@
         insertTarget.classList.remove('pasted');
         insertTargetText.textContent = 'var payload = /* 拖拽右侧卡片直接粘贴到此 */ ;';
         sidebarDrawer.className = 'sidebar-drawer';
+        viewport.style.filter = 'brightness(1)';
 
-        if (currentTime >= 0.6 && currentTime <= 3.2) {
-          shortcutToast.classList.add('visible');
-        } else {
-          shortcutToast.classList.remove('visible');
-        }
-
-        if (currentTime >= 0.8) {
-          sidebarDrawer.classList.add('open');
-        } else {
+        // 0.0s - 3.2s: 展示 CopyBox 1.0 居中悬浮窗
+        if (currentTime < 3.2) {
+          evolutionBanner.classList.remove('show');
+          v1Window.style.opacity = '1';
+          v1Window.style.pointerEvents = 'auto';
+          v1Window.style.transform = 'translate(-50%, -50%) scale(1)';
           sidebarDrawer.classList.remove('open');
-        }
 
-        // 光标从左侧编辑器移动到抽屉顶部
-        const p = Math.min(1, Math.max(0, (currentTime - 1.2) / 3.0));
-        const curX = 600 + (1600 - 600) * p;
-        const curY = 500 + (160 - 500) * p;
-        setCursorPos(curX, curY);
+          // 鼠标在 1.0 窗口内悬停
+          const p = Math.min(1, currentTime / 2.5);
+          setCursorPos(960 + 40 * Math.sin(p * Math.PI), 520 + 30 * Math.cos(p * Math.PI));
+        }
+        // 3.2s - 4.5s: 蜕变波爆发，1.0 窗口向右聚拢平滑淡出
+        else if (currentTime < 4.5) {
+          evolutionBanner.classList.add('show');
+          const p = (currentTime - 3.2) / 1.3;
+          v1Window.style.opacity = (1 - p).toString();
+          v1Window.style.transform = `translate(${-50 + 90 * p}%, -50%) scale(${1 - 0.2 * p})`;
+          sidebarDrawer.classList.remove('open');
+          setCursorPos(960 + 400 * p, 520);
+        }
+        // 4.5s - 6.0s: 2.0 贴边抽屉丝滑滑入展开
+        else {
+          evolutionBanner.classList.add('show');
+          v1Window.style.opacity = '0';
+          v1Window.style.pointerEvents = 'none';
+          sidebarDrawer.classList.add('open');
+          const p = (currentTime - 4.5) / 1.5;
+          setCursorPos(1360 + 260 * p, 520 - 360 * p);
+        }
       }
 
-      // 阶段 2 (5.0s - 10.5s): 亮度、音量与媒体播控
-      else if (currentTime < 10.5) {
-        shortcutToast.classList.remove('visible');
+      // ==========================================
+      // 第 2 幕 (6.0s - 11.5s): 亮度与音量真·视听联动
+      // ==========================================
+      else if (currentTime < 11.5) {
+        evolutionBanner.classList.remove('show');
+        v1Window.style.opacity = '0';
+        v1Window.style.pointerEvents = 'none';
         sidebarDrawer.classList.add('open');
         embeddedSettings.classList.remove('show');
         quickNoteModal.classList.remove('open');
         githubEndCard.classList.remove('visible');
 
-        // 5.0s - 7.0s: 拖动亮度滑块
-        if (currentTime < 7.0) {
-          const p = (currentTime - 5.0) / 2.0;
-          const bVal = Math.round(65 + (85 - 65) * p);
-          brightFill.style.width = bVal + '%';
-          brightVal.textContent = bVal + '%';
-          setCursorPos(1640 + 60 * p, 105);
+        // 6.0s - 8.6s: 屏幕物理亮度调节 (75% -> 35% -> 100% -> 85%)
+        if (currentTime < 8.6) {
+          volFill.style.width = '60%';
+          volVal.textContent = '60%';
+
+          if (currentTime < 7.2) {
+            // 滑动变暗 (75% -> 35%)
+            const p = (currentTime - 6.0) / 1.2;
+            const bVal = Math.round(75 - 40 * p);
+            brightFill.style.width = bVal + '%';
+            brightVal.textContent = bVal + '%';
+            // 真实画面变暗！
+            const bFactor = 1.0 - 0.50 * p;
+            viewport.style.filter = `brightness(${bFactor.toFixed(3)})`;
+            setCursorPos(1660 - 70 * p, 105);
+          } else if (currentTime < 8.3) {
+            // 滑动变亮 (35% -> 100%)
+            const p = (currentTime - 7.2) / 1.1;
+            const bVal = Math.round(35 + 65 * p);
+            brightFill.style.width = bVal + '%';
+            brightVal.textContent = bVal + '%';
+            // 真实画面大亮！
+            const bFactor = 0.50 + 0.70 * p;
+            viewport.style.filter = `brightness(${bFactor.toFixed(3)})`;
+            setCursorPos(1590 + 120 * p, 105);
+          } else {
+            // 稳定在 85%
+            const p = (currentTime - 8.3) / 0.3;
+            const bVal = Math.round(100 - 15 * p);
+            brightFill.style.width = bVal + '%';
+            brightVal.textContent = bVal + '%';
+            viewport.style.filter = 'brightness(1)';
+            setCursorPos(1710, 105);
+          }
         }
-        // 7.0s - 8.8s: 拖动音量滑块
-        else if (currentTime < 8.8) {
-          const p = (currentTime - 7.0) / 1.8;
-          const vVal = Math.round(50 + (75 - 50) * p);
-          volFill.style.width = vVal + '%';
-          volVal.textContent = vVal + '%';
-          setCursorPos(1620 + 80 * p, 145);
-        }
-        // 8.8s - 10.5s: 点击切歌按钮
+        // 8.6s - 11.5s: 系统主音量调节 (60% -> 20% -> 95% -> 75%)
         else {
+          viewport.style.filter = 'brightness(1)';
+          brightFill.style.width = '85%';
+          brightVal.textContent = '85%';
+
+          if (currentTime < 9.8) {
+            // 滑动音量变小 (60% -> 20%)
+            const p = (currentTime - 8.6) / 1.2;
+            const vVal = Math.round(60 - 40 * p);
+            volFill.style.width = vVal + '%';
+            volVal.textContent = vVal + '%';
+            setCursorPos(1640 - 70 * p, 145);
+          } else if (currentTime < 11.0) {
+            // 滑动音量澎湃增大 (20% -> 95%)
+            const p = (currentTime - 9.8) / 1.2;
+            const vVal = Math.round(20 + 75 * p);
+            volFill.style.width = vVal + '%';
+            volVal.textContent = vVal + '%';
+            setCursorPos(1570 + 125 * p, 145);
+          } else {
+            // 回归舒适 75%
+            const p = (currentTime - 11.0) / 0.5;
+            const vVal = Math.round(95 - 20 * p);
+            volFill.style.width = vVal + '%';
+            volVal.textContent = vVal + '%';
+            setCursorPos(1695, 145);
+          }
+        }
+      }
+
+      // ==========================================
+      // 第 3 幕 (11.5s - 17.5s): 智能切歌、随手记便签、卡片拖拽直放秒贴
+      // ==========================================
+      else if (currentTime < 17.5) {
+        viewport.style.filter = 'brightness(1)';
+        sidebarDrawer.classList.add('open');
+        embeddedSettings.classList.remove('show');
+        githubEndCard.classList.remove('visible');
+
+        // 11.5s - 13.2s: 点击切歌按钮 (晴天 -> 夜曲)
+        if (currentTime < 13.2) {
           setCursorPos(1830, 215);
-          if (currentTime >= 9.2) {
+          if (currentTime >= 12.4) {
             songTitle.textContent = '夜曲 - 周杰伦';
             songArtist.textContent = 'QQ音乐 • 正在播放 (FLAC)';
           } else {
             songTitle.textContent = '晴天 - 周杰伦';
             songArtist.textContent = '网易云音乐 • 正在播放';
           }
-        }
-      }
-
-      // 阶段 3 (10.5s - 16.5s): 分类筛选、随手记、卡片拖拽直放秒贴
-      else if (currentTime < 16.5) {
-        sidebarDrawer.classList.add('open');
-        embeddedSettings.classList.remove('show');
-        githubEndCard.classList.remove('visible');
-
-        // 10.5s - 12.0s: 点击“图片”Tab过滤
-        if (currentTime < 12.0) {
-          setCursorPos(1680, 280);
-          tabAll.classList.remove('active');
-          tabImg.classList.add('active');
-          cardCode.style.display = 'none';
-          cardText.style.display = 'none';
-          cardLink.style.display = 'none';
-          cardImage.style.display = 'flex';
           quickNoteModal.classList.remove('open');
         }
-        // 12.0s - 13.8s: 随手记便签打开与打字
-        else if (currentTime < 13.8) {
-          tabImg.classList.remove('active');
-          tabAll.classList.add('active');
-          cardCode.style.display = 'flex';
-          cardImage.style.display = 'flex';
-          cardText.style.display = 'flex';
-          cardLink.style.display = 'flex';
-
+        // 13.2s - 15.0s: 随手记便签打开与打字
+        else if (currentTime < 15.0) {
           quickNoteModal.classList.add('open');
           setCursorPos(1790, 280);
           const txt = '💡 CopyBox 2.0 架构升级已完成，准备发布！';
-          const p = Math.min(1, (currentTime - 12.2) / 1.4);
+          const p = Math.min(1, (currentTime - 13.4) / 1.4);
           noteInput.value = txt.substring(0, Math.floor(txt.length * p));
+          dragGhost.style.opacity = '0';
         }
-        // 13.8s - 16.5s: 卡片拖拽直放到左侧代码编辑器
+        // 15.0s - 17.5s: 卡片拖拽直放到左侧代码编辑器
         else {
           quickNoteModal.classList.remove('open');
-          const p = (currentTime - 13.8) / 2.7;
+          const p = (currentTime - 15.0) / 2.5;
           
           if (p < 0.2) {
-            // 鼠标移向卡片
             setCursorPos(1700, 360);
             dragGhost.style.opacity = '0';
           } else if (p < 0.8) {
-            // 正在往左侧拖拽
             const dragP = (p - 0.2) / 0.6;
             const curX = 1700 - (1700 - 580) * dragP;
             const curY = 360 + (430 - 360) * dragP;
@@ -1380,7 +1490,6 @@
             dragGhost.style.left = (curX * scaleX) + 'px';
             dragGhost.style.top = (curY * scaleY) + 'px';
           } else {
-            // 释放并秒贴
             dragGhost.style.opacity = '0';
             setCursorPos(580, 430);
             insertTarget.classList.add('pasted');
@@ -1389,17 +1498,18 @@
         }
       }
 
-      // 阶段 4 (16.5s - 22.0s): 设置面板与6大主题换肤、壁纸适配
-      else if (currentTime < 22.0) {
+      // ==========================================
+      // 第 4 幕 (17.5s - 23.5s): 6大预设主题与自定义磨砂壁纸
+      // ==========================================
+      else if (currentTime < 23.5) {
         sidebarDrawer.classList.add('open');
         dragGhost.style.opacity = '0';
         githubEndCard.classList.remove('visible');
 
-        // 打开设置
         embeddedSettings.classList.add('show');
 
         // 点击极光 -> 暮色 -> 壁纸
-        if (currentTime < 18.2) {
+        if (currentTime < 19.5) {
           setCursorPos(1660, 220); // 极光
           sidebarDrawer.className = 'sidebar-drawer open theme-aurora';
           themeDark.className = 'theme-card-btn';
@@ -1407,7 +1517,7 @@
           themeOcean.className = 'theme-card-btn';
           themeWallpaper.className = 'theme-card-btn';
           themeAurora.className = 'theme-card-btn selected';
-        } else if (currentTime < 20.0) {
+        } else if (currentTime < 21.5) {
           setCursorPos(1770, 220); // 暮色
           sidebarDrawer.className = 'sidebar-drawer open theme-sunset';
           themeAurora.className = 'theme-card-btn';
@@ -1420,14 +1530,15 @@
         }
       }
 
-      // 阶段 5 (22.0s - 26.5s): 双模架构切换与中英无缝重载
-      else if (currentTime < 26.5) {
+      // ==========================================
+      // 第 5 幕 (23.5s - 29.5s): 双模架构切换与中英无缝重载
+      // ==========================================
+      else if (currentTime < 29.5) {
         sidebarDrawer.classList.add('open');
         embeddedSettings.classList.add('show');
         githubEndCard.classList.remove('visible');
 
-        // 鼠标移向双模切换
-        if (currentTime < 24.2) {
+        if (currentTime < 26.5) {
           setCursorPos(1800, 340);
           modeDrawer.className = 'mode-btn active';
           modeCenter.className = 'mode-btn';
@@ -1438,17 +1549,18 @@
         }
       }
 
-      // 阶段 6 (26.5s - 30.0s): 终幕 100% 离线与 GitHub 开源致谢
+      // ==========================================
+      // 第 6 幕 (29.5s - 36.0s): 终幕 100% 离线与 GitHub 开源致谢
+      // ==========================================
       else {
         sidebarDrawer.classList.remove('open');
         embeddedSettings.classList.remove('show');
         githubEndCard.classList.add('visible');
 
-        // 鼠标移向 Star 按钮并点击
-        const p = Math.min(1, (currentTime - 26.8) / 1.5);
+        const p = Math.min(1, (currentTime - 30.5) / 2.0);
         setCursorPos(960, 680 + (590 - 680) * p);
 
-        if (currentTime >= 28.5) {
+        if (currentTime >= 33.5) {
           githubStarBtn.classList.add('starred');
           starBtnText.textContent = '★ Starred!';
         } else {
@@ -1457,14 +1569,13 @@
         }
       }
 
-      // 更新进度条显示
+      // 更新控制器显示
       const min = Math.floor(currentTime / 60).toString().padStart(2, '0');
       const sec = Math.floor(currentTime % 60).toString().padStart(2, '0');
-      document.getElementById('timeDisplay').textContent = `${min}:${sec} / 00:30`;
+      document.getElementById('timeDisplay').textContent = `${min}:${sec} / 00:36`;
       document.getElementById('timeSlider').value = currentTime;
     }
 
-    // 播放控制
     const playBtnCtrl = document.getElementById('playBtnCtrl');
     const timeSlider = document.getElementById('timeSlider');
 
@@ -1501,7 +1612,7 @@
       jumpToTime(parseFloat(e.target.value));
     });
 
-    // 初始渲染第 0 秒
+    // 初始展示第 0 秒 (CopyBox 1.0 时代)
     jumpToTime(0);
   </script>
 </body>
