@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>CopyBox v2.0 - Bilibili 爆款视频封面设计</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #06080F;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 电影级科技背景 */
+    .cover-canvas {
+      width: 1920px;
+      height: 1080px;
+      position: relative;
+      background: radial-gradient(circle at 72% 48%, #101B30 0%, #080D18 45%, #05070B 100%);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 0 90px;
+      justify-content: space-between;
+    }
+
+    /* 极光流光微光晕 */
+    .bloom-1 {
+      position: absolute;
+      top: -160px;
+      right: 180px;
+      width: 950px;
+      height: 950px;
+      background: radial-gradient(circle, rgba(0, 120, 212, 0.32) 0%, rgba(56, 189, 248, 0.15) 38%, transparent 70%);
+      filter: blur(100px);
+      pointer-events: none;
+    }
+    .bloom-2 {
+      position: absolute;
+      bottom: -150px;
+      left: 100px;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, rgba(245, 158, 11, 0.12) 42%, transparent 70%);
+      filter: blur(110px);
+      pointer-events: none;
+    }
+    .bloom-purple {
+      position: absolute;
+      top: 50%;
+      right: 500px;
+      transform: translateY(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, transparent 65%);
+      filter: blur(95px);
+      pointer-events: none;
+    }
+
+    /* 科技背景细线网格 */
+    .tech-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 70px 70px;
+      mask-image: radial-gradient(circle at 60% 50%, black 40%, transparent 85%);
+      -webkit-mask-image: radial-gradient(circle at 60% 50%, black 40%, transparent 85%);
+      pointer-events: none;
+    }
+
+    /* 左侧文字与标语区 (占 50% 空间) */
+    .hero-info-section {
+      width: 860px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      z-index: 10;
+    }
+
+    .top-badge-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .tag-hot {
+      background: linear-gradient(135deg, #EF4444, #DC2626);
+      color: #FFFFFF;
+      font-size: 19px;
+      font-weight: 800;
+      padding: 6px 18px;
+      border-radius: 8px;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.5);
+    }
+    .tag-open-source {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #38BDF8;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(10px);
+    }
+    .tag-offline {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34D399;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 6px 18px;
+      border-radius: 8px;
+    }
+
+    /* 超大震撼主标题 */
+    .hero-headline {
+      font-size: 82px;
+      font-weight: 900;
+      line-height: 1.12;
+      letter-spacing: -2px;
+      color: #FFFFFF;
+      text-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    }
+    .hero-gradient-text {
+      background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 45%, #F43F5E 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+      filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.45));
+    }
+    .hero-cyan-text {
+      background: linear-gradient(135deg, #38BDF8 0%, #0078D4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+      filter: drop-shadow(0 0 25px rgba(56, 189, 248, 0.45));
+    }
+
+    /* 副标题 */
+    .hero-subtitle {
+      font-size: 27px;
+      font-weight: 600;
+      color: #94A3B8;
+      line-height: 1.45;
+    }
+    .hero-subtitle strong {
+      color: #F8FAFC;
+      font-weight: 700;
+    }
+
+    /* 核心功能亮点矩阵胶囊卡 */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 8px;
+    }
+    .feature-pill {
+      background: rgba(20, 27, 41, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 12px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+    .feature-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .feature-text-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .feature-name {
+      font-size: 17.5px;
+      font-weight: 800;
+      color: #F8FAFC;
+    }
+    .feature-desc {
+      font-size: 13.5px;
+      color: #94A3B8;
+    }
+
+    /* 右侧 3D 悬浮 UI 侧边栏实景大卡 (占 48% 空间) */
+    .mockup-3d-wrapper {
+      position: relative;
+      width: 680px;
+      height: 920px;
+      perspective: 1200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    .mockup-card-3d {
+      width: 480px;
+      height: 890px;
+      background: rgba(18, 24, 36, 0.90);
+      backdrop-filter: blur(45px) saturate(180%);
+      -webkit-backdrop-filter: blur(45px) saturate(180%);
+      border: 1.5px solid rgba(56, 189, 248, 0.35);
+      border-radius: 24px;
+      box-shadow: 
+        -25px 35px 80px rgba(0, 0, 0, 0.9),
+        0 0 60px rgba(0, 120, 212, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transform: rotateY(-11deg) rotateX(4deg) translateZ(10px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 22px;
+      gap: 16px;
+    }
+
+    /* 侧边栏内嵌设计 */
+    .mockup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .mockup-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mockup-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #0078D4, #38BDF8);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(0, 120, 212, 0.4);
+    }
+    .mockup-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #FFFFFF;
+    }
+    .mockup-badge {
+      font-size: 12px;
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid #38BDF8;
+      color: #38BDF8;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+
+    /* 快捷状态看板 */
+    .mockup-dashboard {
+      background: rgba(14, 19, 28, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .mock-slider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mock-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .mock-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0078D4, #38BDF8);
+      border-radius: 4px;
+    }
+
+    /* 智能音乐播控 */
+    .mock-media {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mock-cover {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #EC4899, #8B5CF6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    /* 分类药丸 */
+    .mock-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(14, 19, 28, 0.6);
+      padding: 4px;
+      border-radius: 10px;
+    }
+    .mock-tab {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      font-size: 13px;
+      color: #94A3B8;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .mock-tab.active {
+      background: #0078D4;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(0, 120, 212, 0.4);
+    }
+
+    /* 卡片列表 */
+    .mock-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mock-card {
+      background: rgba(26, 33, 48, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    /* 悬浮光标手绘特效与大标签 */
+    .floating-stamp {
+      position: absolute;
+      bottom: 25px;
+      right: -25px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: #FFFFFF;
+      padding: 12px 26px;
+      border-radius: 16px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 15px 35px rgba(245, 158, 11, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      transform: rotate(-6deg);
+      border: 2px solid #FDE68A;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cover-canvas">
+    
+    <!-- 极光光晕 -->
+    <div class="bloom-1"></div>
+    <div class="bloom-2"></div>
+    <div class="bloom-purple"></div>
+    <div class="tech-grid"></div>
+
+    <!-- 左侧文案与亮点区 -->
+    <div class="hero-info-section">
+      
+      <div class="top-badge-row">
+        <span class="tag-hot">🔥 重磅大版本发布</span>
+        <span class="tag-open-source">📦 GitHub 100% 开源</span>
+        <span class="tag-offline">🔒 物理离线 • 零隐私风险</span>
+      </div>
+
+      <div class="hero-headline">
+        这才是剪贴板<br>
+        <span class="hero-cyan-text">该有的样子！</span>
+      </div>
+
+      <div class="hero-subtitle">
+        <strong>CopyBox 2.0</strong> • Windows 11 原生贴边毛玻璃双模抽屉<br>
+        集成系统亮度/音量调节、智能媒体播控、随手记灵感便签
+      </div>
+
+      <!-- 四大核心功能亮点矩阵 -->
+      <div class="features-grid">
+        
+        <div class="feature-pill">
+          <div class="feature-icon-box" style="background: rgba(0, 120, 212, 0.25); color: #38BDF8;">🪟</div>
+          <div class="feature-text-group">
+            <span class="feature-name">贴边双模抽屉</span>
+            <span class="feature-desc">WS_EX_NOACTIVATE 焦点免夺</span>
+          </div>
+        </div>
+
+        <div class="feature-pill">
+          <div class="feature-icon-box" style="background: rgba(245, 158, 11, 0.25); color: #FBBF24;">🎛️</div>
+          <div class="feature-text-group">
+            <span class="feature-name">音量与亮度中枢</span>
+            <span class="feature-desc">无级滑动调节 + 智能切歌</span>
+          </div>
+        </div>
+
+        <div class="feature-pill">
+          <div class="feature-icon-box" style="background: rgba(16, 185, 129, 0.25); color: #34D399;">📝</div>
+          <div class="feature-text-group">
+            <span class="feature-name">随手记与拖拽秒贴</span>
+            <span class="feature-desc">卡片直接拖入文档与代码</span>
+          </div>
+        </div>
+
+        <div class="feature-pill">
+          <div class="feature-icon-box" style="background: rgba(236, 72, 153, 0.25); color: #F472B6;">🎨</div>
+          <div class="feature-text-group">
+            <span class="feature-name">6大主题 & 自定义壁纸</span>
+            <span class="feature-desc">全界面磨砂亚克力玻璃</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 右侧 3D 倾斜贴边抽屉实景透视 -->
+    <div class="mockup-3d-wrapper">
+      <div class="mockup-card-3d">
+        
+        <!-- 顶栏 -->
+        <div class="mockup-header">
+          <div class="mockup-brand">
+            <div class="mockup-logo">📦</div>
+            <span class="mockup-title">CopyBox</span>
+            <span class="mockup-badge">v2.0 贴边抽屉</span>
+          </div>
+          <div style="font-size:16px; color:#94A3B8; display:flex; gap:10px;">
+            <span>📌</span>
+            <span>🪟</span>
+            <span>⚙️</span>
+          </div>
+        </div>
+
+        <!-- 快捷看板 -->
+        <div class="mockup-dashboard">
+          <div class="mock-slider">
+            <span style="font-size:16px;">☀️</span>
+            <div class="mock-track"><div class="mock-fill" style="width: 85%;"></div></div>
+            <span style="font-size:13px; font-weight:700; color:#E2E8F0;">85%</span>
+          </div>
+          <div class="mock-slider">
+            <span style="font-size:16px;">🔊</span>
+            <div class="mock-track"><div class="mock-fill" style="width: 75%;"></div></div>
+            <span style="font-size:13px; font-weight:700; color:#E2E8F0;">75%</span>
+          </div>
+          <div class="mock-media">
+            <div class="mock-cover">🎵</div>
+            <div style="flex:1;">
+              <div style="font-size:14px; font-weight:700; color:#FFFFFF;">晴天 - 周杰伦</div>
+              <div style="font-size:12px; color:#94A3B8;">网易云音乐 • 正在播放</div>
+            </div>
+            <div style="font-size:14px; color:#38BDF8;">⏮ ⏸ ⏭</div>
+          </div>
+        </div>
+
+        <!-- 分类栏 -->
+        <div class="mock-tabs">
+          <div class="mock-tab active">全部</div>
+          <div class="mock-tab">文本</div>
+          <div class="mock-tab">图片</div>
+          <div class="mock-tab">链接</div>
+          <div class="mock-tab" style="color:#34D399; font-weight:700;">📝 随手记</div>
+        </div>
+
+        <!-- 剪贴板卡片列表 -->
+        <div class="mock-cards">
+          
+          <div class="mock-card">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94A3B8;">
+              <span style="color:#38BDF8; font-weight:700; background:rgba(56,189,248,0.15); padding:2px 8px; border-radius:4px;">JSON 片段</span>
+              <span>刚刚 • 120 B</span>
+            </div>
+            <div style="background:#090D15; padding:8px 10px; border-radius:6px; font-family:monospace; font-size:12px; color:#38BDF8; border:1px solid #1E293B;">
+              { "version": "2.0", "drawer": true, "offline": true }
+            </div>
+          </div>
+
+          <div class="mock-card">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94A3B8;">
+              <span style="color:#F472B6; font-weight:700; background:rgba(244,114,182,0.15); padding:2px 8px; border-radius:4px;">高清壁纸预览</span>
+              <span>2分钟前 • 2.4 MB</span>
+            </div>
+            <div style="height:65px; background:linear-gradient(135deg, #1E1B4B, #312E81, #064E3B); border-radius:6px; display:flex; align-items:center; justify-content:center; color:#E2E8F0; font-size:13px; font-weight:600; border:1px solid rgba(255,255,255,0.12);">
+              🌄 4K 极光壁纸 (1920×1080 PNG)
+            </div>
+          </div>
+
+          <div class="mock-card">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94A3B8;">
+              <span style="color:#A78BFA; font-weight:700; background:rgba(167,139,250,0.15); padding:2px 8px; border-radius:4px;">灵感便签</span>
+              <span>5分钟前</span>
+            </div>
+            <div style="font-size:13.5px; color:#F8FAFC; line-height:1.4;">
+              原生 Windows 11 Acrylic 毛玻璃贴边双模抽屉，永不抢占焦点。
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- 悬浮金色印章 -->
+      <div class="floating-stamp">
+        <span>⚡</span>
+        <span>生产力直接翻倍！</span>
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>
