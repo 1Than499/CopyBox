@@ -262,7 +262,7 @@ namespace ClipVault.Views
                                     SystemControlService.ResetGammaRamp();
                                 }
                             }
-                            if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = currentSys < 50 ? "🔅" : "🔆";
+                            UpdateBrightnessIconText(currentSys);
                         }
                         catch { }
                     }
@@ -287,10 +287,7 @@ namespace ClipVault.Views
                                 }
                             }
                             bool isMuted = SystemControlService.GetIsMuted();
-                            if (TxtVolumeIcon != null)
-                            {
-                                TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔈" : (currentVol < 50 ? "🔉" : "🔊"));
-                            }
+                            UpdateVolumeIconText(currentVol, isMuted);
                         }
                         catch { }
                     }
@@ -312,7 +309,7 @@ namespace ClipVault.Views
                     SliderBrightness.Value = sysBrightness;
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                 }
-                if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
+                UpdateBrightnessIconText(sysBrightness);
 
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
@@ -321,10 +318,7 @@ namespace ClipVault.Views
                     if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
-                if (TxtVolumeIcon != null)
-                {
-                    TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔈" : (sysVol < 50 ? "🔉" : "🔊"));
-                }
+                UpdateVolumeIconText(sysVol, isMuted);
             }
             catch { }
             finally
@@ -352,64 +346,306 @@ namespace ClipVault.Views
             UpdateLocalizedTexts();
         }
 
-        #region 外观主题与多语言热更新 (支持深色/白天浅色热切换)
+        private void UpdateBrightnessIconText(int brightness)
+        {
+            if (TxtBrightnessIcon != null)
+            {
+                TxtBrightnessIcon.Text = "\uE706"; // Segoe MDL2 Assets 统一高质感太阳矢量图标
+            }
+        }
+
+        private void UpdateVolumeIconText(int vol, bool isMuted)
+        {
+            if (TxtVolumeIcon != null)
+            {
+                if (isMuted) TxtVolumeIcon.Text = "\uE74F"; // 静音
+                else if (vol == 0) TxtVolumeIcon.Text = "\uE992"; // 0音量
+                else if (vol < 35) TxtVolumeIcon.Text = "\uE993"; // 低音量
+                else if (vol < 70) TxtVolumeIcon.Text = "\uE994"; // 中音量
+                else TxtVolumeIcon.Text = "\uE767"; // 高音量
+            }
+        }
+
+        #region 外观主题与多语言热更新 (支持深色/明亮/极光/暮色/深海/自定义壁纸)
 
         /// <summary>
-        /// 实时应用外观主题 (深色 / 浅色)，通过修改 Resources 实现 DynamicResource 毫秒级刷新
+        /// 确保默认星空暗调壁纸存在，如不存在则利用 GDI+ 绘制高质量渐变星夜壁纸并保存
+        /// </summary>
+        private string EnsureDefaultWallpaperExists()
+        {
+            try
+            {
+                string wallpapersDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Wallpapers");
+                Directory.CreateDirectory(wallpapersDir);
+                string defaultPath = Path.Combine(wallpapersDir, "default_wallpaper.jpg");
+                if (File.Exists(defaultPath)) return defaultPath;
+
+                int width = 1920;
+                int height = 1080;
+                using var bmp = new System.Drawing.Bitmap(width, height);
+                using (var g = System.Drawing.Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                    // 绘制深空背景渐变: 从深邃墨蓝到暗夜黑
+                    using (var lgb = new System.Drawing.Drawing2D.LinearGradientBrush(
+                        new System.Drawing.Rectangle(0, 0, width, height),
+                        System.Drawing.Color.FromArgb(12, 19, 36),
+                        System.Drawing.Color.FromArgb(5, 7, 15),
+                        45f))
+                    {
+                        g.FillRectangle(lgb, 0, 0, width, height);
+                    }
+
+                    // 叠加冰蓝极光漫射光晕
+                    using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+                    {
+                        path.AddEllipse(200, -100, 1200, 700);
+                        using var pgb = new System.Drawing.Drawing2D.PathGradientBrush(path)
+                        {
+                            CenterColor = System.Drawing.Color.FromArgb(45, 14, 165, 233),
+                            SurroundColors = new[] { System.Drawing.Color.Transparent }
+                        };
+                        g.FillPath(pgb, path);
+                    }
+
+                    // 叠加紫罗兰星云
+                    using (var path2 = new System.Drawing.Drawing2D.GraphicsPath())
+                    {
+                        path2.AddEllipse(width - 900, height - 600, 1000, 700);
+                        using var pgb2 = new System.Drawing.Drawing2D.PathGradientBrush(path2)
+                        {
+                            CenterColor = System.Drawing.Color.FromArgb(40, 168, 85, 247),
+                            SurroundColors = new[] { System.Drawing.Color.Transparent }
+                        };
+                        g.FillPath(pgb2, path2);
+                    }
+
+                    // 随机微光星粒点缀
+                    var rnd = new Random(42);
+                    for (int i = 0; i < 200; i++)
+                    {
+                        int x = rnd.Next(width);
+                        int y = rnd.Next(height);
+                        int size = rnd.Next(1, 4);
+                        int alpha = rnd.Next(40, 190);
+                        using var starBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(alpha, 240, 248, 255));
+                        g.FillEllipse(starBrush, x, y, size, size);
+                    }
+                }
+                bmp.Save(defaultPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                return defaultPath;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// 安全加载壁纸图片为冻结的 BitmapImage
+        /// </summary>
+        private BitmapImage? LoadWallpaperBitmap(string? path)
+        {
+            try
+            {
+                string targetPath = path ?? "";
+                if (string.IsNullOrEmpty(targetPath) || !File.Exists(targetPath))
+                {
+                    targetPath = EnsureDefaultWallpaperExists();
+                }
+
+                if (File.Exists(targetPath))
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(targetPath, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return bmp;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// 实时应用外观主题 (深色 / 明亮 / 极光 / 暮色 / 深海 / 自定义壁纸)，通过修改 Resources 实现 DynamicResource 毫秒级刷新
         /// </summary>
         public void ApplyTheme(string theme)
         {
-            bool isLight = theme.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            switch (theme)
+            {
+                case "Light":
+                    if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFA, 0xFB, 0xFD));
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
+                    this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFD, 0xFE, 0xFE));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                    this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
+                    break;
 
-            if (isLight)
-            {
-                // 白天浅色 Fluent 毛玻璃高级质感 (高不透明度象牙白，杜绝刺眼叠影；浅灰底盘彻底告别黑块)
-                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFA, 0xFB, 0xFD));
-                this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-                this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
-                this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
-                this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
-                this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
-                this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
-                this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFD, 0xFE, 0xFE));
-                this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
-                this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
-                this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
-                this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
-            }
-            else
-            {
-                // 暗夜深色 Fluent 极简质感
-                this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
-                this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
-                this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
-                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
-                this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
-                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
-                this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
-                this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
-                this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
-                this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
-                this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
-                this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
-                this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
-                this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
-                this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x1A, 0x20, 0x2C));
-                this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
-                this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
-                this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
-                this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x15, 0x1F));
-                this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x2C, 0x3D));
-                this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x2A, 0x42));
+                case "Aurora": // 极光星空 (翠绿极光)
+                    if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0B, 0x1A, 0x17));
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x4E, 0x4A));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x07, 0x14, 0x12));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0x26, 0x23));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x16, 0x38, 0x33));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x4D, 0x45));
+                    this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xEC, 0xFD, 0xF5));
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x6E, 0xE7, 0xB7));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x24, 0x21));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x17, 0x36, 0x31));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0A, 0x1C, 0x1A));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x08, 0x16, 0x14));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x3D, 0x38));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0F, 0x24, 0x21));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x4E, 0x4A));
+                    this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xEC, 0xFD, 0xF5));
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x09, 0x19, 0x17));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x4E, 0x4A));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x2E, 0x28));
+                    break;
+
+                case "Sunset": // 暮色霞光 (紫橙夕阳)
+                    if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x1C, 0x12, 0x20));
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4C, 0x1D, 0x44));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x16, 0x0D, 0x19));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x2A, 0x18, 0x2E));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x3B, 0x22, 0x40));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x53, 0x26, 0x58));
+                    this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xF1, 0xF2));
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF4, 0x72, 0xB6));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x13, 0x27));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x1B, 0x38));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x19, 0x0C, 0x1D));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x08, 0x16));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0xFB, 0x71, 0x85));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x4A, 0x20, 0x48));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x23, 0x13, 0x27));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4C, 0x1D, 0x44));
+                    this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xF1, 0xF2));
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x0A, 0x18));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4C, 0x1D, 0x44));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x16, 0x32));
+                    break;
+
+                case "Ocean": // 深海之渊 (深海天青)
+                    if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0A, 0x13, 0x26));
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x3B, 0x62));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x07, 0x0E, 0x1E));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0x21, 0x3D));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x17, 0x2E, 0x54));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1D, 0x3E, 0x6F));
+                    this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF0, 0xF9, 0xFF));
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x7D, 0xD3, 0xFC));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0C, 0x1A, 0x33));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x27, 0x4A));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x08, 0x12, 0x23));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x05, 0x0E, 0x1B));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1A, 0x32, 0x54));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0C, 0x1A, 0x33));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x3B, 0x62));
+                    this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xF0, 0xF9, 0xFF));
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x06, 0x10, 0x1F));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x3B, 0x62));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x12, 0x25, 0x43));
+                    break;
+
+                case "CustomImage": // 自定义图片背景 + 磨砂亚克力层级全面适配
+                    if (BgImageContainer != null)
+                    {
+                        BgImageContainer.Visibility = Visibility.Visible;
+                        if (ImgCustomBg != null)
+                        {
+                            ImgCustomBg.Source = LoadWallpaperBitmap(_settingsService?.CurrentSettings.CustomBackgroundImagePath);
+                        }
+                        if (BdCustomBgOverlay != null)
+                        {
+                            BdCustomBgOverlay.Opacity = _settingsService?.CurrentSettings.BackgroundOverlayOpacity ?? 0.75;
+                        }
+                    }
+
+                    // 抽屉背景全透，显现图片与遮罩
+                    this.Resources["SidebarBgBrush"] = Brushes.Transparent;
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromArgb(0x70, 0x64, 0x74, 0x8B));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0x65, 0x0F, 0x17, 0x2A));
+                    // 剪贴板卡片：微透明深色磨砂亚克力
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(0x55, 0x1E, 0x29, 0x3B));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromArgb(0x80, 0x33, 0x41, 0x55));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromArgb(0x55, 0x94, 0xA3, 0xB8));
+                    this.Resources["TextPrimaryBrush"] = Brushes.White;
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(0x55, 0x1E, 0x29, 0x3B));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromArgb(0x80, 0x33, 0x41, 0x55));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(0x75, 0x0F, 0x17, 0x2A));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromArgb(0x80, 0x0F, 0x17, 0x2A));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromArgb(0x70, 0x64, 0x74, 0x8B));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x1E, 0x29, 0x3B));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
+                    this.Resources["MenuTextBrush"] = Brushes.White;
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromArgb(0x75, 0x0F, 0x17, 0x2A));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromArgb(0x60, 0x94, 0xA3, 0xB8));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromArgb(0x80, 0x1E, 0x29, 0x3B));
+                    break;
+
+                default: // 默认暗夜深色 (极夜蓝黑)
+                    if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
+                    this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
+                    this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                    this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
+                    this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
+                    this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
+                    this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
+                    this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                    this.Resources["SliderTrackBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
+                    this.Resources["MenuBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x1A, 0x20, 0x2C));
+                    this.Resources["MenuBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
+                    this.Resources["MenuTextBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
+                    this.Resources["SelectedBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
+                    this.Resources["ScratchpadInputBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x15, 0x1F));
+                    this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x2C, 0x3D));
+                    this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x2A, 0x42));
+                    break;
             }
 
             // 更新视图切换栏指示与高亮
@@ -529,7 +765,7 @@ namespace ClipVault.Views
                     SliderBrightness.Value = sysBrightness;
                     if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
                 }
-                if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = sysBrightness < 50 ? "🔅" : "🔆";
+                UpdateBrightnessIconText(sysBrightness);
 
                 int sysVol = SystemControlService.GetMasterVolume();
                 if (SliderVolume != null)
@@ -538,10 +774,7 @@ namespace ClipVault.Views
                     if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
                 }
                 bool isMuted = SystemControlService.GetIsMuted();
-                if (TxtVolumeIcon != null)
-                {
-                    TxtVolumeIcon.Text = isMuted ? "🔇" : (sysVol == 0 ? "🔈" : (sysVol < 50 ? "🔉" : "🔊"));
-                }
+                UpdateVolumeIconText(sysVol, isMuted);
             }
             catch { }
             finally
@@ -1436,7 +1669,7 @@ namespace ClipVault.Views
             int val = (int)e.NewValue;
             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{val}%";
             SystemControlService.SetBrightness(val);
-            if (TxtBrightnessIcon != null) TxtBrightnessIcon.Text = val < 50 ? "🔅" : "🔆";
+            UpdateBrightnessIconText(val);
         }
 
         private void TxtBrightnessIcon_Click(object sender, MouseButtonEventArgs e)
@@ -1463,10 +1696,7 @@ namespace ClipVault.Views
             int val = (int)e.NewValue;
             if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{val}%";
             SystemControlService.SetMasterVolume(val);
-            if (TxtVolumeIcon != null)
-            {
-                TxtVolumeIcon.Text = val == 0 ? "🔇" : (val < 50 ? "🔉" : "🔊");
-            }
+            UpdateVolumeIconText(val, false);
         }
 
         private void SliderVolume_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -1483,10 +1713,7 @@ namespace ClipVault.Views
         {
             bool isMuted = SystemControlService.ToggleMute();
             int currentVol = SystemControlService.GetMasterVolume();
-            if (TxtVolumeIcon != null)
-            {
-                TxtVolumeIcon.Text = isMuted ? "🔇" : (currentVol == 0 ? "🔈" : (currentVol < 50 ? "🔉" : "🔊"));
-            }
+            UpdateVolumeIconText(currentVol, isMuted);
             if (!isMuted && SliderVolume != null)
             {
                 _isUpdatingVolumeUi = true;
@@ -1672,11 +1899,52 @@ namespace ClipVault.Views
                 else RadioLangZh2.IsChecked = true;
             }
 
-            // 主题单选与透明度
-            if (RadioThemeDark2 != null && RadioThemeLight2 != null)
+            // 主题单选回显与壁纸状态
+            try
             {
-                if (s.ThemeMode == "Light") RadioThemeLight2.IsChecked = true;
-                else RadioThemeDark2.IsChecked = true;
+                _isInternalSettingUpdate = true;
+                switch (s.ThemeMode)
+                {
+                    case "Light":
+                        if (RadioThemeLight2 != null) RadioThemeLight2.IsChecked = true;
+                        break;
+                    case "Aurora":
+                        if (RadioThemeAurora2 != null) RadioThemeAurora2.IsChecked = true;
+                        break;
+                    case "Sunset":
+                        if (RadioThemeSunset2 != null) RadioThemeSunset2.IsChecked = true;
+                        break;
+                    case "Ocean":
+                        if (RadioThemeOcean2 != null) RadioThemeOcean2.IsChecked = true;
+                        break;
+                    case "CustomImage":
+                        if (RadioThemeCustom2 != null) RadioThemeCustom2.IsChecked = true;
+                        break;
+                    default:
+                        if (RadioThemeDark2 != null) RadioThemeDark2.IsChecked = true;
+                        break;
+                }
+
+                if (BdCustomImageSettings != null)
+                {
+                    BdCustomImageSettings.Visibility = (s.ThemeMode == "CustomImage") ? Visibility.Visible : Visibility.Collapsed;
+                }
+                if (SliderBgOverlayOpacity != null)
+                {
+                    int overlayVal = (int)Math.Round(s.BackgroundOverlayOpacity * 100);
+                    SliderBgOverlayOpacity.Value = Math.Clamp(overlayVal, 30, 95);
+                    if (TxtBgOverlayOpacityVal != null) TxtBgOverlayOpacityVal.Text = $"{SliderBgOverlayOpacity.Value}%";
+                }
+                if (TxtCustomBgPath != null)
+                {
+                    TxtCustomBgPath.Text = string.IsNullOrEmpty(s.CustomBackgroundImagePath)
+                        ? "未选择本地图片 (当前使用内置极光壁纸)"
+                        : Path.GetFileName(s.CustomBackgroundImagePath);
+                }
+            }
+            finally
+            {
+                _isInternalSettingUpdate = false;
             }
 
             // 立即应用当前主题
@@ -1726,13 +1994,103 @@ namespace ClipVault.Views
 
         private void ThemeRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
-            string newTheme = RadioThemeLight2.IsChecked == true ? "Light" : "Dark";
-            _settingsService.CurrentSettings.ThemeMode = newTheme;
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            if (sender is not RadioButton rb || rb.Tag is not string tag) return;
+
+            _settingsService.CurrentSettings.ThemeMode = tag;
             _settingsService.SaveSettings();
 
+            if (BdCustomImageSettings != null)
+            {
+                BdCustomImageSettings.Visibility = (tag == "CustomImage") ? Visibility.Visible : Visibility.Collapsed;
+            }
+
             // 立即生效外观切换
-            ApplyTheme(newTheme);
+            ApplyTheme(tag);
+        }
+
+        private void BtnUploadCustomBg_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "选择自定义背景壁纸图片",
+                    Filter = "图片文件 (*.jpg;*.jpeg;*.png;*.bmp;*.webp)|*.jpg;*.jpeg;*.png;*.bmp;*.webp|所有文件 (*.*)|*.*",
+                    Multiselect = false
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    string sourcePath = dialog.FileName;
+                    if (!File.Exists(sourcePath)) return;
+
+                    string wallpapersDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Wallpapers");
+                    Directory.CreateDirectory(wallpapersDir);
+
+                    string ext = Path.GetExtension(sourcePath);
+                    string destFileName = $"custom_bg_{DateTime.Now:yyyyMMdd_HHmmss}{ext}";
+                    string destPath = Path.Combine(wallpapersDir, destFileName);
+
+                    File.Copy(sourcePath, destPath, true);
+
+                    _settingsService.CurrentSettings.CustomBackgroundImagePath = destPath;
+                    _settingsService.CurrentSettings.ThemeMode = "CustomImage";
+                    _settingsService.SaveSettings();
+
+                    if (TxtCustomBgPath != null)
+                    {
+                        TxtCustomBgPath.Text = Path.GetFileName(sourcePath);
+                    }
+
+                    if (RadioThemeCustom2 != null)
+                    {
+                        RadioThemeCustom2.IsChecked = true;
+                    }
+
+                    ApplyTheme("CustomImage");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"设置壁纸失败: {ex.Message}", "壁纸设置", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void BtnResetCustomBg_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _settingsService.CurrentSettings.CustomBackgroundImagePath = "";
+                _settingsService.SaveSettings();
+
+                if (TxtCustomBgPath != null)
+                {
+                    TxtCustomBgPath.Text = "未选择本地图片 (当前使用内置极光壁纸)";
+                }
+
+                ApplyTheme("CustomImage");
+            }
+            catch { }
+        }
+
+        private void SliderBgOverlayOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            int intVal = (int)e.NewValue;
+            double opacity = intVal / 100.0;
+            _settingsService.CurrentSettings.BackgroundOverlayOpacity = opacity;
+            _settingsService.SaveSettings();
+
+            if (TxtBgOverlayOpacityVal != null)
+            {
+                TxtBgOverlayOpacityVal.Text = $"{intVal}%";
+            }
+
+            if (BdCustomBgOverlay != null)
+            {
+                BdCustomBgOverlay.Opacity = opacity;
+            }
         }
 
         private void SliderSideOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

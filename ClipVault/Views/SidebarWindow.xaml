@@ -261,6 +261,32 @@
             </Setter>
         </Style>
 
+        <!-- 现代化主题切换卡片单选框样式 -->
+        <Style x:Key="ThemeCardRadioStyle" TargetType="{x:Type RadioButton}">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <Border x:Name="bd" Background="{DynamicResource TileBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBlueBrush}"/>
+                                <Setter TargetName="bd" Property="BorderThickness" Value="1.5"/>
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CardHoverBgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 现代化 Fluent 右键菜单与弹出层样式 (1:1 传承 1.0 质感，深浅色自适应) -->
         <SolidColorBrush x:Key="MenuBgBrush" Color="#F21A202C"/>
         <SolidColorBrush x:Key="MenuBorderBrush" Color="#334155"/>
@@ -356,6 +382,14 @@
                 <RowDefinition Height="*"/>    <!-- 核心视图区域 (剪贴板 / 快捷看板 / 侧边栏内置设置) -->
                 <RowDefinition Height="Auto"/> <!-- 底部状态栏 -->
             </Grid.RowDefinitions>
+
+            <!-- 自定义图片背景层 (铺满全高 3 行，圆角裁剪 + 半透明高级磨砂遮罩) -->
+            <Grid x:Name="BgImageContainer" Grid.RowSpan="3" Visibility="Collapsed">
+                <Border CornerRadius="16,0,0,16" ClipToBounds="True">
+                    <Image x:Name="ImgCustomBg" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border x:Name="BdCustomBgOverlay" CornerRadius="16,0,0,16" Background="#0F172A" Opacity="0.75"/>
+            </Grid>
 
             <!-- ================= 第一行：顶栏与双模切换药丸 ================= -->
             <Border Grid.Row="0" Background="{DynamicResource HeaderBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0,0,0,1" Padding="14,12,14,10">
@@ -923,7 +957,9 @@
                                 <!-- (1) 屏幕亮度 -->
                                 <DockPanel Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtBrightnessIcon" Text="🔆" FontSize="12" Margin="0,0,6,0" Cursor="Hand" ToolTip="点击快捷切换 50% / 100% 亮度" PreviewMouseLeftButtonUp="TxtBrightnessIcon_Click"/>
+                                        <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource TileBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0.6" Margin="0,0,8,0" VerticalAlignment="Center" Cursor="Hand" ToolTip="点击快捷切换 50% / 100% 亮度" PreviewMouseLeftButtonUp="TxtBrightnessIcon_Click">
+                                            <TextBlock x:Name="TxtBrightnessIcon" Text="&#xE706;" FontFamily="Segoe MDL2 Assets" FontSize="11.5" Foreground="#F59E0B" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
                                         <TextBlock x:Name="TxtBrightnessTitle" Text="屏幕亮度" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <TextBlock x:Name="TxtBrightnessValue" DockPanel.Dock="Right" Text="--" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
@@ -937,7 +973,9 @@
                                 <!-- (2) 系统主音量 -->
                                 <DockPanel Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtVolumeIcon" Text="🔊" FontSize="12" Margin="0,0,6,0" Cursor="Hand" ToolTip="点击切换静音" PreviewMouseLeftButtonUp="TxtVolumeIcon_Click"/>
+                                        <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource TileBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="0.6" Margin="0,0,8,0" VerticalAlignment="Center" Cursor="Hand" ToolTip="点击切换静音" PreviewMouseLeftButtonUp="TxtVolumeIcon_Click">
+                                            <TextBlock x:Name="TxtVolumeIcon" Text="&#xE767;" FontFamily="Segoe MDL2 Assets" FontSize="11.5" Foreground="{DynamicResource AccentBlueBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
                                         <TextBlock x:Name="TxtVolumeTitle" Text="系统主音量" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <TextBlock x:Name="TxtVolumeValue" DockPanel.Dock="Right" Text="--" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" Margin="6,0,0,0"/>
@@ -975,14 +1013,90 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 3. 外观模式与透明度 (范围 0~100%，实时应用) -->
+                        <!-- 3. 外观模式、自定义主题与壁纸设置 (支持 6 大主题与本地图片上传) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetThemeTitle" Text="🎨 外观与主题" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <RadioButton x:Name="RadioThemeDark2" Content="🌙 深色暗黑" IsChecked="True" GroupName="SideTheme" Margin="0,0,18,0" Checked="ThemeRadio_Checked" Tag="Dark" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <RadioButton x:Name="RadioThemeLight2" Content="☀️ 明亮白天" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Light" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                </StackPanel>
+                                <TextBlock x:Name="TxtSetThemeTitle" Text="🎨 预设主题与个性化壁纸" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                                
+                                <!-- 主题卡片网格 (3列 x 2行) -->
+                                <UniformGrid Columns="3" Margin="0,0,0,8">
+                                    <!-- 1. 暗夜深色 -->
+                                    <RadioButton x:Name="RadioThemeDark2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Dark" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#141722" BorderBrush="#38BDF8" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="🌙 深色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <!-- 2. 纯净明亮 -->
+                                    <RadioButton x:Name="RadioThemeLight2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Light" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#F8FAFC" BorderBrush="#0078D4" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="☀️ 明亮" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <!-- 3. 极光夜幕 -->
+                                    <RadioButton x:Name="RadioThemeAurora2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Aurora" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#064E3B" BorderBrush="#10B981" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="🌌 极光" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <!-- 4. 暮色紫霞 -->
+                                    <RadioButton x:Name="RadioThemeSunset2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Sunset" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="🌆 暮色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <!-- 5. 深海湛蓝 -->
+                                    <RadioButton x:Name="RadioThemeOcean2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="Ocean" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#0C4A6E" BorderBrush="#0EA5E9" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="🌊 深海" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <!-- 6. 自定义壁纸 -->
+                                    <RadioButton x:Name="RadioThemeCustom2" GroupName="SideTheme" Checked="ThemeRadio_Checked" Tag="CustomImage" Margin="2"
+                                                 Style="{StaticResource ThemeCardRadioStyle}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="11" Height="11" CornerRadius="5.5" Background="#3B82F6" BorderBrush="#60A5FA" BorderThickness="1.5" Margin="0,0,4,0"/>
+                                            <TextBlock Text="🖼️ 壁纸" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        </StackPanel>
+                                    </RadioButton>
+                                </UniformGrid>
+
+                                <!-- 自定义壁纸图片管理区 (仅在选中 CustomImage 时展开) -->
+                                <Border x:Name="BdCustomImageSettings" Background="{DynamicResource TileBgBrush}" CornerRadius="6" Padding="9,8" Margin="0,2,0,8" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <TextBlock Text="🖼️ 自定义壁纸图片管理" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="TxtCustomBgPath" Text="未选择本地图片 (当前使用内置极光壁纸)" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="BtnUploadCustomBg" Content="📁 上传本地图片..." Background="{DynamicResource AccentBlueBrush}" Foreground="#FFFFFF" BorderThickness="0" Padding="8,4" FontSize="10.5" Cursor="Hand" Click="BtnUploadCustomBg_Click"/>
+                                            <Button x:Name="BtnResetCustomBg" Grid.Column="1" Content="🔄 内置壁纸" Background="Transparent" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" Padding="6,4" FontSize="10.5" Cursor="Hand" Margin="6,0,0,0" Click="BtnResetCustomBg_Click"/>
+                                        </Grid>
+                                        <!-- 遮罩深浅度调节 -->
+                                        <DockPanel Margin="0,2,0,2">
+                                            <TextBlock Text="壁纸磨砂遮罩浓度" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock x:Name="TxtBgOverlayOpacityVal" DockPanel.Dock="Right" Text="75%" FontSize="10" Foreground="{DynamicResource AccentBlueBrush}"/>
+                                        </DockPanel>
+                                        <Slider x:Name="SliderBgOverlayOpacity" Style="{StaticResource ModernFluentSliderStyle}" Minimum="30" Maximum="95" Value="75" SmallChange="5" LargeChange="10" ValueChanged="SliderBgOverlayOpacity_ValueChanged"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <DockPanel Margin="0,4,0,4">
                                     <TextBlock x:Name="TxtSetOpacityTitle" Text="抽屉毛玻璃透明度" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="11" Foreground="{DynamicResource AccentBlueBrush}"/>

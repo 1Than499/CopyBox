@@ -24,8 +24,14 @@ namespace ClipVault.Models
         // 点击软件外部(失去焦点)时是否自动隐藏: 默认 false (点击外部绝不自动隐藏/绝不最小化到托盘)
         public bool HideOnDeactivate { get; set; } = false;
 
-        // 主题模式: "Dark" (暗黑模式) 或 "Light" (明亮白天模式)
+        // 主题模式: "Dark" (暗黑模式), "Light" (明亮白天), "Aurora" (极光夜幕), "Sunset" (暮色紫霞), "Ocean" (深海湛蓝), "CustomImage" (自定义图片背景)
         public string ThemeMode { get; set; } = "Dark";
+
+        // 自定义壁纸图片绝对路径 (当 ThemeMode 为 "CustomImage" 时使用)
+        public string CustomBackgroundImagePath { get; set; } = string.Empty;
+
+        // 自定义背景壁纸的暗色遮罩浓度: 0.30 ~ 0.95 (默认 0.75，确保前景文字绝对清晰)
+        public double BackgroundOverlayOpacity { get; set; } = 0.75;
 
         // 窗口透明度: 0.60 ~ 1.00 (默认 0.92)
         public double WindowOpacity { get; set; } = 0.92;
