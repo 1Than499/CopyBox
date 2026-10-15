@@ -64,6 +64,11 @@ namespace ClipVault.Services
                 ";
                 cmd.ExecuteNonQuery();
 
+                // 自动清理存量因历史复制 bug 误产生的内部图片路径纯文本垃圾记录 (例如 images\xxxx.png)
+                using var cleanCmd = conn.CreateCommand();
+                cleanCmd.CommandText = "DELETE FROM ClipboardItems WHERE ItemType = 'Text' AND (Content LIKE 'images\\%.png' OR Content LIKE 'images/%.png');";
+                cleanCmd.ExecuteNonQuery();
+
                 // 若数据库为空，自动播种 1:1 概念图示例数据与缩略图
                 SeedConceptDataIfNeeded(conn);
             }

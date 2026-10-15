@@ -170,6 +170,9 @@ namespace ClipVault.Services
                 var bitmap = Clipboard.GetImage();
                 if (bitmap != null)
                 {
+                    // 智能纠正 Windows GDI / 微信 / QQ 截图 32bpp DIB 的伪 Alpha (全 0 透明度修正为 255)
+                    bitmap = FixDIBAlphaChannel(bitmap) ?? bitmap;
+
                     string imagesDir = Path.Combine(_settingsService.CurrentSettings.StorageDirectory, "images");
                     if (!Directory.Exists(imagesDir)) Directory.CreateDirectory(imagesDir);
 
@@ -239,8 +242,25 @@ namespace ClipVault.Services
             // 3. 纯文本与代码格式
             if (dataObject.GetDataPresent(DataFormats.UnicodeText) || dataObject.GetDataPresent(DataFormats.Text))
             {
+                if (IsInternalOperation) return null;
+
                 string text = Clipboard.GetText();
                 if (string.IsNullOrWhiteSpace(text)) return null;
+
+                // 核心安全过滤：绝不将内部图片相对路径/存储路径作为普通纯文本收录 (例如 images\xxx.png)
+                string trimmedText = text.Trim();
+                if (Regex.IsMatch(trimmedText, @"^images[\\/][a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase) ||
+                    Regex.IsMatch(trimmedText, @"^[a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase))
+                {
+                    return null;
+                }
+
+                // 若来源应用即为 CopyBox 且内容符合内部路径模式，直接跳过
+                if (string.Equals(sourceProcess, "CopyBox.exe", StringComparison.OrdinalIgnoreCase) && 
+                    trimmedText.StartsWith("images", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
 
                 string hash = ComputeHash(Encoding.UTF8.GetBytes(text));
                 bool isCode = DetectIsCode(text);
@@ -307,6 +327,57 @@ namespace ClipVault.Services
             var sb = new StringBuilder();
             foreach (var b in hash) sb.Append(b.ToString("x2"));
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 核心修复算法：智能纠正 Windows GDI 截屏 / 微信 / QQ 截图等 32bpp DIB 格式写入剪贴板时 Alpha 全为 0 (全透明空白) 的经典系统缺陷
+        /// </summary>
+        public static BitmapSource? FixDIBAlphaChannel(BitmapSource? source)
+        {
+            if (source == null) return null;
+
+            try
+            {
+                var converted = new FormatConvertedBitmap();
+                converted.BeginInit();
+                converted.Source = source;
+                converted.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
+                converted.EndInit();
+
+                int width = converted.PixelWidth;
+                int height = converted.PixelHeight;
+                int stride = width * 4;
+                byte[] pixels = new byte[stride * height];
+                converted.CopyPixels(pixels, stride, 0);
+
+                bool hasNonZeroAlpha = false;
+                for (int i = 3; i < pixels.Length; i += 4)
+                {
+                    if (pixels[i] > 0)
+                    {
+                        hasNonZeroAlpha = true;
+                        break;
+                    }
+                }
+
+                // 若所有像素的 Alpha 全部为 0 (典型的 GDI 32bpp DIB 保留对齐位，被误识别为全透明)
+                if (!hasNonZeroAlpha)
+                {
+                    // 强制将所有像素的 Alpha 通道校准为 255 (完全不透明原图)
+                    for (int i = 3; i < pixels.Length; i += 4)
+                    {
+                        pixels[i] = 255;
+                    }
+
+                    var fixedBmp = new WriteableBitmap(width, height, converted.DpiX, converted.DpiY, System.Windows.Media.PixelFormats.Bgra32, null);
+                    fixedBmp.WritePixels(new System.Windows.Int32Rect(0, 0, width, height), pixels, stride, 0);
+                    fixedBmp.Freeze();
+                    return fixedBmp;
+                }
+            }
+            catch { }
+
+            return source;
         }
 
         public void Dispose()

@@ -935,15 +935,8 @@ namespace ClipVault.Views
                 }
                 else
                 {
-                    // 仅复制到剪贴板，保持窗口打开
-                    if (!string.IsNullOrEmpty(selected.Content))
-                    {
-                        Clipboard.SetText(selected.Content);
-                    }
-                    else if (selected.IsImage && selected.ImagePreview is BitmapSource bmp)
-                    {
-                        Clipboard.SetImage(bmp);
-                    }
+                    // 仅复制到剪贴板，保持窗口打开 (智能识别图像实体与纯文本，杜绝图片路径被作为文本二次收录)
+                    CopyItemToClipboard(selected);
                 }
             }
         }
@@ -1090,14 +1083,7 @@ namespace ClipVault.Views
             if (itemStyle != null) copyItem.Style = itemStyle;
             copyItem.Click += (s, args) =>
             {
-                if (!string.IsNullOrEmpty(item.Content))
-                {
-                    Clipboard.SetText(item.Content);
-                }
-                else if (item.IsImage && item.ImagePreview is BitmapSource bmp)
-                {
-                    Clipboard.SetImage(bmp);
-                }
+                CopyItemToClipboard(item);
             };
 
             // 4. 删除 (✕)
@@ -1163,9 +1149,63 @@ namespace ClipVault.Views
 
         private void BtnCardCopy_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item && !string.IsNullOrEmpty(item.Content))
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
             {
-                Clipboard.SetText(item.Content);
+                CopyItemToClipboard(item);
+            }
+        }
+
+        /// <summary>
+        /// 统一安全剪贴板写入引擎：区分图片实体与纯文本，安全托管 internal 操作标记，杜绝图片物理路径被作为纯文本二次捕获
+        /// </summary>
+        private void CopyItemToClipboard(ClipboardItem item)
+        {
+            if (item == null) return;
+            try
+            {
+                if (_monitorService != null) _monitorService.IsInternalOperation = true;
+
+                if (item.IsImage && !string.IsNullOrEmpty(item.ResolvedImagePath) && File.Exists(item.ResolvedImagePath))
+                {
+                    var data = new DataObject();
+                    if (item.ImagePreview is BitmapSource bmp)
+                    {
+                        data.SetImage(bmp);
+                    }
+                    else
+                    {
+                        var bitmap = new BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmap.UriSource = new Uri(item.ResolvedImagePath, UriKind.Absolute);
+                        bitmap.EndInit();
+                        bitmap.Freeze();
+                        data.SetImage(bitmap);
+                    }
+
+                    var files = new System.Collections.Specialized.StringCollection { item.ResolvedImagePath };
+                    data.SetFileDropList(files);
+                    Clipboard.SetDataObject(data, true);
+                }
+                else if (item.ItemType == "File")
+                {
+                    var sc = new System.Collections.Specialized.StringCollection();
+                    var lines = item.Content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var l in lines) sc.Add(l);
+                    Clipboard.SetFileDropList(sc);
+                }
+                else
+                {
+                    Clipboard.SetText(item.Content ?? string.Empty);
+                }
+            }
+            catch { }
+            finally
+            {
+                if (_monitorService != null)
+                {
+                    Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
+                }
             }
         }
 

@@ -107,7 +107,28 @@ namespace ClipVault.Models
                     bmp.StreamSource = ms;
                     bmp.EndInit();
                     bmp.Freeze(); // 允许跨线程安全访问与极速渲染
-                    _cachedImage = bmp;
+
+                    // 存量历史截图全透明自愈：如果图片所有 Alpha 均为 0，现场纠正为正常不透明位图并异步修正磁盘文件
+                    var fixedBmp = ClipVault.Services.ClipboardMonitorService.FixDIBAlphaChannel(bmp);
+                    if (!ReferenceEquals(fixedBmp, bmp))
+                    {
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            try
+                            {
+                                using var outFs = new FileStream(imgPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(fixedBmp));
+                                encoder.Save(outFs);
+                            }
+                            catch { }
+                        });
+                        _cachedImage = fixedBmp;
+                    }
+                    else
+                    {
+                        _cachedImage = bmp;
+                    }
                     return _cachedImage;
                 }
                 catch
