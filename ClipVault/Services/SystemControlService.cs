@@ -316,39 +316,38 @@ namespace ClipVault.Services
             [PreserveSig] int GetVolumeRange(out float pflVolumeMindB, out float pflVolumeMaxdB, out float pflVolumeIncrementdB);
         }
 
-        private static IAudioEndpointVolume? _cachedEndpointVolume = null;
-        private static readonly object _audioLock = new object();
-
         private static IAudioEndpointVolume? GetAudioEndpointVolume()
         {
-            lock (_audioLock)
+            try
             {
-                if (_cachedEndpointVolume != null)
-                {
-                    return _cachedEndpointVolume;
-                }
+                var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+                IMMDevice? dev = null;
 
-                try
+                // 优先尝试 eConsole (0: 任务栏与系统主音量默认输出端点)，次选 eMultimedia (1)，兜底 eCommunications (2)
+                int[] roles = { 0, 1, 2 };
+                foreach (int role in roles)
                 {
-                    var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
-                    // eRender = 0, eMultimedia = 1
-                    if (enumerator.GetDefaultAudioEndpoint(0, 1, out IMMDevice dev) == 0 && dev != null)
+                    if (enumerator.GetDefaultAudioEndpoint(0 /* eRender */, role, out IMMDevice endpoint) == 0 && endpoint != null)
                     {
-                        Guid iid = typeof(IAudioEndpointVolume).GUID;
-                        // CLSCTX_ALL = 23
-                        if (dev.Activate(ref iid, 23, IntPtr.Zero, out object epvObj) == 0 && epvObj is IAudioEndpointVolume epv)
-                        {
-                            _cachedEndpointVolume = epv;
-                            return _cachedEndpointVolume;
-                        }
+                        dev = endpoint;
+                        break;
                     }
                 }
-                catch 
+
+                if (dev != null)
                 {
-                    _cachedEndpointVolume = null;
+                    Guid iid = typeof(IAudioEndpointVolume).GUID;
+                    // CLSCTX_ALL = 23
+                    if (dev.Activate(ref iid, 23, IntPtr.Zero, out object epvObj) == 0 && epvObj is IAudioEndpointVolume epv)
+                    {
+                        Marshal.ReleaseComObject(dev);
+                        return epv;
+                    }
+                    Marshal.ReleaseComObject(dev);
                 }
-                return null;
             }
+            catch { }
+            return null;
         }
 
         private static int _lastKnownMasterVolume = -1;
@@ -363,31 +362,22 @@ namespace ClipVault.Services
                 var epv = GetAudioEndpointVolume();
                 if (epv != null)
                 {
-                    int hr = epv.GetMasterVolumeLevelScalar(out float level);
-                    if (hr == 0)
+                    try
                     {
-                        int vol = (int)Math.Clamp(Math.Round(level * 100f), 0, 100);
-                        _lastKnownMasterVolume = vol;
-                        return vol;
-                    }
-                    else
-                    {
-                        // 接口句柄失效，清空缓存并重试一次
-                        _cachedEndpointVolume = null;
-                        var retryEpv = GetAudioEndpointVolume();
-                        if (retryEpv != null && retryEpv.GetMasterVolumeLevelScalar(out float retryLevel) == 0)
+                        if (epv.GetMasterVolumeLevelScalar(out float level) == 0)
                         {
-                            int vol = (int)Math.Clamp(Math.Round(retryLevel * 100f), 0, 100);
+                            int vol = (int)Math.Clamp(Math.Round(level * 100f), 0, 100);
                             _lastKnownMasterVolume = vol;
                             return vol;
                         }
                     }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(epv);
+                    }
                 }
             }
-            catch 
-            {
-                _cachedEndpointVolume = null;
-            }
+            catch { }
 
             return _lastKnownMasterVolume >= 0 ? _lastKnownMasterVolume : 50;
         }
@@ -397,14 +387,24 @@ namespace ClipVault.Services
         /// </summary>
         public static void SetMasterVolume(int volume)
         {
+            int clamped = Math.Clamp(volume, 0, 100);
+            _lastKnownMasterVolume = clamped;
+
             try
             {
                 var epv = GetAudioEndpointVolume();
                 if (epv != null)
                 {
-                    float level = Math.Clamp(volume, 0, 100) / 100.0f;
-                    Guid empty = Guid.Empty;
-                    epv.SetMasterVolumeLevelScalar(level, ref empty);
+                    try
+                    {
+                        float level = clamped / 100.0f;
+                        Guid empty = Guid.Empty;
+                        epv.SetMasterVolumeLevelScalar(level, ref empty);
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(epv);
+                    }
                 }
             }
             catch { }
@@ -420,9 +420,16 @@ namespace ClipVault.Services
                 var epv = GetAudioEndpointVolume();
                 if (epv != null)
                 {
-                    if (epv.GetMute(out bool isMuted) == 0)
+                    try
                     {
-                        return isMuted;
+                        if (epv.GetMute(out bool isMuted) == 0)
+                        {
+                            return isMuted;
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(epv);
                     }
                 }
             }
@@ -440,11 +447,18 @@ namespace ClipVault.Services
                 var epv = GetAudioEndpointVolume();
                 if (epv != null)
                 {
-                    if (epv.GetMute(out bool isMuted) == 0)
+                    try
                     {
-                        Guid empty = Guid.Empty;
-                        epv.SetMute(!isMuted, ref empty);
-                        return !isMuted;
+                        if (epv.GetMute(out bool isMuted) == 0)
+                        {
+                            Guid empty = Guid.Empty;
+                            epv.SetMute(!isMuted, ref empty);
+                            return !isMuted;
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(epv);
                     }
                 }
             }

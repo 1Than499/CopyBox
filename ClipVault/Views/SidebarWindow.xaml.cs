@@ -234,8 +234,8 @@ namespace ClipVault.Views
             {
                 if (this.IsVisible && SystemActionsPanel.Visibility == Visibility.Visible)
                 {
-                    // 1. 同步系统屏幕真实亮度
-                    if (!_isUpdatingBrightnessUi)
+                    // 1. 同步系统屏幕真实亮度 (当用户未正在拖动时才进行外部变化同步)
+                    if (!_isUpdatingBrightnessUi && SliderBrightness != null && !SliderBrightness.IsMouseCaptureWithin)
                     {
                         try
                         {
@@ -267,13 +267,13 @@ namespace ClipVault.Views
                         catch { }
                     }
 
-                    // 2. 同步系统真实主音量
-                    if (!_isUpdatingVolumeUi)
+                    // 2. 同步系统真实主音量 (当用户未正在拖动时才进行外部变化同步)
+                    if (!_isUpdatingVolumeUi && SliderVolume != null && !SliderVolume.IsMouseCaptureWithin)
                     {
                         try
                         {
                             int currentVol = SystemControlService.GetMasterVolume();
-                            if (SliderVolume != null && Math.Abs(currentVol - (int)SliderVolume.Value) >= 1)
+                            if (Math.Abs(currentVol - (int)SliderVolume.Value) >= 1)
                             {
                                 try
                                 {
