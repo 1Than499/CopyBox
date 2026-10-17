@@ -25,12 +25,6 @@
   <em>左图：v2.0 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.0 快捷看板（音乐播放控制、系统快捷、自定义动作、屏幕亮度/音量调节）</em>
 </p>
 
-> 🎬 **2.0 宣传片 & B站发布资源包**：
-> - 📺 **30秒分镜脚本与B站发布全套文案**：[`docs/VIDEO_SCRIPT_V2.md`](docs/VIDEO_SCRIPT_V2.md)（含爆款标题、置顶评论与标签）
-> - 🎥 **交互式 1080P 网页放映演示器**：[`docs/promo_video_v2.html`](docs/promo_video_v2.html)（浏览器双击即开，60FPS 丝滑播放）
-> - 🎞️ **1080P 高清视频成片 (MP4)**：[`docs/CopyBox_v2_Promo_1080P.mp4`](docs/CopyBox_v2_Promo_1080P.mp4)（开箱即可直接投稿 B站）
-> - 🖼️ **B站 1080P 超清封面图**：[`docs/bilibili_cover_v2.png`](docs/bilibili_cover_v2.png) 与 [`docs/bilibili_cover_v2.jpg`](docs/bilibili_cover_v2.jpg)
-
 ---
 
 # 🇨🇳 简体中文
