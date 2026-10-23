@@ -40,7 +40,7 @@
   <img src="assets/v2_dashboard.png" alt="CopyBox v2.0 快捷看板" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
 </p>
 <p align="center">
-  <em>左图：剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：快捷看板（音乐播放控制、系统快捷、自定义动作、屏幕亮度/音量调节）</em>
+  <em>左图：v2.0 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.0 快捷看板（音乐播放控制、系统快捷、自定义动作、屏幕亮度/音量调节）</em>
 </p>
 
 <div align="center">
@@ -48,8 +48,13 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.1.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.1.0/CopyBox-v2.1.0-Windows-x64-Portable.zip)  
-[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
+**🆕 最新 v2.1.0 版本下载：**  
+[![Download Portable Zip v2.1.0](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.1.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.1.0/CopyBox-v2.1.0-Windows-x64-Portable.zip)  
+[![Direct EXE v2.1](https://img.shields.io/badge/直接下载单文件-CopyBox--v2.1.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox-v2.1.exe)
+
+**📦 历史 v2.0.0 版本归档：**  
+[![Download Portable Zip v2.0.0](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.0.0--Portable.zip-475569?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.0.0/CopyBox-v2.0.0-Windows-x64-Portable.zip)  
+[![Direct EXE v2.0](https://img.shields.io/badge/直接下载单文件-CopyBox--v2.0.exe-64748B?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox-v2.0.exe)
 
 *(更多版本请查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
 
