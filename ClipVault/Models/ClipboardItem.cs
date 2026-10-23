@@ -62,8 +62,9 @@ namespace ClipVault.Models
                     string fileName = Path.GetFileName(Content);
                     var candidates = new[]
                     {
-                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClipVault", "Data"),
+                        AppSettings.GetAppRootDirectory(),
                         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Data"),
+                        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClipVault", "Data"),
                         AppDomain.CurrentDomain.BaseDirectory
                     };
 

@@ -28,15 +28,20 @@ namespace ClipVault
         private Point _dragStartMousePos;
         private Point _dragStartOffset;
         private bool _isInternalSettingUpdate = false;
+        private bool _isSavingOwnSettings = false;
+        private System.Windows.Threading.DispatcherTimer? _saveSettingsDebounceTimer;
+        private string? _cachedMainWallpaperPath;
+        private BitmapImage? _cachedMainWallpaperBitmap;
 
         public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
-            _isInternalSettingUpdate = true;
-            InitializeComponent();
             _dbService = dbService;
             _settingsService = settingsService;
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
+            _isInternalSettingUpdate = true;
+
+            InitializeComponent();
 
             // 加载应用图标
             try
@@ -92,6 +97,21 @@ namespace ClipVault
             _isInternalSettingUpdate = false;
         }
 
+        public void SyncSettingsFromService(bool refreshCards)
+        {
+            if (_isSavingOwnSettings || _isInternalSettingUpdate) return;
+            Dispatcher.Invoke(() =>
+            {
+                LoadSettingsToUI();
+                UpdateAllLocalizedTexts();
+                if (refreshCards)
+                {
+                    RefreshCards();
+                }
+                UpdateStorageInfo();
+            });
+        }
+
         private void LoadSettingsToUI()
         {
             _isInternalSettingUpdate = true;
@@ -143,18 +163,34 @@ namespace ClipVault
                 // 3. 点击外部是否收起加载 (默认 false，点击外部不隐藏)
                 ChkHideOnDeactivate.IsChecked = s.HideOnDeactivate;
 
-                // 4. 主题与透明度加载
-                bool isDark = s.ThemeMode != "Light";
-                if (RadioThemeDark != null && RadioThemeLight != null)
+                // 4. 主题与背景透明度加载 (0% 代表完全不透明，向右滑动增大背景透明度)
+                string theme = s.ThemeMode ?? "Dark";
+                if (RadioThemeDark != null)
                 {
-                    if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+                    if (theme.Equals("Light", StringComparison.OrdinalIgnoreCase)) RadioThemeLight.IsChecked = true;
+                    else if (theme.Equals("Aurora", StringComparison.OrdinalIgnoreCase)) RadioThemeAurora.IsChecked = true;
+                    else if (theme.Equals("Sunset", StringComparison.OrdinalIgnoreCase)) RadioThemeSunset.IsChecked = true;
+                    else if (theme.Equals("Ocean", StringComparison.OrdinalIgnoreCase)) RadioThemeOcean.IsChecked = true;
+                    else if (theme.Equals("CustomImage", StringComparison.OrdinalIgnoreCase)) RadioThemeCustom.IsChecked = true;
+                    else RadioThemeDark.IsChecked = true;
                 }
 
-                SliderOpacity.Value = Math.Clamp(s.WindowOpacity, 0.55, 1.00);
-                TxtOpacityValue.Text = $"{(int)(SliderOpacity.Value * 100)}%";
+                if (SliderMainBgOverlay != null)
+                {
+                    SliderMainBgOverlay.Value = Math.Clamp(s.BackgroundOverlayOpacity, 0.10, 0.90);
+                }
+                if (TxtMainBgOverlayValue != null)
+                {
+                    TxtMainBgOverlayValue.Text = $"{(int)(Math.Clamp(s.BackgroundOverlayOpacity, 0.10, 0.90) * 100)}%";
+                }
 
-                ApplyTheme(s.ThemeMode);
-                ApplyOpacity(SliderOpacity.Value);
+                double clampedOpacity = Math.Clamp(s.WindowOpacity, 0.15, 1.00);
+                double transparencyPct = Math.Round((1.0 - clampedOpacity) * 100.0);
+                SliderOpacity.Value = Math.Clamp(transparencyPct, 0, 85);
+                TxtOpacityValue.Text = $"{(int)SliderOpacity.Value}%";
+
+                this.Opacity = 1.0;
+                ApplyTheme(theme);
 
                 UpdateStorageInfo();
             }
@@ -167,6 +203,7 @@ namespace ClipVault
         public void UpdateAllLocalizedTexts()
         {
             var loc = LocalizationService.Instance;
+            bool isEn = loc.CurrentLanguage == "en-US";
 
             // 窗口标题
             this.Title = loc.Get("AppTitle");
@@ -209,8 +246,16 @@ namespace ClipVault
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
 
             if (TxtAppearanceTitle != null) TxtAppearanceTitle.Text = loc.Get("AppearanceTitle");
-            if (RadioThemeDark != null) RadioThemeDark.Content = loc.Get("ThemeDark");
-            if (RadioThemeLight != null) RadioThemeLight.Content = loc.Get("ThemeLight");
+            if (RadioThemeDark != null) RadioThemeDark.Content = isEn ? "🌙 Dark Geek" : "🌙 暗夜极客";
+            if (RadioThemeLight != null) RadioThemeLight.Content = isEn ? "☀️ Pure Light" : "☀️ 纯净白天";
+            if (RadioThemeAurora != null) RadioThemeAurora.Content = isEn ? "🌌 Aurora" : "🌌 极光紫霓";
+            if (RadioThemeSunset != null) RadioThemeSunset.Content = isEn ? "🌅 Sunset" : "🌅 落日熔金";
+            if (RadioThemeOcean != null) RadioThemeOcean.Content = isEn ? "🌊 Cyber Ocean" : "🌊 深海赛博";
+            if (RadioThemeCustom != null) RadioThemeCustom.Content = isEn ? "🖼️ Custom Pic" : "🖼️ 自定义图";
+
+            if (BtnMainUploadBg != null) BtnMainUploadBg.Content = isEn ? "Upload" : "上传壁纸";
+            if (BtnMainResetBg != null) BtnMainResetBg.Content = isEn ? "Reset" : "重置";
+            if (TxtMainBgOverlayLabel != null) TxtMainBgOverlayLabel.Text = isEn ? "Dim Overlay:" : "壁纸暗化遮罩:";
             if (TxtOpacityLabel != null) TxtOpacityLabel.Text = loc.Get("OpacityLabel");
 
             if (TxtCloseActionTitle != null) TxtCloseActionTitle.Text = loc.Get("CloseActionTitle");
@@ -227,6 +272,7 @@ namespace ClipVault
                 ChkHideOnDeactivate.ToolTip = loc.Get("DeactivateTooltip");
             }
 
+            if (BtnMainClearHistory != null) BtnMainClearHistory.Content = isEn ? "🗑️ Clear History" : "🗑️ 清空历史";
             if (BtnDirectExit != null) BtnDirectExit.Content = loc.Get("BtnExitApp");
             if (BtnCloseSettingsOverlay != null) BtnCloseSettingsOverlay.Content = loc.Get("BtnDone");
 
@@ -236,7 +282,7 @@ namespace ClipVault
 
         private void LangRadio_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null) return;
             string newLang = RadioLangEn.IsChecked == true ? "en-US" : "zh-CN";
             if (_settingsService.CurrentSettings.Language != newLang)
             {
@@ -248,7 +294,7 @@ namespace ClipVault
 
         private void WindowMode_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null || RadioModeSidebar == null || RadioModeCentered == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null || RadioModeSidebar == null || RadioModeCentered == null) return;
             string newMode = RadioModeSidebar.IsChecked == true ? "Sidebar" : "Centered";
             if (_settingsService.CurrentSettings.WindowMode != newMode)
             {
@@ -335,45 +381,189 @@ namespace ClipVault
 
         // ================= 外观：白天/夜间主题与透明度 =================
 
+        private string EnsureDefaultMainWallpaperExists()
+        {
+            string assetsDir = Path.Combine(AppSettings.GetAppRootDirectory(), "assets");
+            if (!Directory.Exists(assetsDir)) Directory.CreateDirectory(assetsDir);
+            string defaultBgPath = Path.Combine(assetsDir, "default_bg.png");
+
+            if (!File.Exists(defaultBgPath))
+            {
+                try
+                {
+                    int w = 420, h = 900;
+                    var dv = new DrawingVisual();
+                    using (var dc = dv.RenderOpen())
+                    {
+                        var bgGrad = new LinearGradientBrush(
+                            Color.FromRgb(15, 12, 41),
+                            Color.FromRgb(36, 36, 62),
+                            new Point(0, 0), new Point(1, 1));
+                        bgGrad.GradientStops.Add(new GradientStop(Color.FromRgb(48, 43, 99), 0.5));
+                        dc.DrawRectangle(bgGrad, null, new Rect(0, 0, w, h));
+
+                        var orb1 = new RadialGradientBrush(Color.FromArgb(140, 236, 72, 153), Colors.Transparent);
+                        dc.DrawEllipse(orb1, null, new Point(w * 0.8, h * 0.2), 180, 180);
+
+                        var orb2 = new RadialGradientBrush(Color.FromArgb(130, 56, 189, 248), Colors.Transparent);
+                        dc.DrawEllipse(orb2, null, new Point(w * 0.2, h * 0.55), 210, 210);
+
+                        var orb3 = new RadialGradientBrush(Color.FromArgb(120, 139, 92, 246), Colors.Transparent);
+                        dc.DrawEllipse(orb3, null, new Point(w * 0.75, h * 0.85), 190, 190);
+                    }
+
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(dv);
+
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(rtb));
+                    using var fs = new FileStream(defaultBgPath, FileMode.Create, FileAccess.Write);
+                    encoder.Save(fs);
+                }
+                catch { }
+            }
+            return defaultBgPath;
+        }
+
         private void ApplyTheme(string themeMode)
         {
-            bool isLight = themeMode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            string mode = string.IsNullOrWhiteSpace(themeMode) ? "Dark" : themeMode;
+            bool isLight = mode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            bool isAurora = mode.Equals("Aurora", StringComparison.OrdinalIgnoreCase);
+            bool isSunset = mode.Equals("Sunset", StringComparison.OrdinalIgnoreCase);
+            bool isOcean = mode.Equals("Ocean", StringComparison.OrdinalIgnoreCase);
+            bool isCustom = mode.Equals("CustomImage", StringComparison.OrdinalIgnoreCase);
             bool isDark = !isLight;
 
             var loc = LocalizationService.Instance;
+            bool isEn = loc.CurrentLanguage == "en-US";
+
             if (BtnQuickTheme != null)
             {
-                BtnQuickTheme.Content = isDark ? "☀️" : "🌙";
-                BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
+                BtnQuickTheme.Content = isLight ? "🌙" : "☀️";
+                BtnQuickTheme.ToolTip = isLight ? loc.Get("ToolTipThemeDark") : loc.Get("ToolTipThemeLight");
             }
-            if (!_isInternalSettingUpdate && RadioThemeDark != null && RadioThemeLight != null)
+
+            if (BdMainCustomImageSettings != null)
             {
-                bool prev = _isInternalSettingUpdate;
-                _isInternalSettingUpdate = true;
+                BdMainCustomImageSettings.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            double opacity = Math.Clamp(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92, 0.15, 1.00);
+            byte bgAlpha = (byte)Math.Clamp(opacity * 255, 38, 255);
+            byte cardAlpha = (byte)Math.Clamp((0.35 + opacity * 0.65) * 255, 95, 255);
+
+            if (isCustom)
+            {
+                string customPath = _settingsService?.CurrentSettings.CustomBackgroundImagePath ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(customPath) || !File.Exists(customPath))
+                {
+                    customPath = EnsureDefaultMainWallpaperExists();
+                    if (TxtMainCustomBgPath != null) TxtMainCustomBgPath.Text = isEn ? "Default Built-in Wallpaper" : "默认内置极光壁纸";
+                }
+                else
+                {
+                    if (TxtMainCustomBgPath != null) TxtMainCustomBgPath.Text = Path.GetFileName(customPath);
+                }
+
                 try
                 {
-                    if (isDark) RadioThemeDark.IsChecked = true; else RadioThemeLight.IsChecked = true;
+                    if (File.Exists(customPath) && ImgMainCustomBg != null && MainBgImageContainer != null)
+                    {
+                        if (_cachedMainWallpaperBitmap == null || !string.Equals(_cachedMainWallpaperPath, customPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit();
+                            bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.UriSource = new Uri(customPath, UriKind.Absolute);
+                            bmp.EndInit();
+                            bmp.Freeze();
+                            _cachedMainWallpaperPath = customPath;
+                            _cachedMainWallpaperBitmap = bmp;
+                        }
+                        ImgMainCustomBg.Source = _cachedMainWallpaperBitmap;
+                        MainBgImageContainer.Visibility = Visibility.Visible;
+                        MainBgImageContainer.Opacity = opacity;
+                    }
                 }
-                finally
+                catch
                 {
-                    _isInternalSettingUpdate = prev;
+                    if (MainBgImageContainer != null) MainBgImageContainer.Visibility = Visibility.Collapsed;
+                }
+
+                double overlayAlphaRatio = Math.Clamp(_settingsService?.CurrentSettings.BackgroundOverlayOpacity ?? 0.55, 0.10, 0.90);
+                byte ovAlpha = (byte)(overlayAlphaRatio * 255);
+                if (BdMainCustomBgOverlay != null)
+                {
+                    BdMainCustomBgOverlay.Background = new SolidColorBrush(Color.FromArgb(ovAlpha, 10, 14, 23));
+                }
+
+                MainBorder.Background = new SolidColorBrush(Color.FromArgb(40, 13, 17, 26));
+                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.78, 80, 210), 22, 29, 42));
+                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromArgb(95, 255, 255, 255));
+                this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(236, 72, 153));
+            }
+            else
+            {
+                if (MainBgImageContainer != null) MainBgImageContainer.Visibility = Visibility.Collapsed;
+
+                if (isLight)
+                {
+                    MainBorder.Background = new SolidColorBrush(Color.FromArgb(bgAlpha, 248, 250, 252));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 255, 255, 255));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(226, 232, 240));
+                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(203, 213, 225));
+                }
+                else if (isAurora)
+                {
+                    var auroraGrad = new LinearGradientBrush(
+                        Color.FromArgb(bgAlpha, 20, 15, 45),
+                        Color.FromArgb(bgAlpha, 12, 29, 54),
+                        new Point(0, 0), new Point(1, 1));
+                    auroraGrad.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 38, 20, 71), 0.5));
+                    MainBorder.Background = auroraGrad;
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 34, 27, 68));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(91, 68, 150));
+                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(139, 92, 246));
+                }
+                else if (isSunset)
+                {
+                    var sunsetGrad = new LinearGradientBrush(
+                        Color.FromArgb(bgAlpha, 43, 16, 29),
+                        Color.FromArgb(bgAlpha, 33, 21, 16),
+                        new Point(0, 0), new Point(1, 1));
+                    sunsetGrad.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 58, 24, 34), 0.5));
+                    MainBorder.Background = sunsetGrad;
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 56, 27, 36));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(133, 61, 69));
+                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(249, 115, 22));
+                }
+                else if (isOcean)
+                {
+                    var oceanGrad = new LinearGradientBrush(
+                        Color.FromArgb(bgAlpha, 7, 25, 43),
+                        Color.FromArgb(bgAlpha, 6, 38, 48),
+                        new Point(0, 0), new Point(1, 1));
+                    MainBorder.Background = oceanGrad;
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 13, 39, 61));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(28, 93, 125));
+                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(6, 182, 212));
+                }
+                else
+                {
+                    MainBorder.Background = new SolidColorBrush(Color.FromArgb(bgAlpha, 22, 25, 34));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 24, 28, 37));
+                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(40, 50, 66));
+                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(51, 64, 80));
                 }
             }
 
-            byte alpha = (byte)((_settingsService?.CurrentSettings.WindowOpacity ?? 0.95) * 255);
-            MainBorder.Background = isDark 
-                ? new SolidColorBrush(Color.FromArgb(alpha, 22, 25, 34)) 
-                : new SolidColorBrush(Color.FromArgb(alpha, 248, 250, 252));
-
-            this.Resources["CardBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(24, 28, 37)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
-            this.Resources["CardBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(226, 232, 240));
             this.Resources["CardTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) : new SolidColorBrush(Color.FromRgb(15, 23, 42));
-            this.Resources["CodeBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(17, 20, 27)) : new SolidColorBrush(Color.FromRgb(241, 245, 249));
+            this.Resources["CodeBgBrush"] = isDark ? new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 120, 255), 17, 20, 27)) : new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 160, 255), 241, 245, 249));
             this.Resources["CodeTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(52, 211, 153)) : new SolidColorBrush(Color.FromRgb(5, 150, 105));
-            this.Resources["SubTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(113, 128, 150)) : new SolidColorBrush(Color.FromRgb(100, 116, 139));
+            this.Resources["SubTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(148, 163, 184)) : new SolidColorBrush(Color.FromRgb(100, 116, 139));
             this.Resources["TitleTextBrush"] = isDark ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42));
-            this.Resources["WindowBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(51, 64, 80)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
-            this.Resources["SearchBgBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(19, 22, 31)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
+            this.Resources["SearchBgBrush"] = isDark ? new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 130, 255), 19, 22, 31)) : new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 180, 255), 255, 255, 255));
             this.Resources["SearchBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
             this.Resources["HoverBgBrush"] = isDark 
                 ? new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)) 
@@ -391,7 +581,7 @@ namespace ClipVault
                 ? new SolidColorBrush(Color.FromRgb(96, 165, 250)) 
                 : new SolidColorBrush(Color.FromRgb(29, 78, 216));
 
-            // 顶栏控制岛高对比防透资源 (保证在透明度拉到最低时依然清晰醒目)
+            // 顶栏控制岛高对比防透资源
             this.Resources["TopPillBgBrush"] = isDark 
                 ? new SolidColorBrush(Color.FromArgb(235, 30, 37, 50)) 
                 : new SolidColorBrush(Color.FromArgb(245, 241, 245, 249));
@@ -402,7 +592,7 @@ namespace ClipVault
                 ? Brushes.White 
                 : new SolidColorBrush(Color.FromRgb(15, 23, 42));
 
-            // 分类胶囊防透实体底色与边框 (低透明度防透)
+            // 分类胶囊防透实体底色与边框
             this.Resources["TabPillBgBrush"] = isDark 
                 ? new SolidColorBrush(Color.FromRgb(30, 37, 50)) 
                 : new SolidColorBrush(Color.FromRgb(241, 245, 249));
@@ -413,7 +603,7 @@ namespace ClipVault
                 ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) 
                 : new SolidColorBrush(Color.FromRgb(30, 41, 59));
 
-            // 选中卡片自适应柔和光晕 (彻底消除白天/暗夜阴影僵硬平切感)
+            // 选中卡片自适应柔和光晕
             this.Resources["SelectedBorderBrush"] = isDark 
                 ? new SolidColorBrush(Color.FromRgb(56, 189, 248)) 
                 : new SolidColorBrush(Color.FromRgb(0, 120, 212));
@@ -422,7 +612,7 @@ namespace ClipVault
                 ? new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, ShadowDepth = 0, Color = Color.FromRgb(0, 120, 212), Opacity = 0.38 }
                 : new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Direction = 270, Color = Color.FromRgb(0, 120, 212), Opacity = 0.18 };
 
-            // 悬浮微质感菜单资源 (防止纯白压纯白导致的边框割裂)
+            // 悬浮微质感菜单资源
             this.Resources["MenuBgBrush"] = isDark 
                 ? new SolidColorBrush(Color.FromRgb(30, 36, 48)) 
                 : new SolidColorBrush(Color.FromRgb(255, 255, 255));
@@ -445,27 +635,128 @@ namespace ClipVault
             }
         }
 
-        private void ApplyOpacity(double opacity)
+        private void SetMainBrushAlphaInPlace(string key, byte alpha)
         {
-            _settingsService.CurrentSettings.WindowOpacity = opacity;
-            _settingsService.SaveSettings();
+            if (this.Resources[key] is SolidColorBrush brush && !brush.IsFrozen)
+            {
+                var c = brush.Color;
+                if (c.A != alpha)
+                {
+                    brush.Color = Color.FromArgb(alpha, c.R, c.G, c.B);
+                }
+            }
+        }
+
+        private void UpdateMainBackgroundOpacityLive(double opacity)
+        {
+            double clamped = Math.Clamp(opacity, 0.15, 1.00);
+            byte bgAlpha = (byte)Math.Clamp(clamped * 255, 38, 255);
+            byte cardAlpha = (byte)Math.Clamp((0.35 + clamped * 0.65) * 255, 95, 255);
+
+            string mode = _settingsService?.CurrentSettings.ThemeMode ?? "Dark";
+            bool isLight = mode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            bool isCustom = mode.Equals("CustomImage", StringComparison.OrdinalIgnoreCase);
+            bool isSpecialGrad = mode.Equals("Aurora", StringComparison.OrdinalIgnoreCase) ||
+                                 mode.Equals("Sunset", StringComparison.OrdinalIgnoreCase) ||
+                                 mode.Equals("Ocean", StringComparison.OrdinalIgnoreCase);
+
+            if (isCustom)
+            {
+                if (MainBgImageContainer != null) MainBgImageContainer.Opacity = clamped;
+                SetMainBrushAlphaInPlace("CardBgBrush", (byte)Math.Clamp(cardAlpha * 0.78, 80, 210));
+            }
+            else
+            {
+                if (MainBorder.Background is SolidColorBrush sb && !sb.IsFrozen)
+                {
+                    var c = sb.Color;
+                    sb.Color = Color.FromArgb(bgAlpha, c.R, c.G, c.B);
+                }
+                else if (MainBorder.Background is LinearGradientBrush lgb && !lgb.IsFrozen)
+                {
+                    foreach (var stop in lgb.GradientStops)
+                    {
+                        var c = stop.Color;
+                        stop.Color = Color.FromArgb(bgAlpha, c.R, c.G, c.B);
+                    }
+                }
+
+                byte targetCardAlpha = isSpecialGrad ? (byte)Math.Clamp(cardAlpha * 0.85, 90, 230) : cardAlpha;
+                SetMainBrushAlphaInPlace("CardBgBrush", targetCardAlpha);
+            }
+
+            SetMainBrushAlphaInPlace("CodeBgBrush", (byte)Math.Clamp((int)cardAlpha, isLight ? 160 : 120, 255));
+            SetMainBrushAlphaInPlace("SearchBgBrush", (byte)Math.Clamp((int)cardAlpha, isLight ? 180 : 130, 255));
+        }
+
+        private void ScheduleDebouncedMainSaveSettings()
+        {
+            if (_saveSettingsDebounceTimer == null)
+            {
+                _saveSettingsDebounceTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(250)
+                };
+                _saveSettingsDebounceTimer.Tick += (s, e) =>
+                {
+                    _saveSettingsDebounceTimer.Stop();
+                    if (_settingsService == null) return;
+                    _isSavingOwnSettings = true;
+                    try
+                    {
+                        _settingsService.SaveSettings();
+                    }
+                    finally
+                    {
+                        _isSavingOwnSettings = false;
+                    }
+                };
+            }
+            _saveSettingsDebounceTimer.Stop();
+            _saveSettingsDebounceTimer.Start();
+        }
+
+        private void ApplyOpacity(double transparencyPct, bool save = true)
+        {
+            double clampedPct = Math.Clamp(transparencyPct, 0, 85);
+            double opacity = Math.Clamp(1.0 - (clampedPct / 100.0), 0.15, 1.00);
 
             if (TxtOpacityValue != null)
             {
-                TxtOpacityValue.Text = $"{(int)(opacity * 100)}%";
+                TxtOpacityValue.Text = $"{(int)Math.Round(clampedPct)}%";
             }
 
-            bool isDark = _settingsService.CurrentSettings.ThemeMode != "Light";
-            byte alpha = (byte)(opacity * 255);
-            MainBorder.Background = isDark 
-                ? new SolidColorBrush(Color.FromArgb(alpha, 22, 25, 34)) 
-                : new SolidColorBrush(Color.FromArgb(alpha, 248, 250, 252));
+            if (_settingsService != null)
+            {
+                _settingsService.CurrentSettings.WindowOpacity = opacity;
+            }
+
+            this.Opacity = 1.0;
+            UpdateMainBackgroundOpacityLive(opacity);
+
+            if (save)
+            {
+                ScheduleDebouncedMainSaveSettings();
+            }
         }
 
         private void BtnQuickTheme_Click(object sender, RoutedEventArgs e)
         {
             if (_settingsService == null) return;
-            string newTheme = _settingsService.CurrentSettings.ThemeMode == "Light" ? "Dark" : "Light";
+            string current = _settingsService.CurrentSettings.ThemeMode ?? "Dark";
+            string newTheme = current.Equals("Light", StringComparison.OrdinalIgnoreCase) ? "Dark" : "Light";
+
+            _isInternalSettingUpdate = true;
+            try
+            {
+                if (newTheme == "Light" && RadioThemeLight != null) RadioThemeLight.IsChecked = true;
+                else if (RadioThemeDark != null) RadioThemeDark.IsChecked = true;
+            }
+            finally
+            {
+                _isInternalSettingUpdate = false;
+            }
+
             _settingsService.CurrentSettings.ThemeMode = newTheme;
             _settingsService.SaveSettings();
             ApplyTheme(newTheme);
@@ -474,19 +765,90 @@ namespace ClipVault
         private void ThemeRadio_Changed(object sender, RoutedEventArgs e)
         {
             if (_isInternalSettingUpdate || _settingsService == null) return;
-            string newTheme = RadioThemeDark.IsChecked == true ? "Dark" : "Light";
+
+            string newTheme = "Dark";
+            if (RadioThemeLight?.IsChecked == true) newTheme = "Light";
+            else if (RadioThemeAurora?.IsChecked == true) newTheme = "Aurora";
+            else if (RadioThemeSunset?.IsChecked == true) newTheme = "Sunset";
+            else if (RadioThemeOcean?.IsChecked == true) newTheme = "Ocean";
+            else if (RadioThemeCustom?.IsChecked == true) newTheme = "CustomImage";
+
             if (_settingsService.CurrentSettings.ThemeMode != newTheme)
             {
                 _settingsService.CurrentSettings.ThemeMode = newTheme;
                 _settingsService.SaveSettings();
-                ApplyTheme(newTheme);
             }
+            ApplyTheme(newTheme);
+        }
+
+        private void BtnMainUploadBg_Click(object sender, RoutedEventArgs e)
+        {
+            bool isEn = LocalizationService.Instance.CurrentLanguage == "en-US";
+            var dlg = new OpenFileDialog
+            {
+                Title = isEn ? "Select Custom Wallpaper Image" : "选择自定义背景壁纸图片",
+                Filter = "Image Files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp"
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    string bgDir = Path.Combine(_settingsService.CurrentSettings.StorageDirectory, "wallpapers");
+                    if (!Directory.Exists(bgDir)) Directory.CreateDirectory(bgDir);
+
+                    string ext = Path.GetExtension(dlg.FileName);
+                    string destPath = Path.Combine(bgDir, $"custom_bg_{DateTime.Now:yyyyMMdd_HHmmss}{ext}");
+                    File.Copy(dlg.FileName, destPath, true);
+
+                    _settingsService.CurrentSettings.CustomBackgroundImagePath = destPath;
+                    _settingsService.CurrentSettings.ThemeMode = "CustomImage";
+                    _settingsService.SaveSettings();
+
+                    ApplyTheme("CustomImage");
+                }
+                catch (Exception ex)
+                {
+                    ShowToast($"Error: {ex.Message}");
+                }
+            }
+        }
+
+        private void BtnMainResetBg_Click(object sender, RoutedEventArgs e)
+        {
+            _settingsService.CurrentSettings.CustomBackgroundImagePath = string.Empty;
+            _settingsService.SaveSettings();
+            ApplyTheme("CustomImage");
+        }
+
+        private void SliderMainBgOverlay_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            double val = Math.Clamp(e.NewValue, 0.10, 0.90);
+            if (TxtMainBgOverlayValue != null)
+            {
+                TxtMainBgOverlayValue.Text = $"{(int)(val * 100)}%";
+            }
+            _settingsService.CurrentSettings.BackgroundOverlayOpacity = val;
+            if (BdMainCustomBgOverlay != null)
+            {
+                byte ovAlpha = (byte)(val * 255);
+                if (BdMainCustomBgOverlay.Background is SolidColorBrush sb && !sb.IsFrozen)
+                {
+                    sb.Color = Color.FromArgb(ovAlpha, 10, 14, 23);
+                }
+                else
+                {
+                    BdMainCustomBgOverlay.Background = new SolidColorBrush(Color.FromArgb(ovAlpha, 10, 14, 23));
+                }
+            }
+            ScheduleDebouncedMainSaveSettings();
         }
 
         private void SliderOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_settingsService == null || MainBorder == null) return;
-            ApplyOpacity(e.NewValue);
+            if (_isInternalSettingUpdate || _settingsService == null || MainBorder == null) return;
+            ApplyOpacity(e.NewValue, save: true);
         }
 
         // ================= 窗口控制与退出行为 =================
@@ -510,7 +872,7 @@ namespace ClipVault
 
         private void CloseActionRadio_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null) return;
 
             if (RadioCloseExit.IsChecked == true)
             {
@@ -526,7 +888,7 @@ namespace ClipVault
 
         private void DoubleClickRadio_Changed(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null) return;
             _settingsService.CurrentSettings.DoubleClickAction = RadioDoubleClickPaste.IsChecked == true
                 ? "PasteAndHide"
                 : "CopyOnly";
@@ -535,9 +897,24 @@ namespace ClipVault
 
         private void ChkHideOnDeactivate_Click(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null) return;
             _settingsService.CurrentSettings.HideOnDeactivate = ChkHideOnDeactivate.IsChecked == true;
             _settingsService.SaveSettings();
+        }
+
+        private void BtnMainClearHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var loc = LocalizationService.Instance;
+            bool isEn = loc.CurrentLanguage == "en-US";
+            var res = MessageBox.Show(loc.Get("ConfirmClearMsg"), loc.Get("ConfirmClearTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (res == MessageBoxResult.Yes)
+            {
+                _dbService.ClearAll();
+                RefreshCards();
+                UpdateStorageInfo();
+                _settingsService.SaveSettings();
+                ShowToast(isEn ? "✓ Unpinned history cleared" : "✓ 已清空未置顶历史");
+            }
         }
 
         private void BtnDirectExit_Click(object sender, RoutedEventArgs e)
@@ -605,6 +982,7 @@ namespace ClipVault
 
         public void OpenSettings()
         {
+            LoadSettingsToUI();
             if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Visible;
             EnsureSettingsInBounds();
         }
@@ -618,6 +996,7 @@ namespace ClipVault
             }
             else
             {
+                LoadSettingsToUI();
                 SettingsOverlayHost.Visibility = Visibility.Visible;
                 EnsureSettingsInBounds();
             }
@@ -1102,12 +1481,11 @@ namespace ClipVault
                 string chosenPath = dialog.FolderName;
                 if (_settingsService.UpdateStorageDirectory(chosenPath, true))
                 {
-                    _dbService.SwitchStorageDirectory(chosenPath);
-                    TxtSettingsStoragePath.Text = chosenPath;
+                    TxtSettingsStoragePath.Text = _settingsService.CurrentSettings.StorageDirectory;
                     RefreshCards();
                     UpdateStorageInfo();
 
-                    MessageBox.Show(loc.Get("StorageMigratedMsg", chosenPath), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(loc.Get("StorageMigratedMsg", _settingsService.CurrentSettings.StorageDirectory), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
         }

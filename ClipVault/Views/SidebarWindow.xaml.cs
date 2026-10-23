@@ -26,6 +26,7 @@ namespace ClipVault.Views
         private readonly PasteSimulator _pasteSimulator;
         private readonly SystemMediaService _mediaService;
         private readonly DispatcherTimer _brightnessSyncTimer;
+        private readonly DispatcherTimer _edgeDetectTimer;
 
         public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
 
@@ -43,14 +44,29 @@ namespace ClipVault.Views
         private bool _isUpdatingBrightnessUi = true;
         private bool _isUpdatingVolumeUi = true;
         private bool _isInternalSettingUpdate = false;
+        private bool _isSavingOwnSettings = false;
+        private DispatcherTimer? _saveSettingsDebounceTimer;
+        private string? _cachedWallpaperPath;
+        private BitmapImage? _cachedWallpaperBitmap;
 
-        #region 全局外部点击监听与智能失焦收起 (图钉锁定/解锁即刻生效核心引擎)
+        // 贴边悬停唤醒与平滑动画防重入状态
+        private int _edgeHoverTicks = 0;
+        private int _outsideHoverTicks = 0;
+        private bool _mouseHasEnteredAfterShow = false;
+        private DateTime _lastHideTime = DateTime.MinValue;
+        private bool _isModalOrMenuOpen = false;
+        private int _animGeneration = 0;
+        private bool _isHiding = false;
+
+        #region 全局外部点击监听、贴边悬停自动唤醒与智能失焦收起
 
         private const int WH_MOUSE_LL = 14;
         private const int WM_LBUTTONDOWN = 0x0201;
         private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_NCRBUTTONDOWN = 0x00A4;
+        private const int SM_CXSCREEN = 0;
+        private const int SM_CYSCREEN = 1;
 
         private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
         private LowLevelMouseProc? _mouseProc;
@@ -89,6 +105,13 @@ namespace ClipVault.Views
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
@@ -131,7 +154,7 @@ namespace ClipVault.Views
                 if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_NCLBUTTONDOWN || msg == WM_NCRBUTTONDOWN)
                 {
                     // 仅当侧边栏可见且为未锁定状态时进行检测
-                    if (this.IsVisible && !_isPinned)
+                    if (this.IsVisible && !_isHiding && !_isPinned && !_isModalOrMenuOpen)
                     {
                         var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
                         int clickX = hookStruct.pt.x;
@@ -146,7 +169,7 @@ namespace ClipVault.Views
                                 // 点击落在侧边栏物理边界外部，且当前没有模态或自定义动作弹窗
                                 Dispatcher.InvokeAsync(() =>
                                 {
-                                    if (this.IsVisible && !_isPinned)
+                                    if (this.IsVisible && !_isHiding && !_isPinned && !_isModalOrMenuOpen)
                                     {
                                         if (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible)
                                         {
@@ -162,8 +185,97 @@ namespace ClipVault.Views
             return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
         }
 
+        /// <summary>
+        /// 贴边悬停自动唤醒与滑出巡检引擎 (每 50ms 探测一次屏幕右边缘光标位置)
+        /// </summary>
+        private void OnEdgeDetectTimerTick(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_settingsService == null || _settingsService.CurrentSettings.WindowMode != "Sidebar")
+                {
+                    _edgeHoverTicks = 0;
+                    _outsideHoverTicks = 0;
+                    return;
+                }
+
+                if (_isModalOrMenuOpen || _isDraggingCard)
+                {
+                    _edgeHoverTicks = 0;
+                    _outsideHoverTicks = 0;
+                    return;
+                }
+
+                if (!GetCursorPos(out POINT pt)) return;
+
+                int screenW = GetSystemMetrics(SM_CXSCREEN);
+                int screenH = GetSystemMetrics(SM_CYSCREEN);
+                if (screenW <= 0 || screenH <= 0) return;
+
+                // 场景 1：当侧边栏处于贴边收起隐藏状态时，鼠标移至屏幕最右侧边缘即刻平滑滑出显示
+                if (!this.IsVisible || _isHiding)
+                {
+                    _outsideHoverTicks = 0;
+
+                    // 刚收起后的 350ms 冷却期内不立即重新弹出，防止点击右上角关闭按钮后瞬间误触
+                    if ((DateTime.UtcNow - _lastHideTime).TotalMilliseconds < 350)
+                    {
+                        _edgeHoverTicks = 0;
+                        return;
+                    }
+
+                    // 探测屏幕右边缘 6px 热区 (避开最顶端关闭按钮角与最底端系统时间托盘角)
+                    bool atRightEdge = pt.x >= (screenW - 6) && pt.y >= 48 && pt.y <= (screenH - 48);
+                    if (atRightEdge)
+                    {
+                        _edgeHoverTicks++;
+                        if (_edgeHoverTicks >= 2) // 悬停约 100ms 即刻丝滑唤起
+                        {
+                            _edgeHoverTicks = 0;
+                            ShowDocked();
+                        }
+                    }
+                    else
+                    {
+                        _edgeHoverTicks = 0;
+                    }
+                    return;
+                }
+
+                // 场景 2：当侧边栏已显示且处于未锁定状态 (!_isPinned) 时，若鼠标进入过侧边栏后移出左侧区域，自动平滑贴边收起
+                _edgeHoverTicks = 0;
+                if (!_isPinned)
+                {
+                    IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                    if (hwnd != IntPtr.Zero && GetWindowRect(hwnd, out RECT rect))
+                    {
+                        bool insideWindow = pt.x >= rect.Left && pt.x <= rect.Right && pt.y >= rect.Top && pt.y <= rect.Bottom;
+                        if (insideWindow)
+                        {
+                            _mouseHasEnteredAfterShow = true;
+                            _outsideHoverTicks = 0;
+                        }
+                        else if (_mouseHasEnteredAfterShow &&
+                                 pt.x < (rect.Left - 35) &&
+                                 (SettingsViewPanel == null || SettingsViewPanel.Visibility != Visibility.Visible) &&
+                                 (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
+                        {
+                            _outsideHoverTicks++;
+                            if (_outsideHoverTicks >= 9) // 移出抽屉约 450ms 自动贴边收起
+                            {
+                                _outsideHoverTicks = 0;
+                                SlideOutAndHide();
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
         protected override void OnClosed(EventArgs e)
         {
+            _edgeDetectTimer?.Stop();
             StopGlobalMouseHook();
             base.OnClosed(e);
         }
@@ -173,12 +285,13 @@ namespace ClipVault.Views
         public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
         {
             _isInternalSettingUpdate = true;
-            InitializeComponent();
             _dbService = dbService;
             _settingsService = settingsService;
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
             _mediaService = new SystemMediaService();
+
+            InitializeComponent();
 
             CardsListBox.ItemsSource = DisplayCards;
 
@@ -199,22 +312,37 @@ namespace ClipVault.Views
                 Dispatcher.Invoke(() =>
                 {
                     RefreshCards();
+                    UpdateSideStorageInfo();
                 });
             };
 
             // 监听失焦自动收起 (图钉锁定状态下常驻，未锁定状态下失焦自动收起)
             this.Deactivated += (s, e) =>
             {
-                if (!_isPinned && this.IsVisible && (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
+                if (!_isPinned && this.IsVisible && !_isHiding && !_isModalOrMenuOpen &&
+                    (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
                 {
                     SlideOutAndHide();
                 }
             };
 
+            // 启动屏幕右边缘悬停唤醒定时器 (常驻监听贴边唤起)
+            _edgeDetectTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            _edgeDetectTimer.Tick += OnEdgeDetectTimerTick;
+            _edgeDetectTimer.Start();
+
             // 监听多语言全局变更
             LocalizationService.Instance.LanguageChanged += () =>
             {
-                Dispatcher.Invoke(() => UpdateLocalizedTexts());
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateLocalizedTexts();
+                    RefreshCards();
+                    UpdateSideStorageInfo();
+                });
             };
 
             // 初始化媒体播放控制服务联动
@@ -371,15 +499,26 @@ namespace ClipVault.Views
 
         #region 外观主题与多语言热更新 (支持深色/明亮/极光/暮色/深海/自定义壁纸)
 
+        private string GetWallpapersDirectory()
+        {
+            string baseDir = _settingsService?.CurrentSettings.StorageDirectory ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(baseDir))
+            {
+                baseDir = AppSettings.GetAppRootDirectory();
+            }
+            string dir = Path.Combine(baseDir, "Wallpapers");
+            try { Directory.CreateDirectory(dir); } catch { }
+            return dir;
+        }
+
         /// <summary>
-        /// 确保默认星空暗调壁纸存在，如不存在则利用 GDI+ 绘制高质量渐变星夜壁纸并保存
+        /// 确保默认星空暗调壁纸存在，如不存在则利用 GDI+ 绘制高质量渐变星夜壁纸并保存至本地存储目录
         /// </summary>
         private string EnsureDefaultWallpaperExists()
         {
             try
             {
-                string wallpapersDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Wallpapers");
-                Directory.CreateDirectory(wallpapersDir);
+                string wallpapersDir = GetWallpapersDirectory();
                 string defaultPath = Path.Combine(wallpapersDir, "default_wallpaper.jpg");
                 if (File.Exists(defaultPath)) return defaultPath;
 
@@ -446,7 +585,7 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 安全加载壁纸图片为冻结的 BitmapImage
+        /// 安全加载壁纸图片为冻结的 BitmapImage (带内存缓存，防止滑动滑块或重复切换时反复解码磁盘图片)
         /// </summary>
         private BitmapImage? LoadWallpaperBitmap(string? path)
         {
@@ -460,12 +599,19 @@ namespace ClipVault.Views
 
                 if (File.Exists(targetPath))
                 {
+                    if (_cachedWallpaperBitmap != null && string.Equals(_cachedWallpaperPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return _cachedWallpaperBitmap;
+                    }
+
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
                     bmp.UriSource = new Uri(targetPath, UriKind.Absolute);
                     bmp.EndInit();
                     bmp.Freeze();
+                    _cachedWallpaperPath = targetPath;
+                    _cachedWallpaperBitmap = bmp;
                     return bmp;
                 }
             }
@@ -473,26 +619,102 @@ namespace ClipVault.Views
             return null;
         }
 
+        private void SetBrushAlphaInPlace(string key, byte alpha)
+        {
+            if (this.Resources[key] is SolidColorBrush brush && !brush.IsFrozen)
+            {
+                var c = brush.Color;
+                if (c.A != alpha)
+                {
+                    brush.Color = Color.FromArgb(alpha, c.R, c.G, c.B);
+                }
+            }
+        }
+
         /// <summary>
-        /// 实时应用外观主题 (深色 / 明亮 / 极光 / 暮色 / 深海 / 自定义壁纸)，通过修改 Resources 实现 DynamicResource 毫秒级刷新
+        /// 滑块拖动期间 0 分配极速更新背景透明度 (直接原位修改画刷 Alpha 通道，不触发 DynamicResource 字典重建与磁盘 I/O)
+        /// </summary>
+        private void UpdateBackgroundOpacityLive(double bgOpacityFactor)
+        {
+            double clamped = Math.Clamp(bgOpacityFactor, 0.15, 1.0);
+            byte bgAlpha = (byte)Math.Clamp((int)Math.Round(clamped * 255), 35, 255);
+            byte headerAlpha = (byte)Math.Clamp((int)Math.Round(Math.Min(1.0, clamped + 0.04) * 255), 45, 255);
+            byte cardAlpha = (byte)Math.Clamp((int)Math.Round((0.55 + 0.45 * clamped) * 255), 140, 255);
+
+            string theme = _settingsService?.CurrentSettings.ThemeMode ?? "Dark";
+            if (string.Equals(theme, "CustomImage", StringComparison.OrdinalIgnoreCase))
+            {
+                if (BgImageContainer != null)
+                {
+                    BgImageContainer.Opacity = clamped;
+                }
+                return;
+            }
+
+            SetBrushAlphaInPlace("SidebarBgBrush", bgAlpha);
+            SetBrushAlphaInPlace("HeaderBgBrush", headerAlpha);
+            SetBrushAlphaInPlace("CardBgBrush", cardAlpha);
+            SetBrushAlphaInPlace("TileBgBrush", cardAlpha);
+            SetBrushAlphaInPlace("TabContainerBgBrush", cardAlpha);
+        }
+
+        private void ScheduleDebouncedSaveSettings()
+        {
+            if (_saveSettingsDebounceTimer == null)
+            {
+                _saveSettingsDebounceTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(250)
+                };
+                _saveSettingsDebounceTimer.Tick += (s, e) =>
+                {
+                    _saveSettingsDebounceTimer.Stop();
+                    SaveOwnSettingsSafely();
+                };
+            }
+            _saveSettingsDebounceTimer.Stop();
+            _saveSettingsDebounceTimer.Start();
+        }
+
+        private void SaveOwnSettingsSafely()
+        {
+            if (_settingsService == null) return;
+            _isSavingOwnSettings = true;
+            try
+            {
+                _settingsService.SaveSettings();
+            }
+            finally
+            {
+                _isSavingOwnSettings = false;
+            }
+        }
+
+        /// <summary>
+        /// 实时应用外观主题与背景透明度 (0% 透明度 = 100% 不透明底色，前景文字始终保持 100% 清晰锐利)
         /// </summary>
         public void ApplyTheme(string theme)
         {
+            double bgOpacityFactor = Math.Clamp(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92, 0.15, 1.0);
+            byte bgAlpha = (byte)Math.Clamp((int)Math.Round(bgOpacityFactor * 255), 35, 255);
+            byte headerAlpha = (byte)Math.Clamp((int)Math.Round(Math.Min(1.0, bgOpacityFactor + 0.04) * 255), 45, 255);
+            byte cardAlpha = (byte)Math.Clamp((int)Math.Round((0.55 + 0.45 * bgOpacityFactor) * 255), 140, 255);
+
             switch (theme)
             {
                 case "Light":
                     if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
-                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xFA, 0xFA, 0xFB, 0xFD));
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(bgAlpha, 0xFA, 0xFB, 0xFD));
                     this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
-                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(headerAlpha, 0xFF, 0xFF, 0xFF));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0xFF, 0xFF, 0xFF));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x17, 0x2A));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0xF1, 0xF5, 0xF9));
                     this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0xE2, 0xE8, 0xF0));
-                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0xEE, 0xF2, 0xF6));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0xEE, 0xF2, 0xF6));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0xF1, 0xF5, 0xF9));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x02, 0x84, 0xC7));
                     this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
@@ -508,17 +730,17 @@ namespace ClipVault.Views
 
                 case "Aurora": // 极光星空 (翠绿极光)
                     if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
-                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0B, 0x1A, 0x17));
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(bgAlpha, 0x0B, 0x1A, 0x17));
                     this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x4E, 0x4A));
-                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x07, 0x14, 0x12));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0x26, 0x23));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(headerAlpha, 0x07, 0x14, 0x12));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x10, 0x26, 0x23));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x16, 0x38, 0x33));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x4D, 0x45));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xEC, 0xFD, 0xF5));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x6E, 0xE7, 0xB7));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0F, 0x24, 0x21));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x0F, 0x24, 0x21));
                     this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x17, 0x36, 0x31));
-                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0A, 0x1C, 0x1A));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x0A, 0x1C, 0x1A));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x08, 0x16, 0x14));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99));
                     this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81));
@@ -534,17 +756,17 @@ namespace ClipVault.Views
 
                 case "Sunset": // 暮色霞光 (紫橙夕阳)
                     if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
-                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x1C, 0x12, 0x20));
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(bgAlpha, 0x1C, 0x12, 0x20));
                     this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x4C, 0x1D, 0x44));
-                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x16, 0x0D, 0x19));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x2A, 0x18, 0x2E));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(headerAlpha, 0x16, 0x0D, 0x19));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x2A, 0x18, 0x2E));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x3B, 0x22, 0x40));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x53, 0x26, 0x58));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xFF, 0xF1, 0xF2));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF4, 0x72, 0xB6));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x13, 0x27));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x23, 0x13, 0x27));
                     this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x33, 0x1B, 0x38));
-                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x19, 0x0C, 0x1D));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x19, 0x0C, 0x1D));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x08, 0x16));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0xFB, 0x71, 0x85));
                     this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0xF9, 0x73, 0x16));
@@ -560,17 +782,17 @@ namespace ClipVault.Views
 
                 case "Ocean": // 深海之渊 (深海天青)
                     if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
-                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF4, 0x0A, 0x13, 0x26));
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(bgAlpha, 0x0A, 0x13, 0x26));
                     this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x3B, 0x62));
-                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF6, 0x07, 0x0E, 0x1E));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x10, 0x21, 0x3D));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(headerAlpha, 0x07, 0x0E, 0x1E));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x10, 0x21, 0x3D));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x17, 0x2E, 0x54));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x1D, 0x3E, 0x6F));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF0, 0xF9, 0xFF));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x7D, 0xD3, 0xFC));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x0C, 0x1A, 0x33));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x0C, 0x1A, 0x33));
                     this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x13, 0x27, 0x4A));
-                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x08, 0x12, 0x23));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x08, 0x12, 0x23));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x05, 0x0E, 0x1B));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
                     this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4));
@@ -588,6 +810,7 @@ namespace ClipVault.Views
                     if (BgImageContainer != null)
                     {
                         BgImageContainer.Visibility = Visibility.Visible;
+                        BgImageContainer.Opacity = bgOpacityFactor;
                         if (ImgCustomBg != null)
                         {
                             ImgCustomBg.Source = LoadWallpaperBitmap(_settingsService?.CurrentSettings.CustomBackgroundImagePath);
@@ -626,17 +849,17 @@ namespace ClipVault.Views
 
                 default: // 默认暗夜深色 (极夜蓝黑)
                     if (BgImageContainer != null) BgImageContainer.Visibility = Visibility.Collapsed;
-                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x17, 0x22));
+                    this.Resources["SidebarBgBrush"] = new SolidColorBrush(Color.FromArgb(bgAlpha, 0x14, 0x17, 0x22));
                     this.Resources["SidebarBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2E, 0x3A, 0x4E));
-                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(0xF5, 0x0F, 0x12, 0x1A));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x30));
+                    this.Resources["HeaderBgBrush"] = new SolidColorBrush(Color.FromArgb(headerAlpha, 0x0F, 0x12, 0x1A));
+                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x1C, 0x22, 0x30));
                     this.Resources["CardHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x32, 0x46));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x2D, 0x39, 0x4D));
                     this.Resources["TextPrimaryBrush"] = new SolidColorBrush(Color.FromRgb(0xF8, 0xFA, 0xFC));
                     this.Resources["TextSecondaryBrush"] = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8));
-                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30));
+                    this.Resources["TileBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x1B, 0x22, 0x30));
                     this.Resources["TileHoverBgBrush"] = new SolidColorBrush(Color.FromRgb(0x28, 0x33, 0x48));
-                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromRgb(0x15, 0x1B, 0x26));
+                    this.Resources["TabContainerBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 0x15, 0x1B, 0x26));
                     this.Resources["CodeBoxBgBrush"] = new SolidColorBrush(Color.FromRgb(0x11, 0x14, 0x1C));
                     this.Resources["CodeTextBrush"] = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8));
                     this.Resources["AccentBlueBrush"] = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD7));
@@ -653,9 +876,6 @@ namespace ClipVault.Views
 
             // 更新视图切换栏指示与高亮
             UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
-
-            // 重新刷新自定义磁贴列表的色彩
-            RefreshCustomActions();
         }
 
         /// <summary>
@@ -677,7 +897,7 @@ namespace ClipVault.Views
             if (RadioCode != null) RadioCode.Content = loc.Get("SidebarFilterCode");
             if (RadioPinned != null) RadioPinned.Content = loc.Get("SidebarFilterPinned");
 
-            // 随手记与连续粘贴队列多语言 (杀手级新功能)
+            // 随手记与连续粘贴队列多语言
             if (TxtScratchpadTitle != null) TxtScratchpadTitle.Text = loc.Get("ScratchpadTitle");
             if (BtnScratchpadCopy != null) BtnScratchpadCopy.ToolTip = loc.Get("ScratchpadCopy");
             if (BtnScratchpadClear != null) BtnScratchpadClear.ToolTip = loc.Get("ScratchpadClear");
@@ -693,7 +913,7 @@ namespace ClipVault.Views
             if (TxtBrightnessTitle != null) TxtBrightnessTitle.Text = loc.Get("SidebarBrightness");
             if (TxtVolumeTitle != null) TxtVolumeTitle.Text = loc.Get("SidebarVolume");
 
-            // 偏好设置页面
+            // 偏好设置页面 (与 1.0 完全对齐)
             if (TxtSettingsHeaderTitle != null) TxtSettingsHeaderTitle.Text = loc.Get("SidebarPreferences");
             if (TxtSetModeTitle != null) TxtSetModeTitle.Text = loc.Get("WindowModeTitle");
             if (RadioModeSidebar2 != null) RadioModeSidebar2.Content = loc.Get("WindowModeSidebar");
@@ -702,17 +922,27 @@ namespace ClipVault.Views
             if (RadioLangZh2 != null) RadioLangZh2.Content = loc.Get("LangZh");
             if (RadioLangEn2 != null) RadioLangEn2.Content = loc.Get("LangEn");
             if (TxtSetThemeTitle != null) TxtSetThemeTitle.Text = loc.Get("AppearanceTitle");
+            if (TxtThemeDarkShort2 != null) TxtThemeDarkShort2.Text = loc.Get("ThemeDarkShort");
+            if (TxtThemeLightShort2 != null) TxtThemeLightShort2.Text = loc.Get("ThemeLightShort");
+            if (TxtThemeAuroraShort2 != null) TxtThemeAuroraShort2.Text = loc.Get("ThemeAuroraShort");
+            if (TxtThemeSunsetShort2 != null) TxtThemeSunsetShort2.Text = loc.Get("ThemeSunsetShort");
+            if (TxtThemeOceanShort2 != null) TxtThemeOceanShort2.Text = loc.Get("ThemeOceanShort");
+            if (TxtThemeCustomShort2 != null) TxtThemeCustomShort2.Text = loc.Get("ThemeCustomShort");
             if (TxtSetOpacityTitle != null) TxtSetOpacityTitle.Text = loc.Get("OpacityLabel");
             if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
+            if (TxtSideCloseActionTitle != null) TxtSideCloseActionTitle.Text = loc.Get("CloseActionTitle");
+            if (RadioSideCloseMinimize != null) RadioSideCloseMinimize.Content = loc.Get("CloseActionTray");
+            if (RadioSideCloseExit != null) RadioSideCloseExit.Content = loc.Get("CloseActionExit");
             if (TxtSetInteractionTitle != null) TxtSetInteractionTitle.Text = loc.Get("DoubleClickTitle");
+            if (RadioSideDoubleClickCopy != null) RadioSideDoubleClickCopy.Content = loc.Get("DoubleClickCopy");
+            if (RadioSideDoubleClickPaste != null) RadioSideDoubleClickPaste.Content = loc.Get("DoubleClickPaste");
             if (ChkHideOnDeactivate2 != null)
             {
                 ChkHideOnDeactivate2.Content = "📌 " + loc.Get("PinSettingTitle");
                 ChkHideOnDeactivate2.ToolTip = loc.Get("PinSettingTooltip");
             }
-            if (ChkPasteOnDblClick != null) ChkPasteOnDblClick.Content = loc.Get("DoubleClickPaste");
-            if (BtnClearHistory != null) BtnClearHistory.Content = loc.Get("TrayClear");
+            if (BtnClearHistory != null) BtnClearHistory.Content = "🗑️ " + loc.Get("TrayClear");
             if (BtnExitApp != null) BtnExitApp.Content = loc.Get("BtnExitApp");
 
             // 底部提示与状态
@@ -720,17 +950,23 @@ namespace ClipVault.Views
             if (TxtStatusLeft != null) TxtStatusLeft.Text = loc.Get("SidebarRecordCount", DisplayCards.Count);
             if (BtnPin != null) BtnPin.ToolTip = _isPinned ? loc.Get("PinLockedTip") : loc.Get("PinUnlockedTip");
             UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
+            UpdateSideStorageInfo();
         }
 
         #endregion
 
-        #region 窗口生命周期与抽屉平滑动画
+        #region 窗口生命周期与抽屉平滑动画 (带代数防重入保护)
 
         /// <summary>
-        /// 精准吸附至屏幕最右侧工作区全高，并执行顺滑显现
+        /// 精准吸附至屏幕最右侧工作区全高，并执行顺滑贴边滑入显现
         /// </summary>
         public void ShowDocked()
         {
+            int gen = ++_animGeneration;
+            _isHiding = false;
+            _mouseHasEnteredAfterShow = false;
+            _outsideHoverTicks = 0;
+
             _pasteSimulator.RecordTargetWindow();
 
             var workArea = SystemParameters.WorkArea;
@@ -742,6 +978,7 @@ namespace ClipVault.Views
             this.Topmost = true;
 
             RefreshCards();
+            UpdateSideStorageInfo();
             
             // 立即用当前音源信息刷新 UI，并触发后台重新检测
             UpdateMediaUI(_mediaService.CurrentMedia);
@@ -791,19 +1028,41 @@ namespace ClipVault.Views
                 StartGlobalMouseHook();
             }
 
+            this.BeginAnimation(UIElement.OpacityProperty, null);
+            DrawerTranslate?.BeginAnimation(TranslateTransform.XProperty, null);
+
             this.Show();
             this.Activate();
 
-            // 顺畅渐变显现，动画完成后解除时钟绑定，使滑块手动调节实时生效
-            double finalOpacity = Math.Max(0.08, _settingsService?.CurrentSettings?.WindowOpacity ?? 1.0);
+            // 顺畅贴边滑入 + 渐显动画，前景保持 100% 清晰，背景透明度由画刷承载
             this.Opacity = 0;
-            var anim = new DoubleAnimation(0, finalOpacity, TimeSpan.FromMilliseconds(200));
-            anim.Completed += (s, e) =>
+            var fadeAnim = new DoubleAnimation(0, 1.0, TimeSpan.FromMilliseconds(180))
             {
-                this.BeginAnimation(UIElement.OpacityProperty, null);
-                this.Opacity = finalOpacity;
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
-            this.BeginAnimation(UIElement.OpacityProperty, anim);
+            fadeAnim.Completed += (s, e) =>
+            {
+                if (gen != _animGeneration) return;
+                this.BeginAnimation(UIElement.OpacityProperty, null);
+                this.Opacity = 1.0;
+            };
+            this.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+
+            if (DrawerTranslate != null)
+            {
+                DrawerTranslate.X = 48;
+                var slideAnim = new DoubleAnimation(48, 0, TimeSpan.FromMilliseconds(180))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                slideAnim.Completed += (s, e) =>
+                {
+                    if (gen != _animGeneration) return;
+                    DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                    DrawerTranslate.X = 0;
+                };
+                DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, slideAnim);
+            }
 
             if (ClipboardViewPanel.Visibility == Visibility.Visible)
             {
@@ -812,27 +1071,52 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 平滑收起抽屉并隐藏
+        /// 平滑向右收起抽屉并隐藏
         /// </summary>
         public void SlideOutAndHide()
         {
+            if (!this.IsVisible || _isHiding) return;
+
+            int gen = ++_animGeneration;
+            _isHiding = true;
+            _lastHideTime = DateTime.UtcNow;
+
             StopGlobalMouseHook();
             _brightnessSyncTimer.Stop();
 
-            double currentOp = this.Opacity;
-            var anim = new DoubleAnimation(currentOp, 0, TimeSpan.FromMilliseconds(160));
-            anim.Completed += (s, e) =>
+            double currentOp = this.Opacity > 0.05 ? this.Opacity : 1.0;
+            var fadeAnim = new DoubleAnimation(currentOp, 0, TimeSpan.FromMilliseconds(150))
             {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            fadeAnim.Completed += (s, e) =>
+            {
+                if (gen != _animGeneration) return;
+                _isHiding = false;
                 this.Hide();
                 this.BeginAnimation(UIElement.OpacityProperty, null);
-                this.Opacity = Math.Max(0.08, _settingsService.CurrentSettings.WindowOpacity);
+                this.Opacity = 1.0;
+                if (DrawerTranslate != null)
+                {
+                    DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                    DrawerTranslate.X = 0;
+                }
             };
-            this.BeginAnimation(UIElement.OpacityProperty, anim);
+            this.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+
+            if (DrawerTranslate != null)
+            {
+                var slideAnim = new DoubleAnimation(DrawerTranslate.X, 48, TimeSpan.FromMilliseconds(150))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+                DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, slideAnim);
+            }
         }
 
         public void ToggleDocked()
         {
-            if (this.IsVisible && this.Opacity > 0.1)
+            if (this.IsVisible && !_isHiding && this.Opacity > 0.1)
             {
                 SlideOutAndHide();
             }
@@ -915,33 +1199,37 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 在侧边栏内部直接展示偏好设置页 (彻底解耦 1.0 居中窗口)
+        /// 在侧边栏内部直接展示偏好设置页 (与 1.0 共享同一套设置源)
         /// </summary>
         public void ShowSettings()
         {
-            if (ClipboardViewPanel.Visibility == Visibility.Visible)
+            try
             {
-                _previousView = "Clipboard";
+                if (ClipboardViewPanel.Visibility == Visibility.Visible)
+                {
+                    _previousView = "Clipboard";
+                }
+                else if (SystemActionsPanel.Visibility == Visibility.Visible)
+                {
+                    _previousView = "SystemActions";
+                }
+
+                LoadSettingsToSidebarUI();
+
+                ClipboardViewPanel.Visibility = Visibility.Collapsed;
+                SystemActionsPanel.Visibility = Visibility.Collapsed;
+                SettingsViewPanel.Visibility = Visibility.Visible;
+
+                HeaderNormalBar.Visibility = Visibility.Collapsed;
+                HeaderSettingsBar.Visibility = Visibility.Visible;
+                TabSwitcherRow.Visibility = Visibility.Collapsed;
+
+                if (!this.IsVisible || _isHiding)
+                {
+                    ShowDocked();
+                }
             }
-            else if (SystemActionsPanel.Visibility == Visibility.Visible)
-            {
-                _previousView = "SystemActions";
-            }
-
-            ClipboardViewPanel.Visibility = Visibility.Collapsed;
-            SystemActionsPanel.Visibility = Visibility.Collapsed;
-            SettingsViewPanel.Visibility = Visibility.Visible;
-
-            HeaderNormalBar.Visibility = Visibility.Collapsed;
-            HeaderSettingsBar.Visibility = Visibility.Visible;
-            TabSwitcherRow.Visibility = Visibility.Collapsed;
-
-            LoadSettingsToSidebarUI();
-
-            if (!this.IsVisible)
-            {
-                ShowDocked();
-            }
+            catch { }
         }
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
@@ -991,15 +1279,32 @@ namespace ClipVault.Views
             if (BtnPin != null) BtnPin.ToolTip = _isPinned ? loc.Get("PinLockedTip") : loc.Get("PinUnlockedTip");
             if (ChkHideOnDeactivate2 != null)
             {
+                bool prev = _isInternalSettingUpdate;
                 _isInternalSettingUpdate = true;
-                ChkHideOnDeactivate2.IsChecked = _isPinned;
-                _isInternalSettingUpdate = false;
+                try
+                {
+                    ChkHideOnDeactivate2.IsChecked = _isPinned;
+                }
+                finally
+                {
+                    _isInternalSettingUpdate = prev;
+                }
             }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            SlideOutAndHide();
+            if (_settingsService?.CurrentSettings.CloseAction == "ExitApp")
+            {
+                if (Application.Current is App app)
+                {
+                    app.ExitApplication();
+                }
+            }
+            else
+            {
+                SlideOutAndHide();
+            }
         }
 
         #endregion
@@ -1726,11 +2031,136 @@ namespace ClipVault.Views
 
         #endregion
 
-        #region 自定义快捷动作网格管理 (用户可自行添加和管理)
+        #region 自定义快捷动作网格管理 (支持自动提取程序原生高清图标 + 自定义 Emoji 覆盖)
+
+        private static readonly System.Collections.Generic.Dictionary<string, ImageSource?> _programIconCache = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// 智能解析命令或路径对应的真实可执行程序物理路径 (支持完整路径、引号路径、系统内置命令如 calc/taskmgr/notepad 等)
+        /// </summary>
+        private static string? ResolveExecutablePath(string? cmdOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(cmdOrPath)) return null;
+            string raw = cmdOrPath.Trim();
+
+            // URL 或 URI 协议 (如 ms-screenclip:, https://) 无本地 exe 图标
+            if (raw.Contains("://") || (raw.EndsWith(":") && !raw.Contains("\\") && !raw.Contains("/")))
+            {
+                return null;
+            }
+
+            // 去除首尾引号或提取带参数的第一个可执行文件路径
+            string candidate = raw;
+            if (raw.StartsWith("\""))
+            {
+                int endQuote = raw.IndexOf('"', 1);
+                if (endQuote > 1)
+                {
+                    candidate = raw.Substring(1, endQuote - 1);
+                }
+            }
+            else if (File.Exists(raw))
+            {
+                candidate = raw;
+            }
+            else
+            {
+                int exeIdx = raw.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+                if (exeIdx > 0)
+                {
+                    candidate = raw.Substring(0, exeIdx + 4).Trim();
+                }
+                else
+                {
+                    int spaceIdx = raw.IndexOf(' ');
+                    if (spaceIdx > 0) candidate = raw.Substring(0, spaceIdx).Trim();
+                }
+            }
+
+            try
+            {
+                if (File.Exists(candidate))
+                {
+                    return Path.GetFullPath(candidate);
+                }
+
+                // 尝试补全 .exe 后缀並在 System32 / Windows / PATH 中检索
+                string withExe = candidate.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? candidate : candidate + ".exe";
+                string sys32 = Environment.SystemDirectory;
+                string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+
+                string p1 = Path.Combine(sys32, withExe);
+                if (File.Exists(p1)) return p1;
+
+                string p2 = Path.Combine(winDir, withExe);
+                if (File.Exists(p2)) return p2;
+
+                string? pathEnv = Environment.GetEnvironmentVariable("PATH");
+                if (!string.IsNullOrEmpty(pathEnv))
+                {
+                    foreach (var dir in pathEnv.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        try
+                        {
+                            string p = Path.Combine(dir.Trim(), withExe);
+                            if (File.Exists(p)) return p;
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 从目标程序提取关联原生图标并转换为冻结的高清 ImageSource
+        /// </summary>
+        private static ImageSource? ExtractProgramIcon(string? cmdOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(cmdOrPath)) return null;
+            string key = cmdOrPath.Trim();
+
+            if (_programIconCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            try
+            {
+                string? resolved = ResolveExecutablePath(key);
+                if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
+                {
+                    using var ico = System.Drawing.Icon.ExtractAssociatedIcon(resolved);
+                    if (ico != null)
+                    {
+                        using var bmp = ico.ToBitmap();
+                        using var ms = new MemoryStream();
+                        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                        ms.Position = 0;
+
+                        var bitmapImage = new BitmapImage();
+                        bitmapImage.BeginInit();
+                        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmapImage.StreamSource = ms;
+                        bitmapImage.EndInit();
+                        bitmapImage.Freeze();
+
+                        _programIconCache[key] = bitmapImage;
+                        return bitmapImage;
+                    }
+                }
+            }
+            catch { }
+
+            _programIconCache[key] = null;
+            return null;
+        }
 
         private void RefreshCustomActions()
         {
-            if (CustomActionsPanel == null) return;
+            if (CustomActionsPanel == null || _settingsService == null) return;
 
             while (CustomActionsPanel.Children.Count > 1)
             {
@@ -1760,6 +2190,7 @@ namespace ClipVault.Views
 
             var template = new ControlTemplate(typeof(Button));
             var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "tileBd";
             borderFactory.SetResourceReference(Border.BackgroundProperty, "TileBgBrush");
             borderFactory.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
             borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
@@ -1769,11 +2200,31 @@ namespace ClipVault.Views
             stack.SetValue(StackPanel.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             stack.SetValue(StackPanel.VerticalAlignmentProperty, VerticalAlignment.Center);
 
-            var iconTxt = new FrameworkElementFactory(typeof(TextBlock));
-            iconTxt.SetValue(TextBlock.TextProperty, string.IsNullOrEmpty(action.Icon) ? "🚀" : action.Icon);
-            iconTxt.SetValue(TextBlock.FontSizeProperty, 16.0);
-            iconTxt.SetResourceReference(TextBlock.ForegroundProperty, "AccentBlueBrush");
-            iconTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            // 判断是否使用程序原生图标：当未设置自定义 Emoji (或为默认占位符 🚀/🧮/📊) 且目标是可提取图标的程序时，默认优先展示程序原生图标！
+            string rawIcon = (action.Icon ?? string.Empty).Trim();
+            bool hasCustomEmoji = !string.IsNullOrEmpty(rawIcon) && rawIcon != "🚀" && rawIcon != "🧮" && rawIcon != "📊";
+            ImageSource? nativeIcon = !hasCustomEmoji ? ExtractProgramIcon(action.CommandOrPath) : null;
+
+            if (nativeIcon != null)
+            {
+                var imgFactory = new FrameworkElementFactory(typeof(Image));
+                imgFactory.SetValue(Image.SourceProperty, nativeIcon);
+                imgFactory.SetValue(Image.WidthProperty, 20.0);
+                imgFactory.SetValue(Image.HeightProperty, 20.0);
+                imgFactory.SetValue(Image.StretchProperty, Stretch.Uniform);
+                imgFactory.SetValue(Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+                imgFactory.SetValue(RenderOptions.BitmapScalingModeProperty, BitmapScalingMode.HighQuality);
+                stack.AppendChild(imgFactory);
+            }
+            else
+            {
+                var iconTxt = new FrameworkElementFactory(typeof(TextBlock));
+                iconTxt.SetValue(TextBlock.TextProperty, string.IsNullOrEmpty(rawIcon) ? "🚀" : rawIcon);
+                iconTxt.SetValue(TextBlock.FontSizeProperty, 16.0);
+                iconTxt.SetResourceReference(TextBlock.ForegroundProperty, "AccentBlueBrush");
+                iconTxt.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+                stack.AppendChild(iconTxt);
+            }
 
             var nameTxt = new FrameworkElementFactory(typeof(TextBlock));
             nameTxt.SetValue(TextBlock.TextProperty, action.Name);
@@ -1785,10 +2236,16 @@ namespace ClipVault.Views
             nameTxt.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
             nameTxt.SetValue(TextBlock.MaxWidthProperty, 70.0);
 
-            stack.AppendChild(iconTxt);
             stack.AppendChild(nameTxt);
             borderFactory.AppendChild(stack);
             template.VisualTree = borderFactory;
+
+            // 悬停高亮触发器
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("TileHoverBgBrush"), "tileBd"));
+            hoverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new DynamicResourceExtension("AccentBlueBrush"), "tileBd"));
+            template.Triggers.Add(hoverTrigger);
+
             btn.Template = template;
 
             btn.Click += (s, e) =>
@@ -1803,31 +2260,87 @@ namespace ClipVault.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"启动失败: {ex.Message}", "快捷动作", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _isModalOrMenuOpen = true;
+                    try
+                    {
+                        MessageBox.Show($"启动失败: {ex.Message}", "快捷动作", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    finally
+                    {
+                        _isModalOrMenuOpen = false;
+                    }
                 }
             };
 
             btn.MouseRightButtonUp += (s, e) =>
             {
-                var result = MessageBox.Show($"确定删除快捷动作【{action.Name}】吗？", "删除快捷动作", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (result == MessageBoxResult.Yes)
+                _isModalOrMenuOpen = true;
+                try
                 {
-                    _settingsService.CurrentSettings.CustomActions.RemoveAt(index);
-                    _settingsService.SaveSettings();
-                    RefreshCustomActions();
+                    var result = MessageBox.Show($"确定删除快捷动作【{action.Name}】吗？", "删除快捷动作", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        _settingsService.CurrentSettings.CustomActions.RemoveAt(index);
+                        _settingsService.SaveSettings();
+                        RefreshCustomActions();
+                    }
+                }
+                finally
+                {
+                    _isModalOrMenuOpen = false;
                 }
             };
 
             return btn;
         }
 
+        private void UpdateNewActionIconPreview()
+        {
+            if (ImgNewActionIconPreview == null || TxtNewActionIconPreview == null) return;
+            string customEmoji = TxtNewActionIcon?.Text?.Trim() ?? string.Empty;
+            string cmd = TxtNewActionCommand?.Text?.Trim() ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(customEmoji))
+            {
+                ImgNewActionIconPreview.Visibility = Visibility.Collapsed;
+                TxtNewActionIconPreview.Visibility = Visibility.Visible;
+                TxtNewActionIconPreview.Text = customEmoji;
+                return;
+            }
+
+            var nativeIcon = ExtractProgramIcon(cmd);
+            if (nativeIcon != null)
+            {
+                ImgNewActionIconPreview.Source = nativeIcon;
+                ImgNewActionIconPreview.Visibility = Visibility.Visible;
+                TxtNewActionIconPreview.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ImgNewActionIconPreview.Visibility = Visibility.Collapsed;
+                TxtNewActionIconPreview.Visibility = Visibility.Visible;
+                TxtNewActionIconPreview.Text = "🚀";
+            }
+        }
+
+        private void TxtNewActionCommand_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateNewActionIconPreview();
+        }
+
+        private void TxtNewActionIcon_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateNewActionIconPreview();
+        }
+
         private void BtnAddNewAction_Click(object sender, RoutedEventArgs e)
         {
             TxtNewActionName.Text = "";
-            TxtNewActionIcon.Text = "🚀";
+            TxtNewActionIcon.Text = ""; // 默认留空以自动拉取目标程序图标，用户也可自行输入 Emoji
             TxtNewActionCommand.Text = "";
+            UpdateNewActionIconPreview();
             AddActionOverlay.Visibility = Visibility.Visible;
-            TxtNewActionName.Focus();
+            TxtNewActionCommand.Focus();
         }
 
         private void BtnCancelAddAction_Click(object sender, RoutedEventArgs e)
@@ -1837,18 +2350,27 @@ namespace ClipVault.Views
 
         private void BtnBrowseActionFile_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFileDialog
+            _isModalOrMenuOpen = true;
+            try
             {
-                Title = "选择可执行程序或文件",
-                Filter = "所有文件 (*.*)|*.*|应用程序 (*.exe)|*.exe"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                TxtNewActionCommand.Text = dlg.FileName;
-                if (string.IsNullOrEmpty(TxtNewActionName.Text))
+                var dlg = new OpenFileDialog
                 {
-                    TxtNewActionName.Text = Path.GetFileNameWithoutExtension(dlg.FileName);
+                    Title = "选择可执行程序或文件",
+                    Filter = "应用程序 (*.exe;*.lnk;*.bat;*.cmd)|*.exe;*.lnk;*.bat;*.cmd|所有文件 (*.*)|*.*"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    TxtNewActionCommand.Text = dlg.FileName;
+                    if (string.IsNullOrEmpty(TxtNewActionName.Text))
+                    {
+                        TxtNewActionName.Text = Path.GetFileNameWithoutExtension(dlg.FileName);
+                    }
+                    UpdateNewActionIconPreview();
                 }
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
             }
         }
 
@@ -1860,16 +2382,25 @@ namespace ClipVault.Views
 
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(cmd))
             {
-                MessageBox.Show("请填写名称和执行目标！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                _isModalOrMenuOpen = true;
+                try
+                {
+                    MessageBox.Show("请填写名称和执行目标！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                finally
+                {
+                    _isModalOrMenuOpen = false;
+                }
                 return;
             }
 
+            // 若用户未输入自定义 Emoji，保持 Icon 为空字符串以优先使用提取到的程序原生图标
             _settingsService.CurrentSettings.CustomActions.Add(new CustomActionItem
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Name = name,
                 CommandOrPath = cmd,
-                Icon = string.IsNullOrEmpty(icon) ? "🚀" : icon
+                Icon = icon
             });
             _settingsService.SaveSettings();
 
@@ -1879,31 +2410,55 @@ namespace ClipVault.Views
 
         #endregion
 
-        #region 侧边栏内置设置中心联动 (100% 独立于 1.0)
+        #region 侧边栏偏好设置中心联动 (与 1.0 居中模式 100% 同源双向实时同步)
+
+        public void SyncSettingsFromService(bool refreshCards)
+        {
+            if (_isSavingOwnSettings || _isInternalSettingUpdate) return;
+            LoadSettingsToSidebarUI();
+            if (refreshCards)
+            {
+                RefreshCards();
+            }
+            UpdateSideStorageInfo();
+        }
+
+        private void UpdateSideStorageInfo()
+        {
+            try
+            {
+                if (TxtSideStorageStatusInfo == null || _dbService == null) return;
+                var (_, totalCount, pinnedCount, imgCount, _) = _dbService.GetStats();
+                TxtSideStorageStatusInfo.Text = LocalizationService.Instance.Get("StatusInfoFormat", totalCount, pinnedCount, imgCount);
+            }
+            catch { }
+        }
 
         private void LoadSettingsToSidebarUI()
         {
-            var s = _settingsService.CurrentSettings;
-            if (TxtSideStoragePath != null) TxtSideStoragePath.Text = s.StorageDirectory;
-
-            // 模式单选
-            if (RadioModeCentered2 != null && RadioModeSidebar2 != null)
-            {
-                if (s.WindowMode == "Centered") RadioModeCentered2.IsChecked = true;
-                else RadioModeSidebar2.IsChecked = true;
-            }
-
-            // 语言单选
-            if (RadioLangEn2 != null && RadioLangZh2 != null)
-            {
-                if (s.Language == "en-US") RadioLangEn2.IsChecked = true;
-                else RadioLangZh2.IsChecked = true;
-            }
-
-            // 主题单选回显与壁纸状态
+            if (_settingsService == null) return;
+            bool prev = _isInternalSettingUpdate;
+            _isInternalSettingUpdate = true;
             try
             {
-                _isInternalSettingUpdate = true;
+                var s = _settingsService.CurrentSettings;
+                if (TxtSideStoragePath != null) TxtSideStoragePath.Text = s.StorageDirectory;
+
+                // 1. 模式单选
+                if (RadioModeCentered2 != null && RadioModeSidebar2 != null)
+                {
+                    if (s.WindowMode == "Centered") RadioModeCentered2.IsChecked = true;
+                    else RadioModeSidebar2.IsChecked = true;
+                }
+
+                // 2. 语言单选
+                if (RadioLangEn2 != null && RadioLangZh2 != null)
+                {
+                    if (s.Language == "en-US") RadioLangEn2.IsChecked = true;
+                    else RadioLangZh2.IsChecked = true;
+                }
+
+                // 3. 主题单选回显与壁纸状态
                 switch (s.ThemeMode)
                 {
                     case "Light":
@@ -1942,31 +2497,46 @@ namespace ClipVault.Views
                         ? "未选择本地图片 (当前使用内置极光壁纸)"
                         : Path.GetFileName(s.CustomBackgroundImagePath);
                 }
+
+                // 4. 背景透明度回显 (0% = 完全不透明 WindowOpacity 1.0；向右拉增大透明度，最高 85% 即 WindowOpacity 0.15)
+                if (SliderSideOpacity != null)
+                {
+                    int transparencyPct = Math.Clamp((int)Math.Round((1.0 - s.WindowOpacity) * 100), 0, 85);
+                    SliderSideOpacity.Value = transparencyPct;
+                    if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{transparencyPct}%";
+                }
+
+                // 立即应用当前主题与背景透明度
+                ApplyTheme(s.ThemeMode);
+
+                // 5. 关闭按钮行为单选
+                if (RadioSideCloseExit != null && RadioSideCloseMinimize != null)
+                {
+                    if (s.CloseAction == "ExitApp") RadioSideCloseExit.IsChecked = true;
+                    else RadioSideCloseMinimize.IsChecked = true;
+                }
+
+                // 6. 双击卡片行为与图钉常驻状态
+                if (RadioSideDoubleClickPaste != null && RadioSideDoubleClickCopy != null)
+                {
+                    if (s.DoubleClickAction == "PasteAndHide") RadioSideDoubleClickPaste.IsChecked = true;
+                    else RadioSideDoubleClickCopy.IsChecked = true;
+                }
+
+                _isPinned = !s.HideOnDeactivate;
+                UpdatePinUiState();
+                UpdateSideStorageInfo();
             }
+            catch { }
             finally
             {
-                _isInternalSettingUpdate = false;
+                _isInternalSettingUpdate = prev;
             }
-
-            // 立即应用当前主题
-            ApplyTheme(s.ThemeMode);
-
-            if (SliderSideOpacity != null)
-            {
-                int opVal = (int)Math.Round(s.WindowOpacity * 100);
-                SliderSideOpacity.Value = opVal;
-                if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{opVal}%";
-                this.Opacity = Math.Max(0.08, s.WindowOpacity);
-            }
-
-            _isPinned = !s.HideOnDeactivate;
-            UpdatePinUiState();
-            if (ChkPasteOnDblClick != null) ChkPasteOnDblClick.IsChecked = s.DoubleClickAction == "PasteAndHide";
         }
 
         private void WindowModeRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null || RadioModeSidebar2 == null || RadioModeCentered2 == null) return;
+            if (_isInternalSettingUpdate || _settingsService == null || RadioModeSidebar2 == null || RadioModeCentered2 == null) return;
             string newMode = RadioModeSidebar2.IsChecked == true ? "Sidebar" : "Centered";
             if (_settingsService.CurrentSettings.WindowMode != newMode)
             {
@@ -1982,8 +2552,8 @@ namespace ClipVault.Views
 
         private void LangRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (_settingsService == null) return;
-            string newLang = RadioLangEn2.IsChecked == true ? "en-US" : "zh-CN";
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newLang = RadioLangEn2?.IsChecked == true ? "en-US" : "zh-CN";
             if (_settingsService.CurrentSettings.Language != newLang)
             {
                 _settingsService.CurrentSettings.Language = newLang;
@@ -1999,20 +2569,21 @@ namespace ClipVault.Views
             if (sender is not RadioButton rb || rb.Tag is not string tag) return;
             if (rb.IsChecked != true) return;
 
-            _settingsService.CurrentSettings.ThemeMode = tag;
-            _settingsService.SaveSettings();
-
-            if (BdCustomImageSettings != null)
+            if (_settingsService.CurrentSettings.ThemeMode != tag)
             {
-                BdCustomImageSettings.Visibility = (tag == "CustomImage") ? Visibility.Visible : Visibility.Collapsed;
+                _settingsService.CurrentSettings.ThemeMode = tag;
+                if (BdCustomImageSettings != null)
+                {
+                    BdCustomImageSettings.Visibility = (tag == "CustomImage") ? Visibility.Visible : Visibility.Collapsed;
+                }
+                ApplyTheme(tag);
+                _settingsService.SaveSettings();
             }
-
-            // 立即生效外观切换
-            ApplyTheme(tag);
         }
 
         private void BtnUploadCustomBg_Click(object sender, RoutedEventArgs e)
         {
+            _isModalOrMenuOpen = true;
             try
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
@@ -2027,9 +2598,7 @@ namespace ClipVault.Views
                     string sourcePath = dialog.FileName;
                     if (!File.Exists(sourcePath)) return;
 
-                    string wallpapersDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CopyBox", "Wallpapers");
-                    Directory.CreateDirectory(wallpapersDir);
-
+                    string wallpapersDir = GetWallpapersDirectory();
                     string ext = Path.GetExtension(sourcePath);
                     string destFileName = $"custom_bg_{DateTime.Now:yyyyMMdd_HHmmss}{ext}";
                     string destPath = Path.Combine(wallpapersDir, destFileName);
@@ -2057,6 +2626,10 @@ namespace ClipVault.Views
             {
                 System.Windows.MessageBox.Show($"设置壁纸失败: {ex.Message}", "壁纸设置", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+            finally
+            {
+                _isModalOrMenuOpen = false;
+            }
         }
 
         private void BtnResetCustomBg_Click(object sender, RoutedEventArgs e)
@@ -2079,10 +2652,9 @@ namespace ClipVault.Views
         private void SliderBgOverlayOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isInternalSettingUpdate || _settingsService == null) return;
-            int intVal = (int)e.NewValue;
+            int intVal = (int)Math.Round(e.NewValue);
             double opacity = intVal / 100.0;
             _settingsService.CurrentSettings.BackgroundOverlayOpacity = opacity;
-            _settingsService.SaveSettings();
 
             if (TxtBgOverlayOpacityVal != null)
             {
@@ -2093,21 +2665,43 @@ namespace ClipVault.Views
             {
                 BdCustomBgOverlay.Opacity = opacity;
             }
+
+            ScheduleDebouncedSaveSettings();
         }
 
         private void SliderSideOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_settingsService == null) return;
-            int intVal = (int)e.NewValue;
-            double val = intVal / 100.0;
-            _settingsService.CurrentSettings.WindowOpacity = val;
-            _settingsService.SaveSettings();
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            int transparencyPct = Math.Clamp((int)Math.Round(e.NewValue), 0, 85);
+            double windowOpacity = Math.Clamp(1.0 - (transparencyPct / 100.0), 0.15, 1.0);
 
-            if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{intVal}%";
+            if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{transparencyPct}%";
 
-            // 清除可能锁住属性的动画时钟，立即应用真实透明度
-            this.BeginAnimation(UIElement.OpacityProperty, null);
-            this.Opacity = Math.Max(0.08, val);
+            _settingsService.CurrentSettings.WindowOpacity = windowOpacity;
+            UpdateBackgroundOpacityLive(windowOpacity);
+            ScheduleDebouncedSaveSettings();
+        }
+
+        private void SideCloseActionRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newAction = RadioSideCloseExit?.IsChecked == true ? "ExitApp" : "MinimizeToTray";
+            if (_settingsService.CurrentSettings.CloseAction != newAction)
+            {
+                _settingsService.CurrentSettings.CloseAction = newAction;
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void SideDoubleClickRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newAction = RadioSideDoubleClickPaste?.IsChecked == true ? "PasteAndHide" : "CopyOnly";
+            if (_settingsService.CurrentSettings.DoubleClickAction != newAction)
+            {
+                _settingsService.CurrentSettings.DoubleClickAction = newAction;
+                _settingsService.SaveSettings();
+            }
         }
 
         private void ChkHideOnDeactivate_Changed(object sender, RoutedEventArgs e)
@@ -2133,48 +2727,72 @@ namespace ClipVault.Views
             }
         }
 
-        private void ChkPasteOnDblClick_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_settingsService == null || ChkPasteOnDblClick == null) return;
-            _settingsService.CurrentSettings.DoubleClickAction = ChkPasteOnDblClick.IsChecked == true ? "PasteAndHide" : "CopyOnly";
-            _settingsService.SaveSettings();
-        }
-
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
-            using var dlg = new System.Windows.Forms.FolderBrowserDialog
+            _isModalOrMenuOpen = true;
+            try
             {
-                Description = "选择 CopyBox 历史数据存储目录",
-                UseDescriptionForTitle = true,
-                SelectedPath = _settingsService.CurrentSettings.StorageDirectory
-            };
-            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                string newDir = dlg.SelectedPath;
-                if (_settingsService.UpdateStorageDirectory(newDir, true))
+                var loc = LocalizationService.Instance;
+                var dialog = new OpenFolderDialog
                 {
-                    TxtSideStoragePath.Text = newDir;
-                    RefreshCards();
-                    MessageBox.Show("数据目录已成功迁移并生效！", "迁移完成", MessageBoxButton.OK, MessageBoxImage.Information);
+                    Title = loc.Get("FolderDialogTitle"),
+                    InitialDirectory = _settingsService.CurrentSettings.StorageDirectory
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    string chosenPath = dialog.FolderName;
+                    if (_settingsService.UpdateStorageDirectory(chosenPath, true))
+                    {
+                        if (TxtSideStoragePath != null) TxtSideStoragePath.Text = _settingsService.CurrentSettings.StorageDirectory;
+                        RefreshCards();
+                        UpdateSideStorageInfo();
+                        MessageBox.Show(loc.Get("StorageMigratedMsg", _settingsService.CurrentSettings.StorageDirectory), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
                 }
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
             }
         }
 
         private void BtnClearHistory_Click(object sender, RoutedEventArgs e)
         {
-            var res = MessageBox.Show("确定要清空全部剪贴板历史记录吗？此操作无法撤销！", "警告", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (res == MessageBoxResult.Yes)
+            _isModalOrMenuOpen = true;
+            try
             {
-                _dbService.ClearAll();
-                RefreshCards();
+                var loc = LocalizationService.Instance;
+                var res = MessageBox.Show(loc.Get("ConfirmClearMsg"), loc.Get("ConfirmClearTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (res == MessageBoxResult.Yes)
+                {
+                    _dbService.ClearAll();
+                    RefreshCards();
+                    UpdateSideStorageInfo();
+                    _settingsService.SaveSettings();
+                }
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
             }
         }
 
         private void BtnExitApp_Click(object sender, RoutedEventArgs e)
         {
-            if (Application.Current is App app)
+            _isModalOrMenuOpen = true;
+            try
             {
-                app.ExitApplication();
+                var loc = LocalizationService.Instance;
+                var res = MessageBox.Show(loc.Get("ConfirmExitMsg"), loc.Get("ConfirmExitTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (res == MessageBoxResult.Yes && Application.Current is App app)
+                {
+                    app.ExitApplication();
+                }
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
             }
         }
 

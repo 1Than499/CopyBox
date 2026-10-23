@@ -377,6 +377,9 @@
             Background="{DynamicResource SidebarBgBrush}" 
             BorderBrush="{DynamicResource SidebarBorderBrush}" 
             BorderThickness="1,0,0,0">
+        <Border.RenderTransform>
+            <TranslateTransform x:Name="DrawerTranslate" X="0" Y="0"/>
+        </Border.RenderTransform>
 
         <Grid>
             <Grid.RowDefinitions>
@@ -404,7 +407,7 @@
                             </Border>
                             <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
-                                <TextBlock Text="v2.0" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
+                                <TextBlock Text="v2.1" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
 
@@ -990,35 +993,64 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- 【视图 3：侧边栏独立偏好设置页 (完全解耦 1.0 居中卡片)】 -->
+                <!-- 【视图 3：侧边栏偏好设置页 (与 1.0 居中模式 100% 同源同步)】 -->
                 <ScrollViewer x:Name="SettingsViewPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="14,12,14,16">
                         
                         <!-- 1. 软件形态与模式切换 -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetModeTitle" Text="🖥️ 软件交互形态" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSetModeDesc" Text="可根据使用习惯自由选择经典悬浮卡片或侧边栏模式：" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-                                <RadioButton x:Name="RadioModeSidebar2" Content="📑 2.0 贴边抽屉模式 (现代化看板+毛玻璃侧边栏)" IsChecked="True" GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                <RadioButton x:Name="RadioModeCentered2" Content="🗂️ 1.0 屏幕居中模式 (原版经典悬浮极速卡片)" GroupName="SideWindowMode" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TxtSetModeTitle" Text="🖥️ 界面展示形态偏好：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <RadioButton x:Name="RadioModeSidebar2" Content="📱 v2.0 贴边毛玻璃双模抽屉 (吸附屏幕右侧 / 双模切换 / 磁贴看板)" IsChecked="True" GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <RadioButton x:Name="RadioModeCentered2" Content="🪟 v1.0 经典居中极速浮窗 (居中弹出 / 双列卡片网格)" GroupName="SideWindowMode" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
                             </StackPanel>
                         </Border>
 
                         <!-- 2. 界面显示语言 -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetLangTitle" Text="🌐 界面语言" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="RadioLangZh2" Content="🇨🇳 简体中文" IsChecked="True" GroupName="SideLang" Margin="0,0,18,0" Checked="LangRadio_Checked" Tag="zh-CN" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <RadioButton x:Name="RadioLangEn2" Content="🇺🇸 English" GroupName="SideLang" Checked="LangRadio_Checked" Tag="en-US" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                </StackPanel>
+                                <TextBlock x:Name="TxtSetLangTitle" Text="🌐 界面语言 / Language：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton x:Name="RadioLangZh2" Grid.Column="0" Content="简体中文" IsChecked="True" GroupName="SideLang" Checked="LangRadio_Checked" Tag="zh-CN" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                    <RadioButton x:Name="RadioLangEn2" Grid.Column="1" Content="English" GroupName="SideLang" Checked="LangRadio_Checked" Tag="en-US" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
-                        <!-- 3. 外观模式、自定义主题与壁纸设置 (支持 6 大主题与本地图片上传) -->
+                        <!-- 3. 本地数据存储目录 (含 SQLite 实时状态统计，与 1.0 完全对齐) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetThemeTitle" Text="🎨 预设主题与个性化壁纸" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                                <TextBlock x:Name="TxtSetStorageTitle" Text="本地数据存储路径：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,6,0" Padding="8,5">
+                                        <TextBlock x:Name="TxtSideStoragePath" Text="" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                    </Border>
+                                    <Button x:Name="BtnBrowseStorage" Grid.Column="1" Content="浏览..." Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" 
+                                            Padding="10,5" FontSize="11" Cursor="Hand" Click="BtnBrowseStorage_Click"/>
+                                </Grid>
+                                <!-- 本地 SQLite 状态提示卡片 -->
+                                <Border Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6">
+                                    <TextBlock x:Name="TxtSideStorageStatusInfo" 
+                                               Text="ℹ 本地 SQLite 状态正常：已记录 0 条 (置顶 0)，图片 0 张，数据 100% 物理留存于本地磁盘。" 
+                                               Foreground="{DynamicResource AccentBlueBrush}" 
+                                               FontSize="10.5" 
+                                               TextWrapping="Wrap"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 4. 外观模式、自定义主题与背景透明度设置 (支持 6 大主题与本地图片上传) -->
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtSetThemeTitle" Text="🎨 界面外观与背景透明度：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                                 
                                 <!-- 主题卡片网格 (3列 x 2行) -->
                                 <UniformGrid Columns="3" Margin="0,0,0,8">
@@ -1027,7 +1059,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#141722" BorderBrush="#38BDF8" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="🌙 深色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeDarkShort2" Text="🌙 深色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
 
@@ -1036,7 +1068,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#F8FAFC" BorderBrush="#0078D4" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="☀️ 明亮" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeLightShort2" Text="☀️ 明亮" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
 
@@ -1045,7 +1077,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#064E3B" BorderBrush="#10B981" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="🌌 极光" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeAuroraShort2" Text="🌌 极光" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
 
@@ -1054,7 +1086,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="🌆 暮色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeSunsetShort2" Text="🌆 暮色" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
 
@@ -1063,7 +1095,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#0C4A6E" BorderBrush="#0EA5E9" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="🌊 深海" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeOceanShort2" Text="🌊 深海" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
 
@@ -1072,7 +1104,7 @@
                                                  Style="{StaticResource ThemeCardRadioStyle}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Border Width="11" Height="11" CornerRadius="5.5" Background="#3B82F6" BorderBrush="#60A5FA" BorderThickness="1.5" Margin="0,0,4,0"/>
-                                            <TextBlock Text="🖼️ 壁纸" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock x:Name="TxtThemeCustomShort2" Text="🖼️ 壁纸" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         </StackPanel>
                                     </RadioButton>
                                 </UniformGrid>
@@ -1099,34 +1131,35 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- 背景透明度调节 (0% = 完全不透明，向右滑动逐渐变透明，最高 85%) -->
                                 <DockPanel Margin="0,4,0,4">
-                                    <TextBlock x:Name="TxtSetOpacityTitle" Text="抽屉毛玻璃透明度" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="92%" FontSize="11" Foreground="{DynamicResource AccentBlueBrush}"/>
+                                    <TextBlock x:Name="TxtSetOpacityTitle" Text="背景透明度:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBlock x:Name="TxtSideOpacityVal" DockPanel.Dock="Right" Text="8%" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}"/>
                                 </DockPanel>
-                                <Slider x:Name="SliderSideOpacity" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="100" Value="92" SmallChange="5" LargeChange="10" ValueChanged="SliderSideOpacity_ValueChanged"/>
+                                <Slider x:Name="SliderSideOpacity" Style="{StaticResource ModernFluentSliderStyle}" Minimum="0" Maximum="85" Value="8" SmallChange="5" LargeChange="10" ValueChanged="SliderSideOpacity_ValueChanged"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- 4. 本地数据存储目录 -->
+                        <!-- 5. 窗口关闭动作偏好 (与 1.0 完全对齐) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetStorageTitle" Text="📁 本地数据存储路径" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSideStoragePath" Text="C:\Users\...\Data" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
-                                <Button x:Name="BtnBrowseStorage" Content="📂 更改目录并迁移数据" Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderThickness="0" 
-                                        Padding="10,5" FontSize="11" Cursor="Hand" Click="BtnBrowseStorage_Click"/>
+                                <TextBlock x:Name="TxtSideCloseActionTitle" Text="点击窗口右上角 [✕ 关闭] 时的动作：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <RadioButton x:Name="RadioSideCloseMinimize" GroupName="SideCloseActionGroup" Content="最小化到系统托盘 / 贴边收起 (继续在后台常驻监听)" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Margin="0,0,0,5" Checked="SideCloseActionRadio_Changed"/>
+                                <RadioButton x:Name="RadioSideCloseExit" GroupName="SideCloseActionGroup" Content="直接彻底退出 CopyBox 程序" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Checked="SideCloseActionRadio_Changed"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- 5. 交互细节 -->
+                        <!-- 6. 列表双击与失焦常驻偏好 (与 1.0 完全对齐) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock x:Name="TxtSetInteractionTitle" Text="⚡ 交互细节" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
-                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="📌 图钉锁定常驻 (点击外部不自动收起)" Margin="0,0,0,6" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed" Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="勾选：图钉锁定常驻，外部操作不收起；未勾选：失焦自动贴边收起"/>
-                                <CheckBox x:Name="ChkPasteOnDblClick" Content="双击直接模拟粘贴并收起" Checked="ChkPasteOnDblClick_Changed" Unchecked="ChkPasteOnDblClick_Changed" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TxtSetInteractionTitle" Text="🖱 双击卡片列表时的动作：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <RadioButton x:Name="RadioSideDoubleClickCopy" GroupName="SideDoubleClickGroup" Content="仅复制到剪贴板 (保持窗口打开，绝不收起)" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Margin="0,0,0,5" Checked="SideDoubleClickRadio_Changed"/>
+                                <RadioButton x:Name="RadioSideDoubleClickPaste" GroupName="SideDoubleClickGroup" Content="直接贴入光标处并自动收起到托盘" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Margin="0,0,0,8" Checked="SideDoubleClickRadio_Changed"/>
+                                <CheckBox x:Name="ChkHideOnDeactivate2" Content="📌 图钉锁定常驻 (点击外部不自动收起)" Margin="0,2,0,0" Checked="ChkHideOnDeactivate_Changed" Unchecked="ChkHideOnDeactivate_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" ToolTip="勾选：图钉锁定常驻，外部操作不收起；未勾选：失焦自动贴边收起"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- 6. 清空与退出按钮 -->
+                        <!-- 7. 清空与退出按钮 -->
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -1143,27 +1176,40 @@
 
                 <!-- 【浮层：添加自定义快捷动作弹窗】 -->
                 <Grid x:Name="AddActionOverlay" Visibility="Collapsed" Background="#D0080B12">
-                    <Border Width="310" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
+                    <Border Width="320" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
                         <StackPanel>
                             <TextBlock Text="➕ 添加自定义快捷动作" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
                             
-                            <!-- 动作名称 -->
-                            <TextBlock Text="名称 (如: 微信 / 计算器 / 哔哩哔哩)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtNewActionName" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5" Margin="0,0,0,8"/>
-
-                            <!-- 图标 Emoji -->
-                            <TextBlock Text="图标 (Emoji)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtNewActionIcon" Text="🚀" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="12" Margin="0,0,0,8"/>
-
                             <!-- 执行目标 -->
                             <TextBlock Text="执行目标 (程序路径 / 网址 / 命令)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <Grid Margin="0,0,0,12">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBox x:Name="TxtNewActionCommand" Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5"/>
-                                <Button Grid.Column="1" Content="浏览..." Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnBrowseActionFile_Click"/>
+                                <TextBox x:Name="TxtNewActionCommand" Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5" TextChanged="TxtNewActionCommand_TextChanged"/>
+                                <Button Grid.Column="1" Content="浏览程序..." Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnBrowseActionFile_Click"/>
+                            </Grid>
+
+                            <!-- 动作名称 -->
+                            <TextBlock Text="名称 (如: 微信 / 计算器 / 哔哩哔哩)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="TxtNewActionName" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="11.5" Margin="0,0,0,8"/>
+
+                            <!-- 图标预览与自定义 Emoji -->
+                            <TextBlock Text="图标 (留空默认提取程序原生图标，输入 Emoji 可自定义)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- 实时图标预览徽标 -->
+                                <Border Grid.Column="0" Width="32" Height="30" CornerRadius="6" Background="{DynamicResource TileBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Image x:Name="ImgNewActionIconPreview" Width="18" Height="18" Stretch="Uniform" Visibility="Collapsed" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <TextBlock x:Name="TxtNewActionIconPreview" Text="🚀" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource AccentBlueBrush}"/>
+                                    </Grid>
+                                </Border>
+                                <TextBox x:Name="TxtNewActionIcon" Grid.Column="1" Text="" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="12" VerticalContentAlignment="Center" TextChanged="TxtNewActionIcon_TextChanged" ToolTip="留空将自动使用程序自身图标；也可输入任意 Emoji（如 🚀、💬、🎮）覆盖"/>
                             </Grid>
 
                             <!-- 操作按钮 -->

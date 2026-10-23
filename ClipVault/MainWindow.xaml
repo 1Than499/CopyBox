@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:helpers="clr-namespace:ClipVault.Helpers"
         mc:Ignorable="d"
         Title="CopyBox"
@@ -218,6 +217,87 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 主题色板选择胶囊样式 -->
+        <Style x:Key="ThemeCardRadioStyle" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,5,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.2" CornerRadius="8" Padding="8,6" SnapsToDevicePixels="True">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Ellipse x:Name="dot" Width="8" Height="8" Fill="{TemplateBinding Tag}" Margin="0,0,5,0"/>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#38BDF8"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2638BDF8"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#38BDF8"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Fluent 现代发光滑块样式 -->
+        <Style x:Key="ModernFluentSliderStyle" TargetType="Slider">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center" Height="22" Background="Transparent">
+                            <Border Height="6" CornerRadius="3" Background="#28FFFFFF" VerticalAlignment="Center"/>
+                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Focusable="False" Opacity="1">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="6" CornerRadius="3" Background="#38BDF8" VerticalAlignment="Center"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Focusable="False" Opacity="0"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Focusable="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Grid Width="16" Height="16">
+                                                    <Ellipse x:Name="ThumbCircle" Width="14" Height="14" Fill="#FFFFFF" Stroke="#38BDF8" StrokeThickness="2.5">
+                                                        <Ellipse.Effect>
+                                                            <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.35" Color="#000000"/>
+                                                        </Ellipse.Effect>
+                                                    </Ellipse>
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbCircle" Property="Width" Value="16"/>
+                                                        <Setter TargetName="ThumbCircle" Property="Height" Value="16"/>
+                                                        <Setter TargetName="ThumbCircle" Property="Fill" Value="#38BDF8"/>
+                                                        <Setter TargetName="ThumbCircle" Property="Stroke" Value="#FFFFFF"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 主窗口毛玻璃圆角容器 (1:1 还原概念图深邃亚克力外框，彻底消除粗暴生硬黑影) -->
@@ -232,7 +312,16 @@
             <DropShadowEffect BlurRadius="8" ShadowDepth="1.5" Direction="270" Opacity="0.16" Color="Black"/>
         </Border.Effect>
 
-        <Grid x:Name="MainRootGrid" Margin="16,10,16,14">
+        <Grid>
+            <!-- 自定义背景壁纸图层 -->
+            <Border x:Name="MainBgImageContainer" CornerRadius="16" ClipToBounds="True" Visibility="Collapsed">
+                <Grid>
+                    <Image x:Name="ImgMainCustomBg" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Border x:Name="BdMainCustomBgOverlay" Background="#8C0D111A"/>
+                </Grid>
+            </Border>
+
+            <Grid x:Name="MainRootGrid" Margin="16,10,16,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- 顶栏极简微型控制行 -->
                 <RowDefinition Height="Auto"/> <!-- 1. 居中流线型搜索框 -->
@@ -642,19 +731,49 @@
                                 </StackPanel>
                             </Border>
 
-                            <!-- 2. 主题与透明度调节 -->
+                            <!-- 2. 主题与透明度调节 (与 2.0 侧边栏设置 100% 同步：6大主题 + 自定义壁纸 + 真实背景透明度) -->
                             <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock x:Name="TxtAppearanceTitle" Text="🎨 界面外观与背景透明度：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,7"/>
                                     
-                                    <Grid Margin="0,0,0,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <RadioButton x:Name="RadioThemeDark" Grid.Column="0" GroupName="ThemeGroup" Content="🌙 暗黑夜间模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
-                                        <RadioButton x:Name="RadioThemeLight" Grid.Column="1" GroupName="ThemeGroup" Content="☀️ 白天明亮模式" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
-                                    </Grid>
+                                    <UniformGrid Columns="2" Margin="0,0,0,6">
+                                        <RadioButton x:Name="RadioThemeDark" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#1E293B" Content="🌙 暗夜极客" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeLight" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#F8FAFC" Content="☀️ 纯净白天" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeAurora" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#8B5CF6" Content="🌌 极光紫霓" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeSunset" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#F97316" Content="🌅 落日熔金" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeOcean" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#06B6D4" Content="🌊 深海赛博" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                        <RadioButton x:Name="RadioThemeCustom" Style="{StaticResource ThemeCardRadioStyle}" GroupName="ThemeGroup" Tag="#EC4899" Content="🖼️ 自定义图" Foreground="{DynamicResource CardTextBrush}" FontSize="11" Checked="ThemeRadio_Changed"/>
+                                    </UniformGrid>
+
+                                    <!-- 自定义壁纸图片管理区 -->
+                                    <Border x:Name="BdMainCustomImageSettings" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,7" Margin="0,0,0,6" Visibility="Collapsed">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="TxtMainCustomBgPath" Grid.Column="0" Text="默认内置壁纸" Foreground="{DynamicResource SubTextBrush}" FontSize="10.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                                                <Button x:Name="BtnMainUploadBg" Grid.Column="1" Content="上传壁纸" Click="BtnMainUploadBg_Click" Background="#0284C7" Foreground="White" BorderThickness="0" Padding="8,3" FontSize="10.5" Cursor="Hand" Margin="0,0,4,0">
+                                                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+                                                </Button>
+                                                <Button x:Name="BtnMainResetBg" Grid.Column="2" Content="重置" Click="BtnMainResetBg_Click" Background="#334155" Foreground="White" BorderThickness="0" Padding="7,3" FontSize="10.5" Cursor="Hand">
+                                                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+                                                </Button>
+                                            </Grid>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="TxtMainBgOverlayLabel" Grid.Column="0" Text="壁纸暗化遮罩:" Foreground="{DynamicResource SubTextBrush}" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <Slider x:Name="SliderMainBgOverlay" Style="{StaticResource ModernFluentSliderStyle}" Grid.Column="1" Minimum="0.10" Maximum="0.90" Value="0.55" ValueChanged="SliderMainBgOverlay_ValueChanged" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TxtMainBgOverlayValue" Grid.Column="2" Text="55%" Foreground="{DynamicResource TitleTextBrush}" FontSize="10.5" FontWeight="Bold" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
 
                                     <Grid Margin="0,2,0,0">
                                         <Grid.ColumnDefinitions>
@@ -662,9 +781,9 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="TxtOpacityLabel" Grid.Column="0" Text="透明度:" Foreground="{DynamicResource SubTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <Slider x:Name="SliderOpacity" Grid.Column="1" Minimum="0.55" Maximum="1.00" Value="0.92" SmallChange="0.05" LargeChange="0.10" ValueChanged="SliderOpacity_ValueChanged" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TxtOpacityValue" Grid.Column="2" Text="92%" Foreground="{DynamicResource CardTextBrush}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TxtOpacityLabel" Grid.Column="0" Text="背景透明度:" Foreground="{DynamicResource SubTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Slider x:Name="SliderOpacity" Style="{StaticResource ModernFluentSliderStyle}" Grid.Column="1" Minimum="0" Maximum="85" Value="8" SmallChange="1" LargeChange="5" ValueChanged="SliderOpacity_ValueChanged" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TxtOpacityValue" Grid.Column="2" Text="8%" Foreground="{DynamicResource CardTextBrush}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -695,7 +814,7 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Row 2: 固定底栏 (退出 + 完成操作) -->
+                    <!-- Row 2: 固定底栏 (清空历史 + 退出 + 完成操作) -->
                     <Border Grid.Row="2" 
                             Background="{DynamicResource CardBgBrush}" 
                             BorderBrush="{DynamicResource CardBorderBrush}" 
@@ -703,7 +822,10 @@
                             CornerRadius="0,0,14,14" 
                             Padding="16,8,16,10">
                         <Grid>
-                            <Button x:Name="BtnDirectExit" Content="🛑 彻底退出程序" Click="BtnDirectExit_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" HorizontalAlignment="Left" Cursor="Hand" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                <Button x:Name="BtnMainClearHistory" Content="🗑️ 清空历史" Click="BtnMainClearHistory_Click" Background="Transparent" Foreground="#F59E0B" BorderThickness="0" FontSize="11" Cursor="Hand" Margin="0,0,14,0"/>
+                                <Button x:Name="BtnDirectExit" Content="🛑 彻底退出程序" Click="BtnDirectExit_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" Cursor="Hand"/>
+                            </StackPanel>
                             <Button x:Name="BtnCloseSettingsOverlay" Content="完成" Click="BtnCloseSettingsOverlay_Click" Background="#FF0078D4" Foreground="White" BorderThickness="0" Padding="18,5" FontSize="11.5" FontWeight="SemiBold" HorizontalAlignment="Right" Cursor="Hand" VerticalAlignment="Center">
                                 <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
                             </Button>
@@ -712,6 +834,7 @@
                 </Grid>
             </Border>
             </Grid>
+        </Grid>
         </Grid>
     </Border>
 </Window>

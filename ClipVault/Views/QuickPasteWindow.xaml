@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="ClipVault Quick Paste"
         Width="680" Height="500"
@@ -39,22 +38,20 @@
 
             <!-- 1. 顶部搜索框 -->
             <Grid Grid.Row="0" Margin="0,0,0,12">
-                <ui:TextBox x:Name="SearchBox" 
-                            PlaceholderText="搜索剪贴板历史、代码、文本... (支持 1~9 数字键秒贴)"
-                            Icon="{ui:SymbolIcon Symbol=Search24}"
-                            TextChanged="SearchBox_TextChanged"
-                            KeyDown="SearchBox_KeyDown"
-                            FontSize="13"
-                            Padding="8,6"/>
+                <TextBox x:Name="SearchBox" 
+                         TextChanged="SearchBox_TextChanged"
+                         KeyDown="SearchBox_KeyDown"
+                         FontSize="13"
+                         Padding="8,6"/>
             </Grid>
 
             <!-- 2. 分类筛选 Pills -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-                <ui:Button x:Name="BtnCatAll" Content="全部" Tag="all" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" CornerRadius="8" Background="#FF0078D4" Foreground="White" BorderThickness="0"/>
-                <ui:Button x:Name="BtnCatText" Content="纯文本" Tag="Text" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" CornerRadius="8" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
-                <ui:Button x:Name="BtnCatCode" Content="&lt;/&gt; 代码片段" Tag="Code" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" CornerRadius="8" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
-                <ui:Button x:Name="BtnCatImage" Content="🖼️ 截图/图片" Tag="Image" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" CornerRadius="8" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
-                <ui:Button x:Name="BtnCatPinned" Content="⭐ 已置顶常用" Tag="pinned" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" CornerRadius="8" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
+                <Button x:Name="BtnCatAll" Content="全部" Tag="all" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" Background="#FF0078D4" Foreground="White" BorderThickness="0"/>
+                <Button x:Name="BtnCatText" Content="纯文本" Tag="Text" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
+                <Button x:Name="BtnCatCode" Content="&lt;/&gt; 代码片段" Tag="Code" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
+                <Button x:Name="BtnCatImage" Content="🖼️ 截图/图片" Tag="Image" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
+                <Button x:Name="BtnCatPinned" Content="⭐ 已置顶常用" Tag="pinned" Click="Category_Click" Margin="0,0,6,0" Padding="12,5" Background="#22FFFFFF" Foreground="#DDD" BorderThickness="0"/>
             </StackPanel>
 
             <!-- 3. 剪贴板卡片列表 -->

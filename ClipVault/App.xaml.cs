@@ -23,6 +23,16 @@ namespace ClipVault
 
         private static System.Threading.Mutex? _singleInstanceMutex;
 
+        private static void LogError(string tag, object? ex)
+        {
+            try
+            {
+                string logPath = Path.Combine(ClipVault.Models.AppSettings.GetAppRootDirectory(), "crash.log");
+                File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{tag}] {ex}\n");
+            }
+            catch { }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             this.ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -30,11 +40,12 @@ namespace ClipVault
 
             AppDomain.CurrentDomain.UnhandledException += (s, args) =>
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[AppDomain Crash] {args.ExceptionObject}\n");
+                LogError("AppDomain Crash", args.ExceptionObject);
             };
             this.DispatcherUnhandledException += (s, args) =>
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[Dispatcher Crash] {args.Exception}\n");
+                LogError("Dispatcher Exception", args.Exception);
+                args.Handled = true;
             };
 
             // 进程防多开检测
@@ -65,6 +76,26 @@ namespace ClipVault
                 _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
                 _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
 
+                // 3.5 全局统一绑定存储路径变更与设置项同步 (确保 1.0 与 2.0 共享同一套数据源与配置状态)
+                _settingsService.StorageDirectoryChanged += newDir =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _dbService?.SwitchStorageDirectory(newDir);
+                        _mainWindow?.SyncSettingsFromService(refreshCards: true);
+                        _sidebarWindow?.SyncSettingsFromService(refreshCards: true);
+                    });
+                };
+
+                _settingsService.SettingsChanged += () =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _mainWindow?.SyncSettingsFromService(refreshCards: false);
+                        _sidebarWindow?.SyncSettingsFromService(refreshCards: false);
+                    });
+                };
+
                 // 4. 绑定统一全局热键 (Alt + V)，根据当前设置呼出对应模式 (1.0 居中 或 2.0 侧边栏)
                 _hotkeyService.HotkeyPressed += () =>
                 {
@@ -79,8 +110,8 @@ namespace ClipVault
             }
             catch (Exception ex)
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[Startup Exception] {ex}\n");
-                MessageBox.Show($"CopyBox 启动失败: {ex.Message}\n{ex.StackTrace}", "启动异常", MessageBoxButton.OK, MessageBoxImage.Error);
+                LogError("Startup Exception", ex);
+                MessageBox.Show($"CopyBox 启动失败: {ex.Message}", "启动异常", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown();
             }
         }
@@ -223,7 +254,7 @@ namespace ClipVault
             }
             catch (Exception ex)
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[TrayIcon Warning] {ex.Message}\n");
+                LogError("TrayIcon Warning", ex.Message);
             }
         }
 
@@ -276,7 +307,7 @@ namespace ClipVault
             }
             catch (Exception ex)
             {
-                File.AppendAllText(@"d:\bank\crash.log", $"[ToggleActiveWindow Exception] {ex}\n");
+                LogError("ToggleActiveWindow Exception", ex);
             }
         }
 
@@ -287,6 +318,9 @@ namespace ClipVault
         {
             Dispatcher.Invoke(() =>
             {
+                _mainWindow?.SyncSettingsFromService(refreshCards: true);
+                _sidebarWindow?.SyncSettingsFromService(refreshCards: true);
+
                 if (newMode == "Centered")
                 {
                     _sidebarWindow?.SlideOutAndHide();
@@ -297,6 +331,7 @@ namespace ClipVault
                 {
                     _mainWindow?.Hide();
                     _sidebarWindow?.ShowDocked();
+                    _sidebarWindow?.ShowSettings();
                 }
             });
         }
@@ -346,7 +381,6 @@ namespace ClipVault
 
         protected override void OnExit(ExitEventArgs e)
         {
-            File.AppendAllText(@"d:\bank\app.log", $"[{DateTime.Now}] OnExit called, code: {e.ApplicationExitCode}\n");
             _monitorService?.Stop();
             _hotkeyService?.Stop();
             if (_notifyIcon != null)

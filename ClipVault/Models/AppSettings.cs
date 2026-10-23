@@ -44,7 +44,7 @@ namespace ClipVault.Models
         public bool AutoConvertImageToWebP { get; set; } = false; // 是否自动压缩图片
         public int MaxHistoryCount { get; set; } = 1000; // 本地最大历史保留数
         public bool StartWithWindows { get; set; } = false; // 开机自启
-        public bool PortableMode { get; set; } = false; // 便携模式
+        public bool PortableMode { get; set; } = true; // 便携模式 (默认开启，数据与配置存储在程序根目录)
 
         // 顶部随手记临时便签内容
         public string ScratchpadContent { get; set; } = string.Empty;
@@ -53,17 +53,53 @@ namespace ClipVault.Models
         public System.Collections.Generic.List<CustomActionItem> CustomActions { get; set; } = new()
         {
             new CustomActionItem { Id = "screenclip", Name = "屏幕截图", Icon = "✂️", CommandOrPath = "ms-screenclip:" },
-            new CustomActionItem { Id = "calc", Name = "计算器", Icon = "🧮", CommandOrPath = "calc" },
-            new CustomActionItem { Id = "taskmgr", Name = "任务管理", Icon = "📊", CommandOrPath = "taskmgr" }
+            new CustomActionItem { Id = "calc", Name = "计算器", Icon = "", CommandOrPath = "calc" },
+            new CustomActionItem { Id = "taskmgr", Name = "任务管理", Icon = "", CommandOrPath = "taskmgr" }
         };
 
+        /// <summary>
+        /// 获取程序真实所在的根目录 (完美兼容单文件发布 SingleFile 与普通发布模式)
+        /// </summary>
+        public static string GetAppRootDirectory()
+        {
+            try
+            {
+                string? processPath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(processPath))
+                {
+                    string? dir = Path.GetDirectoryName(processPath);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                    {
+                        return dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
+                }
+            }
+            catch { }
+
+            return AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        /// <summary>
+        /// 默认本地数据存储路径：直接与程序根目录保持一致 (便携版即开即用，随目录走)
+        /// </summary>
         public static string GetDefaultStoragePath()
         {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CopyBox",
-                "Data"
-            );
+            string appRoot = GetAppRootDirectory();
+            try
+            {
+                string testFile = Path.Combine(appRoot, ".write_test.tmp");
+                File.WriteAllText(testFile, "ok");
+                File.Delete(testFile);
+                return appRoot;
+            }
+            catch
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CopyBox",
+                    "Data"
+                );
+            }
         }
     }
 
@@ -71,7 +107,7 @@ namespace ClipVault.Models
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Name { get; set; } = string.Empty;
-        public string Icon { get; set; } = "⚡";
+        public string Icon { get; set; } = string.Empty;
         public string CommandOrPath { get; set; } = string.Empty;
     }
 }
