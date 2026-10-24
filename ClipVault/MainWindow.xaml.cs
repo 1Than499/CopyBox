@@ -140,6 +140,26 @@ namespace ClipVault
                     RadioModeSidebar.IsChecked = true;
                 }
 
+                // 0.6 贴边方向与多显示器策略加载
+                if (RadioMainDockLeft != null && RadioMainDockRight != null)
+                {
+                    if (string.Equals(s.DockEdge, "Left", StringComparison.OrdinalIgnoreCase)) RadioMainDockLeft.IsChecked = true;
+                    else RadioMainDockRight.IsChecked = true;
+                }
+                if (RadioMainMonitorPrimary != null && RadioMainMonitorCursor != null)
+                {
+                    if (string.Equals(s.MonitorStrategy, "Primary", StringComparison.OrdinalIgnoreCase)) RadioMainMonitorPrimary.IsChecked = true;
+                    else RadioMainMonitorCursor.IsChecked = true;
+                }
+
+                // 0.7 全屏防误触与敏感信息自动遮罩加载
+                if (ChkMainFullscreenDnd != null) ChkMainFullscreenDnd.IsChecked = s.EnableFullscreenDnd;
+                if (ChkMainManualDnd != null) ChkMainManualDnd.IsChecked = s.IsManualDndMode;
+                if (ChkMainAutoMaskSensitive != null) ChkMainAutoMaskSensitive.IsChecked = s.AutoMaskSensitiveData;
+
+                ClipboardItem.GlobalAutoMaskEnabled = s.AutoMaskSensitiveData;
+                foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
+
                 // 1. 关闭行为加载
                 if (s.CloseAction == "ExitApp")
                 {
@@ -242,6 +262,27 @@ namespace ClipVault
             if (RadioModeSidebar != null) RadioModeSidebar.Content = loc.Get("WindowModeSidebar");
             if (RadioModeCentered != null) RadioModeCentered.Content = loc.Get("WindowModeCentered");
 
+            if (TxtMainDockAndMonitorTitle != null) TxtMainDockAndMonitorTitle.Text = loc.Get("DockAndMonitorTitle");
+            if (TxtMainDockEdgeLabel != null) TxtMainDockEdgeLabel.Text = loc.Get("DockEdgeLabel");
+            if (RadioMainDockRight != null) RadioMainDockRight.Content = loc.Get("DockEdgeRight");
+            if (RadioMainDockLeft != null) RadioMainDockLeft.Content = loc.Get("DockEdgeLeft");
+            if (TxtMainMonitorStrategyLabel != null) TxtMainMonitorStrategyLabel.Text = loc.Get("MonitorStrategyLabel");
+            if (RadioMainMonitorCursor != null) RadioMainMonitorCursor.Content = loc.Get("MonitorFollowCursor");
+            if (RadioMainMonitorPrimary != null) RadioMainMonitorPrimary.Content = loc.Get("MonitorPrimaryOnly");
+            if (TxtMainSmartGuardTitle != null) TxtMainSmartGuardTitle.Text = loc.Get("SmartGuardTitle");
+            if (ChkMainFullscreenDnd != null)
+            {
+                ChkMainFullscreenDnd.Content = loc.Get("ChkFullscreenDnd");
+                ChkMainFullscreenDnd.ToolTip = loc.Get("ChkFullscreenDndTip");
+            }
+            if (ChkMainManualDnd != null) ChkMainManualDnd.Content = loc.Get("ChkManualDnd");
+            if (ChkMainAutoMaskSensitive != null)
+            {
+                ChkMainAutoMaskSensitive.Content = loc.Get("ChkAutoMaskSensitive");
+                ChkMainAutoMaskSensitive.ToolTip = loc.Get("ChkAutoMaskSensitiveTip");
+            }
+            foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
+
             if (TxtStoragePathTitle != null) TxtStoragePathTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
 
@@ -308,6 +349,58 @@ namespace ClipVault
             }
         }
 
+        private void MainDockEdgeRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newEdge = RadioMainDockLeft?.IsChecked == true ? "Left" : "Right";
+            if (!string.Equals(_settingsService.CurrentSettings.DockEdge, newEdge, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.DockEdge = newEdge;
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void MainMonitorStrategyRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newStrategy = RadioMainMonitorPrimary?.IsChecked == true ? "Primary" : "FollowCursor";
+            if (!string.Equals(_settingsService.CurrentSettings.MonitorStrategy, newStrategy, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.MonitorStrategy = newStrategy;
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void ChkMainSmartGuard_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            var s = _settingsService.CurrentSettings;
+            bool changed = false;
+
+            if (ChkMainFullscreenDnd != null && s.EnableFullscreenDnd != (ChkMainFullscreenDnd.IsChecked == true))
+            {
+                s.EnableFullscreenDnd = ChkMainFullscreenDnd.IsChecked == true;
+                changed = true;
+            }
+            if (ChkMainManualDnd != null && s.IsManualDndMode != (ChkMainManualDnd.IsChecked == true))
+            {
+                s.IsManualDndMode = ChkMainManualDnd.IsChecked == true;
+                changed = true;
+            }
+            if (ChkMainAutoMaskSensitive != null && s.AutoMaskSensitiveData != (ChkMainAutoMaskSensitive.IsChecked == true))
+            {
+                s.AutoMaskSensitiveData = ChkMainAutoMaskSensitive.IsChecked == true;
+                ClipboardItem.GlobalAutoMaskEnabled = s.AutoMaskSensitiveData;
+                foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _settingsService.SaveSettings();
+            }
+        }
+
         private void UpdateStorageInfo()
         {
             var (dbSize, totalCount, pinnedCount, imgCount, imgSize) = _dbService.GetStats();
@@ -322,6 +415,31 @@ namespace ClipVault
             SearchInputBox.Text = string.Empty;
             if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Collapsed;
             RefreshCards();
+
+            // 根据多显示器策略在目标显示器工作区居中展示
+            try
+            {
+                string monitorStrategy = _settingsService?.CurrentSettings.MonitorStrategy ?? "FollowCursor";
+                var (_, workRect, scaleX, scaleY) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(monitorStrategy);
+                if (scaleX <= 0) scaleX = 1.0;
+                if (scaleY <= 0) scaleY = 1.0;
+
+                double workLeftDip = workRect.Left / scaleX;
+                double workTopDip = workRect.Top / scaleY;
+                double workWidthDip = workRect.Width / scaleX;
+                double workHeightDip = workRect.Height / scaleY;
+
+                double winW = this.Width > 0 ? this.Width : 640;
+                double winH = this.Height > 0 ? this.Height : 540;
+
+                if (workWidthDip > 100 && workHeightDip > 100)
+                {
+                    this.WindowStartupLocation = WindowStartupLocation.Manual;
+                    this.Left = workLeftDip + Math.Max(0, (workWidthDip - winW) / 2.0);
+                    this.Top = workTopDip + Math.Max(0, (workHeightDip - winH) / 2.0);
+                }
+            }
+            catch { }
 
             if (this.WindowState == WindowState.Minimized)
             {
@@ -1363,6 +1481,15 @@ namespace ClipVault
             }
         }
 
+        private void BtnMainToggleMask_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                item.IsMaskRevealed = !item.IsMaskRevealed;
+            }
+        }
+
         private void ShowCardContextMenu(ClipboardItem item, FrameworkElement placementTarget, bool isFromRightClick)
         {
             if (item == null) return;
@@ -1448,6 +1575,30 @@ namespace ClipVault
 
             menu.Items.Add(pinItem);
             menu.Items.Add(copyItem);
+
+            if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
+            {
+                var maskIcon = new TextBlock
+                {
+                    Text = item.IsMaskRevealed ? "🙈" : "👁",
+                    Foreground = new SolidColorBrush(Color.FromRgb(251, 191, 36)),
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var maskItem = new MenuItem
+                {
+                    Icon = maskIcon,
+                    Header = item.IsMaskRevealed ? loc.Get("MenuToggleMaskHide") : loc.Get("MenuToggleMaskShow")
+                };
+                if (itemStyle != null) maskItem.Style = itemStyle;
+                maskItem.Click += (s, args) =>
+                {
+                    item.IsMaskRevealed = !item.IsMaskRevealed;
+                };
+                menu.Items.Add(maskItem);
+            }
+
             menu.Items.Add(new Separator());
             menu.Items.Add(delItem);
 

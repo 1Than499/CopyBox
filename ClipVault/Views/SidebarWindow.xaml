@@ -390,7 +390,7 @@
 
             <!-- 自定义图片背景层 (铺满全高 3 行，圆角裁剪 + 半透明高级磨砂遮罩) -->
             <Grid x:Name="BgImageContainer" Grid.RowSpan="3" Visibility="Collapsed">
-                <Border CornerRadius="16,0,0,16" ClipToBounds="True">
+                <Border x:Name="BdCustomBgClip" CornerRadius="16,0,0,16" ClipToBounds="True">
                     <Image x:Name="ImgCustomBg" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <Border x:Name="BdCustomBgOverlay" CornerRadius="16,0,0,16" Background="#0F172A" Opacity="0.75"/>
@@ -407,7 +407,7 @@
                             </Border>
                             <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
-                                <TextBlock Text="v2.1" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
+                                <TextBlock Text="v2.2.1" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
 
@@ -734,6 +734,15 @@
                                             <!-- 文本专属双引号 -->
                                             <TextBlock Text="❝" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" 
                                                        Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" Margin="0,-2,4,0" VerticalAlignment="Center"/>
+                                            <!-- v2.2.1 敏感信息自动遮罩徽标与单条显隐小眼睛按钮 -->
+                                            <Border Background="#26F59E0B" BorderBrush="#66F59E0B" BorderThickness="0.8" CornerRadius="4" Padding="5,1" Margin="1,0,3,0"
+                                                    Visibility="{Binding ShowSensitiveBadge, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding SensitiveTypeTag}" FontSize="9.5" FontWeight="SemiBold" Foreground="#FBBF24"/>
+                                            </Border>
+                                            <Button Content="{Binding MaskToggleIcon}" ToolTip="{Binding MaskToggleTooltip}"
+                                                    Visibility="{Binding ShowSensitiveBadge, Converter={StaticResource BoolToVis}}"
+                                                    Style="{StaticResource SidebarTopIconBtn}" Width="20" Height="18" FontSize="10.5" Margin="0,0,4,0"
+                                                    Click="BtnToggleMask_Click"/>
                                         </StackPanel>
 
                                         <!-- 中间来源应用名称 -->
@@ -759,7 +768,7 @@
                                     <Grid Grid.Row="1" Margin="0,0,0,8">
                                         <!-- 1. 普通文本内容预览 (严格限制在 IsText 时显现，最大高度截断并带省略号) -->
                                         <Border Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" ClipToBounds="True">
-                                            <TextBlock Text="{Binding Content}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
+                                            <TextBlock Text="{Binding DisplayContent}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" 
                                                        TextWrapping="Wrap" MaxHeight="52" TextTrimming="CharacterEllipsis"/>
                                         </Border>
 
@@ -767,7 +776,7 @@
                                         <Border Background="{DynamicResource CodeBoxBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" 
                                                 BorderThickness="1" CornerRadius="5" Padding="6,4"
                                                 Visibility="{Binding IsCode, Converter={StaticResource BoolToVis}}" ClipToBounds="True">
-                                            <TextBlock Text="{Binding Content}" FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11" 
+                                            <TextBlock Text="{Binding DisplayContent}" FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11" 
                                                        Foreground="{DynamicResource CodeTextBrush}" TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"/>
                                         </Border>
 
@@ -788,7 +797,7 @@
                                             <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
                                             <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding Summary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" 
+                                        <TextBlock Text="{Binding DisplaySummary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" 
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
                                     </DockPanel>
                                 </Grid>
@@ -1003,6 +1012,35 @@
                                 <TextBlock x:Name="TxtSetModeTitle" Text="🖥️ 界面展示形态偏好：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                                 <RadioButton x:Name="RadioModeSidebar2" Content="📱 v2.0 贴边毛玻璃双模抽屉 (吸附屏幕右侧 / 双模切换 / 磁贴看板)" IsChecked="True" GroupName="SideWindowMode" Margin="0,0,0,6" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
                                 <RadioButton x:Name="RadioModeCentered2" Content="🪟 v1.0 经典居中极速浮窗 (居中弹出 / 双列卡片网格)" GroupName="SideWindowMode" Checked="WindowModeRadio_Checked" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 1.5 v2.2.1 新增：多显示器支持与贴边位置自定义 -->
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtSetDockAndMonitorTitle" Text="🖥️ 多显示器与贴边位置自定义：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock x:Name="TxtSetDockEdgeLabel" Text="侧边栏贴边方向：" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton x:Name="RadioDockRight2" Grid.Column="0" Content="➡️ 吸附屏幕右侧 (默认)" IsChecked="True" GroupName="SideDockEdge" Checked="DockEdgeRadio_Checked" Tag="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                    <RadioButton x:Name="RadioDockLeft2" Grid.Column="1" Content="⬅️ 吸附屏幕左侧" GroupName="SideDockEdge" Checked="DockEdgeRadio_Checked" Tag="Left" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                </Grid>
+                                <TextBlock x:Name="TxtSetMonitorStrategyLabel" Text="多显示器唤醒策略：" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <RadioButton x:Name="RadioMonitorCursor2" Content="🖱️ 跟随鼠标所在显示器 (智能跨屏)" IsChecked="True" GroupName="SideMonitorStrategy" Margin="0,0,0,5" Checked="MonitorStrategyRadio_Checked" Tag="FollowCursor" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <RadioButton x:Name="RadioMonitorPrimary2" Content="🖥️ 始终固定在主显示器" GroupName="SideMonitorStrategy" Checked="MonitorStrategyRadio_Checked" Tag="Primary" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 1.8 v2.2.1 新增：全屏游戏免打扰与敏感隐私自动遮罩 -->
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtSetSmartGuardTitle" Text="🛡️ 游戏免打扰与敏感隐私遮罩：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkFullscreenDnd2" Content="🎮 全屏防误触与游戏“免打扰模式” (全屏游戏/视频时自动禁用贴边弹出)" IsChecked="True" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <CheckBox x:Name="ChkManualDnd2" Content="🌙 强制开启免打扰模式 (暂停鼠标移至屏幕边缘自动唤醒)" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <CheckBox x:Name="ChkAutoMaskSensitive2" Content="🔒 敏感信息自动遮罩 (自动打码 API Key、密码、银行卡、身份证、手机号)" IsChecked="True" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
                             </StackPanel>
                         </Border>
 

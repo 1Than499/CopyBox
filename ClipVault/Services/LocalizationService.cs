@@ -137,7 +137,33 @@ namespace ClipVault.Services
                 ["TimeJustNow"] = "刚刚",
                 ["TimeMinsAgo"] = "{0} 分钟前",
                 ["TimeHoursAgo"] = "{0} 小时前",
-                ["TimeDaysAgo"] = "{0} 天前"
+                ["TimeDaysAgo"] = "{0} 天前",
+
+                // v2.2.1 新增：全屏游戏免打扰、多显示器与贴边位置、敏感信息自动遮罩
+                ["DockAndMonitorTitle"] = "🖥️ 多显示器与贴边位置自定义：",
+                ["DockEdgeLabel"] = "侧边栏贴边方向：",
+                ["DockEdgeRight"] = "➡️ 吸附屏幕右侧 (默认)",
+                ["DockEdgeLeft"] = "⬅️ 吸附屏幕左侧",
+                ["MonitorStrategyLabel"] = "多显示器唤醒策略：",
+                ["MonitorFollowCursor"] = "🖱️ 跟随鼠标所在显示器 (智能跨屏)",
+                ["MonitorPrimaryOnly"] = "🖥️ 始终固定在主显示器",
+                ["SmartGuardTitle"] = "🛡️ 游戏免打扰与敏感隐私遮罩：",
+                ["ChkFullscreenDnd"] = "🎮 全屏防误触与游戏“免打扰模式” (全屏游戏/视频时自动禁用贴边弹出)",
+                ["ChkFullscreenDndTip"] = "开启后，检测到全屏游戏、全屏观影或演示时自动屏蔽边缘悬停唤醒，激战零误触；仍可按 Alt+V 主动呼出",
+                ["ChkManualDnd"] = "🌙 强制开启免打扰模式 (暂停鼠标移至屏幕边缘自动唤醒)",
+                ["ChkAutoMaskSensitive"] = "🔒 敏感信息自动遮罩 (自动打码 API Key、密码、银行卡、身份证、手机号)",
+                ["ChkAutoMaskSensitiveTip"] = "仅对界面展示打码防窥屏/防录屏泄露，复制粘贴时仍保持完整原文；支持点击卡片 👁 图标单条查看明文",
+                ["MaskTagApiKey"] = "🛡️ 密钥/Token",
+                ["MaskTagPassword"] = "🛡️ 密码凭据",
+                ["MaskTagSecret"] = "🛡️ 私钥证书",
+                ["MaskTagIdCard"] = "🛡️ 身份证号",
+                ["MaskTagBankCard"] = "🛡️ 银行卡号",
+                ["MaskTagPhone"] = "🛡️ 手机号码",
+                ["MaskShowTip"] = "点击查看敏感明文 (复制粘贴不受遮罩影响)",
+                ["MaskHideTip"] = "点击恢复脱敏遮罩",
+                ["MenuToggleMaskShow"] = "临时显示敏感明文",
+                ["MenuToggleMaskHide"] = "恢复敏感信息遮罩",
+                ["TrayDndMode"] = "游戏免打扰模式 (防贴边误触)"
             },
 
             ["en-US"] = new Dictionary<string, string>
@@ -254,7 +280,33 @@ namespace ClipVault.Services
                 ["TimeJustNow"] = "Just now",
                 ["TimeMinsAgo"] = "{0}m ago",
                 ["TimeHoursAgo"] = "{0}h ago",
-                ["TimeDaysAgo"] = "{0}d ago"
+                ["TimeDaysAgo"] = "{0}d ago",
+
+                // v2.2.1 New Features
+                ["DockAndMonitorTitle"] = "🖥️ Multi-Monitor & Dock Position:",
+                ["DockEdgeLabel"] = "Sidebar Dock Edge:",
+                ["DockEdgeRight"] = "➡️ Right Edge (Default)",
+                ["DockEdgeLeft"] = "⬅️ Left Edge",
+                ["MonitorStrategyLabel"] = "Multi-Monitor Strategy:",
+                ["MonitorFollowCursor"] = "🖱️ Follow Cursor Monitor (Smart Multi-Screen)",
+                ["MonitorPrimaryOnly"] = "🖥️ Primary Monitor Only",
+                ["SmartGuardTitle"] = "🛡️ Gaming DND & Sensitive Data Masking:",
+                ["ChkFullscreenDnd"] = "🎮 Fullscreen Game DND Mode (Disable edge hover wake in fullscreen games/videos)",
+                ["ChkFullscreenDndTip"] = "Automatically blocks edge hover pop-ups during fullscreen gaming, video playback, or presentations",
+                ["ChkManualDnd"] = "🌙 Force Do-Not-Disturb Mode (Disable mouse edge hover wake)",
+                ["ChkAutoMaskSensitive"] = "🔒 Auto-Mask Sensitive Data (Mask API Keys, passwords, bank/ID cards, phones)",
+                ["ChkAutoMaskSensitiveTip"] = "Masks sensitive text on UI while preserving full plaintext when copying/pasting; click 👁 on card to reveal",
+                ["MaskTagApiKey"] = "🛡️ API Key",
+                ["MaskTagPassword"] = "🛡️ Password",
+                ["MaskTagSecret"] = "🛡️ Secret Key",
+                ["MaskTagIdCard"] = "🛡️ ID Card",
+                ["MaskTagBankCard"] = "🛡️ Bank Card",
+                ["MaskTagPhone"] = "🛡️ Phone",
+                ["MaskShowTip"] = "Click to reveal plaintext",
+                ["MaskHideTip"] = "Click to mask sensitive text",
+                ["MenuToggleMaskShow"] = "Reveal Sensitive Plaintext",
+                ["MenuToggleMaskHide"] = "Mask Sensitive Text",
+                ["TrayDndMode"] = "Gaming DND Mode (Block Edge Hover)"
             }
         };
 

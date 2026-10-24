@@ -186,7 +186,7 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 贴边悬停自动唤醒与滑出巡检引擎 (每 50ms 探测一次屏幕右边缘光标位置)
+        /// 贴边悬停自动唤醒与滑出巡检引擎 (每 50ms 探测一次目标显示器边缘光标位置，支持多屏、左/右贴边与全屏游戏免打扰)
         /// </summary>
         private void OnEdgeDetectTimerTick(object? sender, EventArgs e)
         {
@@ -208,25 +208,43 @@ namespace ClipVault.Views
 
                 if (!GetCursorPos(out POINT pt)) return;
 
-                int screenW = GetSystemMetrics(SM_CXSCREEN);
-                int screenH = GetSystemMetrics(SM_CYSCREEN);
-                if (screenW <= 0 || screenH <= 0) return;
+                var settings = _settingsService.CurrentSettings;
+                bool isLeftDock = string.Equals(settings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
 
-                // 场景 1：当侧边栏处于贴边收起隐藏状态时，鼠标移至屏幕最右侧边缘即刻平滑滑出显示
+                // 场景 1：当侧边栏处于贴边收起隐藏状态时，探测目标显示器对应边缘热区
                 if (!this.IsVisible || _isHiding)
                 {
                     _outsideHoverTicks = 0;
 
-                    // 刚收起后的 350ms 冷却期内不立即重新弹出，防止点击右上角关闭按钮后瞬间误触
+                    // 刚收起后的 350ms 冷却期内不立即重新弹出，防止点击关闭按钮后瞬间误触
                     if ((DateTime.UtcNow - _lastHideTime).TotalMilliseconds < 350)
                     {
                         _edgeHoverTicks = 0;
                         return;
                     }
 
-                    // 探测屏幕右边缘 6px 热区 (避开最顶端关闭按钮角与最底端系统时间托盘角)
-                    bool atRightEdge = pt.x >= (screenW - 6) && pt.y >= 48 && pt.y <= (screenH - 48);
-                    if (atRightEdge)
+                    // v2.2.1 特性 1：全屏防误触与游戏“免打扰模式”
+                    if (settings.IsManualDndMode)
+                    {
+                        _edgeHoverTicks = 0;
+                        return;
+                    }
+                    if (settings.EnableFullscreenDnd && ClipVault.Interop.NativeMethods.IsForegroundFullscreenOrGame())
+                    {
+                        _edgeHoverTicks = 0;
+                        return;
+                    }
+
+                    // v2.2.1 特性 2：多显示器支持与左/右贴边位置自定义
+                    var (monRect, _, _, _) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(settings.MonitorStrategy);
+                    if (monRect.Width <= 0 || monRect.Height <= 0) return;
+
+                    bool withinVerticalSafeZone = pt.y >= (monRect.Top + 48) && pt.y <= (monRect.Bottom - 48);
+                    bool atTargetEdge = isLeftDock
+                        ? (withinVerticalSafeZone && pt.x >= monRect.Left && pt.x <= (monRect.Left + 6))
+                        : (withinVerticalSafeZone && pt.x >= (monRect.Right - 6) && pt.x <= monRect.Right);
+
+                    if (atTargetEdge)
                     {
                         _edgeHoverTicks++;
                         if (_edgeHoverTicks >= 2) // 悬停约 100ms 即刻丝滑唤起
@@ -242,7 +260,7 @@ namespace ClipVault.Views
                     return;
                 }
 
-                // 场景 2：当侧边栏已显示且处于未锁定状态 (!_isPinned) 时，若鼠标进入过侧边栏后移出左侧区域，自动平滑贴边收起
+                // 场景 2：当侧边栏已显示且处于未锁定状态 (!_isPinned) 时，若鼠标进入过侧边栏后移出抽屉外侧区域，自动平滑贴边收起
                 _edgeHoverTicks = 0;
                 if (!_isPinned)
                 {
@@ -255,16 +273,23 @@ namespace ClipVault.Views
                             _mouseHasEnteredAfterShow = true;
                             _outsideHoverTicks = 0;
                         }
-                        else if (_mouseHasEnteredAfterShow &&
-                                 pt.x < (rect.Left - 35) &&
-                                 (SettingsViewPanel == null || SettingsViewPanel.Visibility != Visibility.Visible) &&
-                                 (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
+                        else
                         {
-                            _outsideHoverTicks++;
-                            if (_outsideHoverTicks >= 9) // 移出抽屉约 450ms 自动贴边收起
+                            bool movedOutsideDrawer = isLeftDock
+                                ? (pt.x > (rect.Right + 35))
+                                : (pt.x < (rect.Left - 35));
+
+                            if (_mouseHasEnteredAfterShow &&
+                                movedOutsideDrawer &&
+                                (SettingsViewPanel == null || SettingsViewPanel.Visibility != Visibility.Visible) &&
+                                (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
                             {
-                                _outsideHoverTicks = 0;
-                                SlideOutAndHide();
+                                _outsideHoverTicks++;
+                                if (_outsideHoverTicks >= 9) // 移出抽屉约 450ms 自动贴边收起
+                                {
+                                    _outsideHoverTicks = 0;
+                                    SlideOutAndHide();
+                                }
                             }
                         }
                     }
@@ -918,6 +943,28 @@ namespace ClipVault.Views
             if (TxtSetModeTitle != null) TxtSetModeTitle.Text = loc.Get("WindowModeTitle");
             if (RadioModeSidebar2 != null) RadioModeSidebar2.Content = loc.Get("WindowModeSidebar");
             if (RadioModeCentered2 != null) RadioModeCentered2.Content = loc.Get("WindowModeCentered");
+            if (TxtSetDockAndMonitorTitle != null) TxtSetDockAndMonitorTitle.Text = loc.Get("DockAndMonitorTitle");
+            if (TxtSetDockEdgeLabel != null) TxtSetDockEdgeLabel.Text = loc.Get("DockEdgeLabel");
+            if (RadioDockRight2 != null) RadioDockRight2.Content = loc.Get("DockEdgeRight");
+            if (RadioDockLeft2 != null) RadioDockLeft2.Content = loc.Get("DockEdgeLeft");
+            if (TxtSetMonitorStrategyLabel != null) TxtSetMonitorStrategyLabel.Text = loc.Get("MonitorStrategyLabel");
+            if (RadioMonitorCursor2 != null) RadioMonitorCursor2.Content = loc.Get("MonitorFollowCursor");
+            if (RadioMonitorPrimary2 != null) RadioMonitorPrimary2.Content = loc.Get("MonitorPrimaryOnly");
+            if (TxtSetSmartGuardTitle != null) TxtSetSmartGuardTitle.Text = loc.Get("SmartGuardTitle");
+            if (ChkFullscreenDnd2 != null)
+            {
+                ChkFullscreenDnd2.Content = loc.Get("ChkFullscreenDnd");
+                ChkFullscreenDnd2.ToolTip = loc.Get("ChkFullscreenDndTip");
+            }
+            if (ChkManualDnd2 != null)
+            {
+                ChkManualDnd2.Content = loc.Get("ChkManualDnd");
+            }
+            if (ChkAutoMaskSensitive2 != null)
+            {
+                ChkAutoMaskSensitive2.Content = loc.Get("ChkAutoMaskSensitive");
+                ChkAutoMaskSensitive2.ToolTip = loc.Get("ChkAutoMaskSensitiveTip");
+            }
             if (TxtSetLangTitle != null) TxtSetLangTitle.Text = loc.Get("LangSectionTitle");
             if (RadioLangZh2 != null) RadioLangZh2.Content = loc.Get("LangZh");
             if (RadioLangEn2 != null) RadioLangEn2.Content = loc.Get("LangEn");
@@ -949,16 +996,50 @@ namespace ClipVault.Views
             if (TxtStatusRightTip != null) TxtStatusRightTip.Text = loc.Get("SidebarAltVTip");
             if (TxtStatusLeft != null) TxtStatusLeft.Text = loc.Get("SidebarRecordCount", DisplayCards.Count);
             if (BtnPin != null) BtnPin.ToolTip = _isPinned ? loc.Get("PinLockedTip") : loc.Get("PinUnlockedTip");
+            foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
             UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
             UpdateSideStorageInfo();
         }
 
         #endregion
 
-        #region 窗口生命周期与抽屉平滑动画 (带代数防重入保护)
+        #region 窗口生命周期与抽屉平滑动画 (带代数防重入保护 + 多显示器与左右贴边自适应)
 
         /// <summary>
-        /// 精准吸附至屏幕最右侧工作区全高，并执行顺滑贴边滑入显现
+        /// 根据当前多显示器策略与左/右贴边配置计算并应用窗口坐标、高度与圆角边框
+        /// </summary>
+        public void ApplyDockPositionAndGeometry()
+        {
+            string monitorStrategy = _settingsService?.CurrentSettings.MonitorStrategy ?? "FollowCursor";
+            string dockEdge = _settingsService?.CurrentSettings.DockEdge ?? "Right";
+            bool isLeftDock = string.Equals(dockEdge, "Left", StringComparison.OrdinalIgnoreCase);
+
+            var (_, workRect, scaleX, scaleY) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(monitorStrategy);
+            if (scaleX <= 0) scaleX = 1.0;
+            if (scaleY <= 0) scaleY = 1.0;
+
+            double workLeftDip = workRect.Left / scaleX;
+            double workTopDip = workRect.Top / scaleY;
+            double workRightDip = workRect.Right / scaleX;
+            double workHeightDip = workRect.Height / scaleY;
+
+            this.Width = 380;
+            this.Height = workHeightDip > 100 ? workHeightDip : SystemParameters.WorkArea.Height;
+            this.Top = workTopDip;
+            this.Left = isLeftDock ? workLeftDip : (workRightDip - this.Width);
+
+            if (RootBorder != null)
+            {
+                RootBorder.BorderThickness = isLeftDock ? new Thickness(0, 0, 1, 0) : new Thickness(1, 0, 0, 0);
+            }
+
+            var corner = isLeftDock ? new CornerRadius(0, 16, 16, 0) : new CornerRadius(16, 0, 0, 16);
+            if (BdCustomBgClip != null) BdCustomBgClip.CornerRadius = corner;
+            if (BdCustomBgOverlay != null) BdCustomBgOverlay.CornerRadius = corner;
+        }
+
+        /// <summary>
+        /// 精准吸附至目标显示器左/右侧工作区全高，并执行顺滑贴边滑入显现
         /// </summary>
         public void ShowDocked()
         {
@@ -969,11 +1050,7 @@ namespace ClipVault.Views
 
             _pasteSimulator.RecordTargetWindow();
 
-            var workArea = SystemParameters.WorkArea;
-            this.Width = 380;
-            this.Height = workArea.Height;
-            this.Top = workArea.Top;
-            this.Left = workArea.Right - this.Width;
+            ApplyDockPositionAndGeometry();
             this.WindowState = WindowState.Normal;
             this.Topmost = true;
 
@@ -1050,8 +1127,10 @@ namespace ClipVault.Views
 
             if (DrawerTranslate != null)
             {
-                DrawerTranslate.X = 48;
-                var slideAnim = new DoubleAnimation(48, 0, TimeSpan.FromMilliseconds(180))
+                bool isLeftDock = string.Equals(_settingsService?.CurrentSettings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
+                double startX = isLeftDock ? -48 : 48;
+                DrawerTranslate.X = startX;
+                var slideAnim = new DoubleAnimation(startX, 0, TimeSpan.FromMilliseconds(180))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
@@ -1071,7 +1150,7 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 平滑向右收起抽屉并隐藏
+        /// 平滑向贴边侧收起抽屉并隐藏
         /// </summary>
         public void SlideOutAndHide()
         {
@@ -1106,7 +1185,9 @@ namespace ClipVault.Views
 
             if (DrawerTranslate != null)
             {
-                var slideAnim = new DoubleAnimation(DrawerTranslate.X, 48, TimeSpan.FromMilliseconds(150))
+                bool isLeftDock = string.Equals(_settingsService?.CurrentSettings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
+                double endX = isLeftDock ? -48 : 48;
+                var slideAnim = new DoubleAnimation(DrawerTranslate.X, endX, TimeSpan.FromMilliseconds(150))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
                 };
@@ -1567,6 +1648,15 @@ namespace ClipVault.Views
             }
         }
 
+        private void BtnToggleMask_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                item.IsMaskRevealed = !item.IsMaskRevealed;
+            }
+        }
+
         private void ShowCardContextMenu(ClipboardItem item, FrameworkElement placementTarget, bool isFromRightClick)
         {
             if (item == null) return;
@@ -1670,6 +1760,29 @@ namespace ClipVault.Views
             menu.Items.Add(pinItem);
             menu.Items.Add(queueItem);
             menu.Items.Add(copyItem);
+
+            if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
+            {
+                var maskIcon = new TextBlock
+                {
+                    Text = item.IsMaskRevealed ? "🙈" : "👁",
+                    Foreground = new SolidColorBrush(Color.FromRgb(251, 191, 36)),
+                    FontSize = 13,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var maskItem = new MenuItem
+                {
+                    Icon = maskIcon,
+                    Header = item.IsMaskRevealed ? loc.Get("MenuToggleMaskHide") : loc.Get("MenuToggleMaskShow")
+                };
+                if (itemStyle != null) maskItem.Style = itemStyle;
+                maskItem.Click += (s, args) =>
+                {
+                    item.IsMaskRevealed = !item.IsMaskRevealed;
+                };
+                menu.Items.Add(maskItem);
+            }
 
             var sep = new Separator();
             if (TryFindResource("ModernMenuSeparatorStyle") is Style sepStyle)
@@ -2451,6 +2564,27 @@ namespace ClipVault.Views
                     else RadioModeSidebar2.IsChecked = true;
                 }
 
+                // 1.1 贴边方向与多显示器策略单选
+                if (RadioDockLeft2 != null && RadioDockRight2 != null)
+                {
+                    if (string.Equals(s.DockEdge, "Left", StringComparison.OrdinalIgnoreCase)) RadioDockLeft2.IsChecked = true;
+                    else RadioDockRight2.IsChecked = true;
+                }
+                if (RadioMonitorPrimary2 != null && RadioMonitorCursor2 != null)
+                {
+                    if (string.Equals(s.MonitorStrategy, "Primary", StringComparison.OrdinalIgnoreCase)) RadioMonitorPrimary2.IsChecked = true;
+                    else RadioMonitorCursor2.IsChecked = true;
+                }
+
+                // 1.2 游戏免打扰与敏感隐私遮罩复选框
+                if (ChkFullscreenDnd2 != null) ChkFullscreenDnd2.IsChecked = s.EnableFullscreenDnd;
+                if (ChkManualDnd2 != null) ChkManualDnd2.IsChecked = s.IsManualDndMode;
+                if (ChkAutoMaskSensitive2 != null) ChkAutoMaskSensitive2.IsChecked = s.AutoMaskSensitiveData;
+
+                ClipboardItem.GlobalAutoMaskEnabled = s.AutoMaskSensitiveData;
+                foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
+                if (this.IsVisible) ApplyDockPositionAndGeometry();
+
                 // 2. 语言单选
                 if (RadioLangEn2 != null && RadioLangZh2 != null)
                 {
@@ -2547,6 +2681,60 @@ namespace ClipVault.Views
                 {
                     app.OnWindowModeChanged(newMode);
                 }
+            }
+        }
+
+        private void DockEdgeRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newEdge = RadioDockLeft2?.IsChecked == true ? "Left" : "Right";
+            if (!string.Equals(_settingsService.CurrentSettings.DockEdge, newEdge, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.DockEdge = newEdge;
+                _settingsService.SaveSettings();
+                ApplyDockPositionAndGeometry();
+            }
+        }
+
+        private void MonitorStrategyRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            string newStrategy = RadioMonitorPrimary2?.IsChecked == true ? "Primary" : "FollowCursor";
+            if (!string.Equals(_settingsService.CurrentSettings.MonitorStrategy, newStrategy, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.MonitorStrategy = newStrategy;
+                _settingsService.SaveSettings();
+                ApplyDockPositionAndGeometry();
+            }
+        }
+
+        private void ChkSmartGuard_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            var s = _settingsService.CurrentSettings;
+            bool changed = false;
+
+            if (ChkFullscreenDnd2 != null && s.EnableFullscreenDnd != (ChkFullscreenDnd2.IsChecked == true))
+            {
+                s.EnableFullscreenDnd = ChkFullscreenDnd2.IsChecked == true;
+                changed = true;
+            }
+            if (ChkManualDnd2 != null && s.IsManualDndMode != (ChkManualDnd2.IsChecked == true))
+            {
+                s.IsManualDndMode = ChkManualDnd2.IsChecked == true;
+                changed = true;
+            }
+            if (ChkAutoMaskSensitive2 != null && s.AutoMaskSensitiveData != (ChkAutoMaskSensitive2.IsChecked == true))
+            {
+                s.AutoMaskSensitiveData = ChkAutoMaskSensitive2.IsChecked == true;
+                ClipboardItem.GlobalAutoMaskEnabled = s.AutoMaskSensitiveData;
+                foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _settingsService.SaveSettings();
             }
         }
 

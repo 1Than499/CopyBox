@@ -1,23 +1,60 @@
 <div align="center">
 
-# CopyBox 📦 v2.1
+# CopyBox 📦 v2.2.1
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v2.1.0-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v2.2.1-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **🆕 v2.1 更新内容** ](#-v21-版本更新说明-whats-new-in-v21) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **🆕 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **📜 v2.1 更新内容** ](#-v21-版本更新说明-whats-new-in-v21) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
 
 ---
 
-## 🆕 v2.1 版本更新说明 (What's New in v2.1)
+## 🆕 v2.2.1 版本更新说明 (What's New in v2.2.1)
+
+### 🛡️ 三大核心新特性进化
+1. **🎮 全屏防误触与游戏“免打扰模式” (Fullscreen Anti-Mistouch & Gaming DND Mode)**：
+   - **全屏应用/游戏自动感知**：底层结合 `SHQueryUserNotificationState`（Direct3D 独占全屏游戏识别）与物理显示器全屏窗口边界比对，当检测到全屏游戏、全屏视频播放或 PPT 演示时，自动屏蔽鼠标移至屏幕边缘的贴边唤出，彻底杜绝打游戏甩鼠标或看电影时边缘误触弹窗（`Alt + V` 热键仍可随时主动唤出）。
+   - **手动免打扰开关**：支持在「偏好设置」或「系统托盘右键菜单」一键开启/关闭 **🔕 强制免打扰模式**，自由掌控贴边唤醒。
+2. **🖥️ 多显示器支持与贴边位置自定义 (Multi-Monitor Support & Custom Dock Edge)**：
+   - **左右贴边自由切换**：侧边栏不仅支持默认的 **➡️ 屏幕右侧贴边**，还可在设置中一键切换为 **⬅️ 屏幕左侧贴边**，滑入/滑出动画、边缘热区感应与毛玻璃圆角自动镜像适配。
+   - **智能多屏唤醒策略**：支持 **🖱️ 跟随鼠标所在显示器唤醒（智能多屏）** 与 **🖥️ 始终固定在主显示器唤醒** 两种策略，并内置 Per-Monitor DPI（`GetDpiForMonitor`）精准缩放换算，跨不同分辨率与缩放比例的多屏环境依然严丝合缝（v2.0 侧边栏与 v1.0 居中浮窗双形态同步生效）。
+3. **🔒 敏感信息自动遮罩 (Automatic Sensitive Data Masking)**：
+   - **智能识别 6 类高敏隐私内容**：自动检测剪贴板中的 **API 密钥 / Token / JWT**（如 `sk-...`、`ghp_...`、`Bearer ...`）、**密码与连接串凭据**、**私钥证书块**、**18 位身份证号**、**16~19 位银行卡号** 以及 **11 位手机号码**。
+   - **UI 安全打码 + 粘贴原样输出**：卡片界面默认对敏感字段智能打码（如 `sk-proj****9aB2`、`138****5678`）并标注醒目的金色隐私盾牌角标（`🛡️ 密钥/Token`、`🛡️ 银行卡号` 等），防止投屏、录屏或旁人窥屏泄露隐私；点击卡片右上角 **`👁` / `🙈` 小眼睛按钮**（或右键菜单）可随时单条切换明文预览，且**双击/回车/快捷键粘贴或复制时始终输出 100% 完整原始明文**。
+
+---
+
+<p align="center">
+  <img src="assets/v2_clipboard.png" alt="CopyBox v2.2.1 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v2_dashboard.png" alt="CopyBox v2.2.1 偏好设置与新特性" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+</p>
+<p align="center">
+  <em>左图：v2.2.1 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.2.1 偏好设置（多显示器唤醒策略、左右贴边自定义、全屏游戏免打扰、敏感隐私自动遮罩）</em>
+</p>
+
+<div align="center">
+
+### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
+无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
+
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.2.1--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.2.1/CopyBox-v2.2.1-Windows-x64-Portable.zip)  
+[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
+
+*(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
+
+</div>
+
+---
+
+## 📜 v2.1 版本更新说明 (What's New in v2.1)
 
 ### 🛠️ 核心修复与体验进化
 1. **🖱️ 贴边收起后屏幕右边缘悬停自动唤出**：
@@ -32,28 +69,6 @@
    - 修正透明度滑块语义：`0%` 代表完全不透明，向右滑动（`0% ~ 85%`）逐步增加背景通透度，且前景文字与图标始终保持 100% 锐利清晰；采用底层 DirectX 画刷 Alpha 通道原位更新与磁盘写入防抖技术，滑动调节全程零卡顿。
 6. **🧩 快捷看板添加程序时默认自动提取程序原生图标**：
    - 在快捷看板添加应用程序（`.exe`）动作时，默认自动提取并高清渲染该程序的原生系统图标；同时保留自定义 Emoji 图标能力（填写 Emoji 则优先展示自定义 Emoji，留空则展示程序原生图标）。
-
----
-
-<p align="center">
-  <img src="assets/v2_clipboard.png" alt="CopyBox v2.1 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
-  <img src="assets/v2_dashboard.png" alt="CopyBox v2.1 快捷看板" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
-</p>
-<p align="center">
-  <em>左图：v2.1 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.1 快捷看板（音乐播放控制、系统快捷、原生图标自定义动作、屏幕亮度/音量调节）</em>
-</p>
-
-<div align="center">
-
-### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
-无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
-
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.1.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.1.0/CopyBox-v2.1.0-Windows-x64-Portable.zip)  
-[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
-
-*(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
-
-</div>
 
 ---
 

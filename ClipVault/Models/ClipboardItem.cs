@@ -1,20 +1,135 @@
 using System;
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
+using ClipVault.Helpers;
 
 namespace ClipVault.Models
 {
-    public class ClipboardItem
+    public class ClipboardItem : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        // 全局敏感信息遮罩开关状态 (与 AppSettings.AutoMaskSensitiveData 实时同步)
+        public static bool GlobalAutoMaskEnabled { get; set; } = true;
+
         public int Id { get; set; }
         public string ItemType { get; set; } = "Text"; // Text, Code, Image, File, Color
-        public string Content { get; set; } = string.Empty; // 文本内容 或 本地图片相对路径
-        public string Summary { get; set; } = string.Empty; // 标题/摘要
+
+        private string _content = string.Empty;
+        public string Content
+        {
+            get => _content;
+            set
+            {
+                _content = value ?? string.Empty;
+                RecomputeSensitiveState();
+            }
+        }
+
+        private string _summary = string.Empty;
+        public string Summary
+        {
+            get => _summary;
+            set
+            {
+                _summary = value ?? string.Empty;
+                RecomputeSensitiveState();
+            }
+        }
+
         public string SourceApp { get; set; } = string.Empty; // 例如 "Google Chrome", "VS Code"
         public string SourceProcess { get; set; } = string.Empty; // 例如 "chrome.exe"
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime Timestamp => CreatedAt;
         public bool IsPinned { get; set; }
         public int CharCount { get; set; }
         public string Sha256 { get; set; } = string.Empty;
+
+        // ==================== v2.2.1 敏感信息自动遮罩属性 ====================
+        private bool _isSensitive;
+        private string _sensitiveBadgeKey = string.Empty;
+        private string _maskedContent = string.Empty;
+        private string _maskedSummary = string.Empty;
+        private bool _isMaskRevealed;
+
+        private void RecomputeSensitiveState()
+        {
+            if (IsImage || ItemType == "File" || string.IsNullOrEmpty(_content))
+            {
+                _isSensitive = false;
+                _sensitiveBadgeKey = string.Empty;
+                _maskedContent = _content;
+                _maskedSummary = _summary;
+                return;
+            }
+
+            var (sens, badgeKey, masked) = SensitiveDataHelper.InspectAndMask(_content);
+            _isSensitive = sens;
+            _sensitiveBadgeKey = badgeKey;
+            _maskedContent = masked;
+
+            if (sens && !string.IsNullOrEmpty(_summary))
+            {
+                var (_, _, mSum) = SensitiveDataHelper.InspectAndMask(_summary);
+                _maskedSummary = mSum;
+            }
+            else
+            {
+                _maskedSummary = _summary;
+            }
+        }
+
+        public bool IsSensitive => _isSensitive;
+        public bool ShowSensitiveBadge => GlobalAutoMaskEnabled && _isSensitive;
+
+        public string SensitiveTypeTag => string.IsNullOrEmpty(_sensitiveBadgeKey)
+            ? string.Empty
+            : ClipVault.Services.LocalizationService.Instance.Get(_sensitiveBadgeKey);
+
+        public bool IsMaskRevealed
+        {
+            get => _isMaskRevealed;
+            set
+            {
+                if (_isMaskRevealed == value) return;
+                _isMaskRevealed = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(DisplayContent));
+                OnPropertyChanged(nameof(DisplaySummary));
+                OnPropertyChanged(nameof(MaskToggleIcon));
+                OnPropertyChanged(nameof(MaskToggleTooltip));
+            }
+        }
+
+        public string DisplayContent => (GlobalAutoMaskEnabled && _isSensitive && !_isMaskRevealed)
+            ? _maskedContent
+            : _content;
+
+        public string DisplaySummary => (GlobalAutoMaskEnabled && _isSensitive && !_isMaskRevealed)
+            ? _maskedSummary
+            : _summary;
+
+        public string MaskToggleIcon => _isMaskRevealed ? "🙈" : "👁";
+
+        public string MaskToggleTooltip => _isMaskRevealed
+            ? ClipVault.Services.LocalizationService.Instance.Get("MaskHideTip")
+            : ClipVault.Services.LocalizationService.Instance.Get("MaskShowTip");
+
+        public void NotifyMaskStateChanged()
+        {
+            OnPropertyChanged(nameof(ShowSensitiveBadge));
+            OnPropertyChanged(nameof(SensitiveTypeTag));
+            OnPropertyChanged(nameof(DisplayContent));
+            OnPropertyChanged(nameof(DisplaySummary));
+            OnPropertyChanged(nameof(MaskToggleIcon));
+            OnPropertyChanged(nameof(MaskToggleTooltip));
+        }
 
         // UI 绑定展示辅助属性
         public string DisplayBadge { get; set; } = string.Empty; // [1], [2] 等数字快捷键

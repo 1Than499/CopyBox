@@ -46,6 +46,26 @@ namespace ClipVault.Models
         public bool StartWithWindows { get; set; } = false; // 开机自启
         public bool PortableMode { get; set; } = true; // 便携模式 (默认开启，数据与配置存储在程序根目录)
 
+        // ==================== v2.2.1 三大核心升级配置 ====================
+
+        // 1. 全屏防误触与游戏“免打扰模式”
+        // 开启后，当处于全屏游戏、全屏观影或演示模式时，自动禁用贴边悬停弹出，杜绝误触
+        public bool EnableFullscreenDnd { get; set; } = true;
+
+        // 手动游戏免打扰开关 (开启后暂停屏幕边缘鼠标悬停唤醒，仅通过快捷键或托盘呼出)
+        public bool IsManualDndMode { get; set; } = false;
+
+        // 2. 多显示器支持与贴边位置自定义
+        // 侧边栏贴边位置: "Right" (屏幕右侧，默认) 或 "Left" (屏幕左侧)
+        public string DockEdge { get; set; } = "Right";
+
+        // 多显示器唤醒策略: "FollowCursor" (跟随鼠标所在屏幕，默认) 或 "Primary" (固定主显示器)
+        public string MonitorStrategy { get; set; } = "FollowCursor";
+
+        // 3. 敏感信息自动遮罩保护
+        // 开启后，自动对密码、API Key/Token、身份证号、银行卡号、手机号等敏感内容脱敏打码显示，支持单条点击小眼睛查看明文
+        public bool AutoMaskSensitiveData { get; set; } = true;
+
         // 顶部随手记临时便签内容
         public string ScratchpadContent { get; set; } = string.Empty;
 

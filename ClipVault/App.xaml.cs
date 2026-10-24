@@ -62,6 +62,7 @@ namespace ClipVault
             {
                 // 1. 初始化核心后台服务
                 _settingsService = new SettingsService();
+                ClipVault.Models.ClipboardItem.GlobalAutoMaskEnabled = _settingsService.CurrentSettings.AutoMaskSensitiveData;
                 LocalizationService.Instance.SetLanguage(_settingsService.CurrentSettings.Language);
                 _dbService = new DatabaseService(_settingsService.CurrentSettings.StorageDirectory);
                 _monitorService = new ClipboardMonitorService(_dbService, _settingsService);
@@ -91,6 +92,11 @@ namespace ClipVault
                 {
                     Dispatcher.Invoke(() =>
                     {
+                        ClipVault.Models.ClipboardItem.GlobalAutoMaskEnabled = _settingsService.CurrentSettings.AutoMaskSensitiveData;
+                        if (_trayMenuDnd != null)
+                        {
+                            _trayMenuDnd.Checked = _settingsService.CurrentSettings.IsManualDndMode;
+                        }
                         _mainWindow?.SyncSettingsFromService(refreshCards: false);
                         _sidebarWindow?.SyncSettingsFromService(refreshCards: false);
                     });
@@ -170,6 +176,7 @@ namespace ClipVault
 
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuQuick;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuPause;
+        private System.Windows.Forms.ToolStripMenuItem? _trayMenuDnd;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuClear;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuSettings;
         private System.Windows.Forms.ToolStripMenuItem? _trayMenuExit;
@@ -204,6 +211,20 @@ namespace ClipVault
                     }
                 };
 
+                _trayMenuDnd = new System.Windows.Forms.ToolStripMenuItem
+                {
+                    Checked = _settingsService?.CurrentSettings.IsManualDndMode == true
+                };
+                _trayMenuDnd.Click += (s, e) =>
+                {
+                    if (_settingsService != null)
+                    {
+                        _settingsService.CurrentSettings.IsManualDndMode = !_settingsService.CurrentSettings.IsManualDndMode;
+                        _trayMenuDnd.Checked = _settingsService.CurrentSettings.IsManualDndMode;
+                        Dispatcher.Invoke(() => _settingsService.SaveSettings());
+                    }
+                };
+
                 _trayMenuClear = new System.Windows.Forms.ToolStripMenuItem();
                 _trayMenuClear.Click += (s, e) =>
                 {
@@ -229,6 +250,7 @@ namespace ClipVault
                 contextMenu.Items.Add(_trayMenuQuick);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
                 contextMenu.Items.Add(_trayMenuPause);
+                contextMenu.Items.Add(_trayMenuDnd);
                 contextMenu.Items.Add(_trayMenuClear);
                 contextMenu.Items.Add(_trayMenuSettings);
                 contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
@@ -265,6 +287,7 @@ namespace ClipVault
             _notifyIcon.Text = loc.Get("TrayTooltip");
 
             if (_trayMenuQuick != null) _trayMenuQuick.Text = "🚀 " + loc.Get("TrayShow");
+            if (_trayMenuDnd != null) _trayMenuDnd.Text = "🎮 " + loc.Get("TrayDndMode");
             if (_trayMenuClear != null) _trayMenuClear.Text = "🗑️ " + loc.Get("TrayClear");
             if (_trayMenuSettings != null) _trayMenuSettings.Text = "⚙️ " + loc.Get("TraySettings");
             if (_trayMenuExit != null) _trayMenuExit.Text = "🛑 " + loc.Get("TrayExit");
