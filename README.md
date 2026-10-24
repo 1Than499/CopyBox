@@ -74,16 +74,17 @@
 
 # 🇨🇳 简体中文
 
-## 🌟 为什么选择 CopyBox 2.1？
+## 🌟 为什么选择 CopyBox 2.2.1？
 
 在日常使用 Windows 时，自带的剪贴板历史经常呼出迟缓、图片加载卡顿、缺少快速搜索和常用内容置顶功能；而市面上大多数第三方剪贴板工具不仅体积臃肿（基于 Electron 动辄占用几百兆内存），甚至强制捆绑云端同步，让密码、API Token、私信记录等极度敏感的数据面临泄露风险。
 
-**CopyBox 2.1 全面进化**，它不仅是一个极速轻量的离线剪贴板，更是 Windows 桌面右侧优雅的 **多合一生产力抽屉**：
-1. **绝对隐私，100% 纯本地离线**：不发起任何网络请求、不收集任何用户遥测，所有历史数据物理留存在用户本地磁盘；
-2. **开箱即用真便携，数据默认存放在程序根目录**：默认将配置与数据库保存在程序所在根目录，拷入移动硬盘随插随用；同时也支持自由绑定到 **OneDrive / Dropbox / 坚果云** 目录实现零成本私有云同步；
-3. **贴边悬停自动唤出 & 双模形态 100% 同源互通**：屏幕右侧边缘亚克力智能抽屉（支持鼠标移至屏幕右边缘自动滑出、移出或失焦即收、图钉常驻），也可随时切换至经典居中卡片面板，两套形态所有设置实时双向同步；
-4. **双重视图架构**：集成 `[ 📋 剪贴板中心 ]` 与 `[ ⚡ 快捷看板 ]` 药丸切换，办公提效与系统控制触手可及；
-5. **原生 120FPS 极速性能与刀锋级画质**：100% 纯原生 .NET 8 + WPF 矢量渲染引擎，无第三方重型 UI 库累赘，冷启动飞快，常驻内存极低，毫秒级响应。
+**CopyBox 2.2.1 全面进化**，它不仅是一个极速轻量的离线隐私剪贴板，更是 Windows 桌面边缘优雅的 **多屏自适应生产力抽屉**：
+1. **绝对隐私，100% 纯本地离线 + 敏感信息自动遮罩**：不发起任何网络请求、不收集任何用户遥测，所有历史数据物理留存在本地磁盘；自动识别 API Key、密码、银行卡、身份证、手机号并在卡片上安全打码，防止录屏、投屏或旁人窥屏泄密；
+2. **多显示器智能跨屏 & 左右贴边自由定制**：支持 **跟随鼠标所在显示器唤醒（智能多屏）** 或 **固定主显示器唤醒**，内置 Per-Monitor DPI 独立缩放适配；支持 **屏幕右侧贴边** 与 **屏幕左侧贴边** 一键切换；
+3. **全屏防误触与游戏“免打扰模式”**：自动感知 Direct3D 独占全屏游戏、无边框全屏游戏/视频/演示并暂停鼠标边缘唤醒，杜绝打游戏甩鼠标误触弹窗，同时支持托盘与设置面板一键开启强制免打扰；
+4. **开箱即用真便携，数据默认存放在程序根目录**：默认将配置与数据库保存在程序所在根目录，拷入移动硬盘随插随用；同时也支持自由绑定到 **OneDrive / Dropbox / 坚果云** 目录实现零成本私有云同步；
+5. **双重视图架构 & 双形态 100% 同源互通**：集成 `[ 📋 剪贴板中心 ]` 与 `[ ⚡ 快捷看板 ]` 药丸切换，支持 v2.0 侧边栏抽屉与 v1.0 经典居中浮窗无缝切换，所有设置实时双向同步；
+6. **原生 120FPS 极速性能与刀锋级画质**：100% 纯原生 .NET 8 + WPF 矢量渲染引擎，无第三方重型 UI 库累赘，冷启动飞快，常驻内存极低，毫秒级响应。
 
 ---
 
@@ -92,13 +93,16 @@
 ### 1. 🗂️ 剪贴板中心 (Clipboard Center)
 - **智能内容格式化呈现**：
   - **代码片段**：自动识别 JSON、各类编程语言，采用代码高亮卡片排版；
-  - **图片与截图**：自动解析图片分辨率与尺寸（如 `444 × 90 px`），提供圆角自适应缩略图；
+  - **图片与截图**：自动解析图片分辨率与尺寸（如 `475 × 1030 px`），提供圆角自适应缩略图；
   - **多行文本**：优雅段落排版，智能标注复制来源应用（如 Weixin、Word、Chrome 等）；
+- **🔒 敏感信息自动遮罩与单条明文切换**：
+  - 自动检测 **API 密钥/Token/JWT**、**密码凭据**、**私钥证书**、**18 位身份证**、**银行卡号**、**手机号**，UI 默认智能打码并显示金色隐私盾牌标签（如 `🛡️ 密钥/Token`）；
+  - 点击卡片右上角 **`👁` / `🙈` 按钮**可随时单条预览明文，且**粘贴与复制时始终输出 100% 原始未打码内容**；
 - **数字键极限秒贴 (`1~9` / `Alt+1~9`)**：无需移动鼠标，按下对应序号即可瞬间将内容粘入目标光标处；
 - **智能分类药丸**：提供 `全部`、`文本`、`图片`、`代码`、`置顶` 快速过滤筛选；
 - **即时交互体系**：
-  - **右键上下文菜单**：卡片上单击右键立即呼出上下文菜单；
-  - **右上角 `···` 快捷按钮**：平滑展开置顶、连续粘贴、复制与删除；
+  - **右键上下文菜单**：卡片上单击右键立即呼出上下文菜单（置顶、加入队列、复制、切换敏感明文/掩码、删除）；
+  - **右上角 `···` 快捷按钮**：平滑展开卡片操作菜单；
   - **钉住置顶**：置顶项目始终固定在最前部；
 
 ### 2. ⚡ 快捷看板 (Quick Dashboard)
@@ -117,12 +121,15 @@
 
 ---
 
-## 🏆 4 项杀手级生产力功能
+## 🏆 7 项杀手级生产力与隐私防护功能
 
 | 杀手级特性 | 亮点说明 |
 | :--- | :--- |
+| 🎮 **全屏防误触与游戏免打扰** | 自动检测全屏游戏（D3D 独占全屏 & 无边框全屏）、全屏视频与 PPT 演示，全屏时自动屏蔽鼠标边缘呼出，彻底告别游戏甩鼠标误触；亦可在托盘菜单一键开启手动免打扰。 |
+| 🖥️ **多显示器跨屏与左右贴边** | 支持 **跟随鼠标所在显示器唤醒** 或 **固定主显示器唤醒**（Per-Monitor DPI 自适应），并支持自由切换 **屏幕右侧贴边** 或 **屏幕左侧贴边**。 |
+| 🔒 **敏感信息自动遮罩防窥** | 自动识别 API Key/Token、密码、私钥、身份证、银行卡、手机号并在卡片上安全打码，支持 `👁` 按钮单条切换明文，粘贴时始终输出完整原始明文。 |
 | 🖱️ **全局拖拽直接粘贴** | 直接按住侧边栏中任意卡片，拖动到聊天框、Word、浏览器、代码编辑器甚至 Windows 资源管理器目录，**松手即自动粘贴或复制文件**，跨窗口交互丝滑流畅。 |
-| 🪟 **贴边悬停唤醒与失焦秒收** | 采用毫秒级屏幕右边缘热区检测与全局鼠标挂钩。贴边收起后**鼠标移至屏幕右边缘自动唤出**；未锁定状态下移出或点击外部瞬间智能收起；开启顶栏 📌 图钉后则稳定常驻。 |
+| 🪟 **贴边悬停唤醒与失焦秒收** | 采用毫秒级屏幕左/右边缘热区检测与全局鼠标挂钩。贴边收起后**鼠标移至屏幕贴边侧边缘自动唤出**；未锁定状态下移出或点击外部瞬间智能收起；开启顶栏 📌 图钉后则稳定常驻。 |
 | 📑 **顺序连续粘贴流** | 点击卡片上的“连续粘贴”图标即可将多张卡片加入流水线队列。切换到目标文档后，**只需连续按下 `Ctrl + V`**，便会按加入顺序依次粘贴出每一条内容，批量填表与整理文档的终极利器！ |
 | 📝 **快捷看板随手记便签** | 侧边栏常驻轻量随手记草稿板。随手记录临时密码、备忘电话、零碎灵感，**软件关闭或电脑重启后自动持久化恢复**，无需频繁新建记事本。 |
 
@@ -130,7 +137,7 @@
 
 ## 🎨 6 大高级预设主题、自定义壁纸与真背景透明度调节
 
-CopyBox 2.1 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
+CopyBox 2.2.1 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
 
 1. 🌙 **深色模式 (Dark)**：经典极夜蓝黑，深沉护眼，高对比度；
 2. ☀️ **明亮模式 (Light)**：象牙冷白，纯净素雅，浅灰底盘彻底告别黑块；
@@ -151,7 +158,7 @@ CopyBox 2.1 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心
 | 快捷键 | 作用说明 |
 | :--- | :--- |
 | `Alt + V` | 全局任意界面快速唤醒 / 隐藏 CopyBox |
-| `屏幕最右边缘悬停` | 侧边栏贴边收起后，鼠标移至屏幕右边缘自动滑出唤起 |
+| `屏幕左/右贴边边缘悬停` | 侧边栏贴边收起后，鼠标移至所选贴边侧（右侧或左侧）屏幕边缘自动滑出唤起 |
 | `1` ~ `9` 或 `Alt + 1~9` | 直接秒贴前 1~9 条对应历史内容 |
 | `↑` / `↓` | 在卡片列表中上下快速导航移动 |
 | `Enter` | 选定当前卡片并自动贴入目标窗口光标处 |
@@ -170,7 +177,9 @@ CopyBox 2.1 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心
   - `AddClipboardFormatListener`：系统剪贴板高频异步监听
   - `RegisterHotKey`：全局 `Alt + V` 低延迟唤醒
   - `WS_EX_NOACTIVATE`：侧边栏无侵入展示（点击卡片不夺取工作窗口光标焦点）
-  - `GetCursorPos` + `SetWindowsHookEx` (WH_MOUSE_LL)：屏幕右边缘悬停唤醒与外部物理边界失焦识别
+  - `GetCursorPos` + `SetWindowsHookEx` (WH_MOUSE_LL)：屏幕左/右边缘悬停唤醒与外部物理边界失焦识别
+  - `MonitorFromPoint` + `GetMonitorInfo` + `GetDpiForMonitor`：多显示器工作区定位与 Per-Monitor DPI 独立缩放计算
+  - `SHQueryUserNotificationState` + `GetForegroundWindow`：Direct3D 独占全屏游戏与无边框全屏应用智能防误触识别
   - `ExtractAssociatedIcon`：可执行程序原生高清图标提取与内存缓存
   - `Windows.Media.Control` (SMTC)：原生流媒体全局播放会话控制
 - **本地存储**：`Microsoft.Data.Sqlite`（开启 **WAL 并发预写日志模式**）
@@ -200,7 +209,7 @@ dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile
 
 ## 📁 本地数据目录规范
 
-CopyBox v2.1 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
+CopyBox v2.2.1 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
 
 ```text
 CopyBox/
@@ -219,24 +228,26 @@ CopyBox/
 
 # 🇺🇸 English
 
-## 🌟 Why CopyBox 2.1?
+## 🌟 Why CopyBox 2.2.1?
 
 Windows' built-in clipboard history frequently suffers from sluggish popups, slow thumbnail loading, and a lack of quick search or pinning capabilities. Most third-party alternatives are bloated Electron apps that consume hundreds of megabytes of RAM while forcing mandatory cloud synchronization—exposing sensitive credentials, private notes, and source code tokens to potential data leaks.
 
-**CopyBox 2.1 evolves further**: it is not just a lightweight, 100% offline clipboard manager, but an elegant, **docked productivity drawer** on your Windows desktop.
+**CopyBox 2.2.1 evolves further**: it is not just a lightweight, 100% offline privacy clipboard manager, but an intelligent, **multi-monitor productivity drawer** on your Windows desktop.
 
-1. **100% Offline & Private**: Zero network connections, zero telemetry, zero analytics. All your history stays securely on your physical disk;
-2. **True Portable Root Storage & Private Cloud Sync**: Stores configuration (`settings.json`), database (`clipvault.db`), and image caches directly in the app root directory by default—or point it to your **OneDrive / Dropbox / Google Drive** directory for zero-config multi-device sync;
-3. **Edge-Hover Auto-Wake & Unified Dual Window Modes**: Hover at the right edge of your screen to smoothly slide out the **Sidebar Acrylic Drawer**, or switch to the classic **Centered Palette**—with 100% synchronized settings across both modes;
-4. **Dual-View Architecture**: Toggle effortlessly between `[ 📋 Clipboard Center ]` and `[ ⚡ Quick Dashboard ]`;
-5. **120FPS Blazing Native Performance**: Pure native .NET 8 and WPF vector styles with in-place DirectX brush alpha updates and razor-sharp ClearType rendering.
+1. **100% Offline & Automatic Sensitive Data Masking**: Zero network connections, zero telemetry. Automatically detects API Keys/Tokens, passwords, private keys, bank cards, ID cards, and phone numbers—masking them on UI cards to prevent shoulder-surfing or screen-sharing leaks while pasting 100% original text;
+2. **Multi-Monitor Support & Left/Right Dock Customization**: Wake the drawer on whichever monitor your mouse cursor is on (`FollowCursor`) or lock it to your primary monitor (`Primary`) with full Per-Monitor DPI scaling; freely dock to either the **Right Edge** or **Left Edge** of your screen;
+3. **Fullscreen Anti-Mistouch & Gaming DND Mode**: Automatically detects fullscreen games (Direct3D exclusive & borderless fullscreen), fullscreen videos, and presentations to suppress edge-hover wake—plus a manual DND toggle in the system tray and settings;
+4. **True Portable Root Storage & Private Cloud Sync**: Stores configuration (`settings.json`), database (`clipvault.db`), and image caches directly in the app root directory by default—or point it to your **OneDrive / Dropbox / Google Drive** directory for zero-config multi-device sync;
+5. **Dual-View Architecture & Unified Dual Window Modes**: Toggle effortlessly between `[ 📋 Clipboard Center ]` and `[ ⚡ Quick Dashboard ]`, and switch between the **Sidebar Acrylic Drawer** and **Centered Palette** with 100% synchronized settings;
+6. **120FPS Blazing Native Performance**: Pure native .NET 8 and WPF vector styles with in-place DirectX brush alpha updates and razor-sharp ClearType rendering.
 
 ---
 
 ## ✨ Key Capabilities
 
 ### 1. 🗂️ Clipboard Center
-- **Smart Formatting**: Automatic syntax-highlighted code cards (JSON/C#/Python/JS/etc.), image thumbnails with auto-calculated resolution tags (e.g. `444 × 90 px`), and multi-line text with source app badges;
+- **Smart Formatting**: Automatic syntax-highlighted code cards (JSON/C#/Python/JS/etc.), image thumbnails with auto-calculated resolution tags (e.g. `475 × 1030 px`), and multi-line text with source app badges;
+- **🔒 Sensitive Privacy Masking & Per-Card Reveal (`👁` / `🙈`)**: Automatically masks sensitive tokens, passwords, bank cards, ID numbers, and phone numbers on UI cards with a golden privacy badge while keeping copy/paste output 100% unmasked;
 - **Instant Number-Key Pasting (`1~9` / `Alt+1~9`)**: Paste the top items without ever touching your mouse;
 - **Category Filter Pills**: Fast filter tabs for `All`, `Text`, `Images`, `Code`, and `Pinned`;
 - **Interactive Rich Context**: Right-click context menus, expandable `···` action bars, warm golden pin badges, and one-click copying/deletion.
@@ -250,12 +261,15 @@ Windows' built-in clipboard history frequently suffers from sluggish popups, slo
 
 ---
 
-## 🏆 4 Killer Productivity Features
+## 🏆 7 Killer Productivity & Privacy Features
 
-1. 🖱️ **Global Drag & Drop Direct Paste**: Drag any clipboard card directly into WeChat, Word, browser textareas, VS Code, or Windows Explorer folders—**release to paste or copy the file instantly**!
-2. 🪟 **Right-Edge Hover Wake & Smart Auto-Dismiss**: When collapsed to the edge, simply move your cursor to the right edge of the screen to wake the drawer; when unpinned, moving outside or clicking outside smoothly hides it; pin it (📌) to keep it permanently on top.
-3. 📑 **Sequential Continuous Paste Queue**: Queue multiple items by clicking the "Continuous Paste" button. Switch to your target document and **simply press `Ctrl + V` repeatedly** to paste each queued item in sequence.
-4. 📝 **Persistent Scratchpad**: Built-in notepad right inside the drawer for temporary passwords, phone numbers, or code snippets—automatically preserved across app restarts.
+1. 🎮 **Fullscreen Gaming DND & Anti-Mistouch**: Automatically pauses edge-hover wake when running fullscreen games, videos, or presentations—plus one-click manual DND mode in the system tray.
+2. 🖥️ **Multi-Monitor Follow-Cursor & Left/Right Dock Edge**: Seamlessly follows your cursor across multiple monitors with Per-Monitor DPI scaling, and docks to either the left or right screen edge.
+3. 🔒 **Automatic Sensitive Data Masking**: Masks API keys, passwords, bank cards, ID numbers, and phone numbers on screen (`👁` to toggle plaintext preview) while pasting the full original text.
+4. 🖱️ **Global Drag & Drop Direct Paste**: Drag any clipboard card directly into WeChat, Word, browser textareas, VS Code, or Windows Explorer folders—**release to paste or copy the file instantly**!
+5. 🪟 **Edge Hover Wake & Smart Auto-Dismiss**: When collapsed to the edge, simply move your cursor to the docked screen edge to wake the drawer; when unpinned, moving outside or clicking outside smoothly hides it; pin it (📌) to keep it permanently on top.
+6. 📑 **Sequential Continuous Paste Queue**: Queue multiple items by clicking the "Continuous Paste" button. Switch to your target document and **simply press `Ctrl + V` repeatedly** to paste each queued item in sequence.
+7. 📝 **Persistent Scratchpad**: Built-in notepad right inside the drawer for temporary passwords, phone numbers, or code snippets—automatically preserved across app restarts.
 
 ---
 
@@ -278,7 +292,7 @@ Windows' built-in clipboard history frequently suffers from sluggish popups, slo
 | Shortcut | Description |
 | :--- | :--- |
 | `Alt + V` | Globally toggle / dismiss CopyBox from anywhere |
-| `Hover Right Screen Edge` | Automatically slide out the sidebar when collapsed |
+| `Hover Left/Right Screen Edge` | Automatically slide out the sidebar when collapsed (suppressed in fullscreen gaming DND mode) |
 | `1` ~ `9` or `Alt + 1~9` | Instantly paste items #1 through #9 |
 | `↑` / `↓` | Navigate smoothly through cards |
 | `Enter` | Select and paste item directly into active cursor position |
