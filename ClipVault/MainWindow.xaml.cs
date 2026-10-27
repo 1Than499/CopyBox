@@ -72,14 +72,30 @@ namespace ClipVault
                 });
             };
 
-            // 监听后台新捕获的剪贴板条目
+            // 监听后台新捕获的剪贴板条目（仅在前台可见时刷新，后台静默不产生视觉对象）
             _monitorService.ItemCaptured += (item) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    RefreshCards();
-                    UpdateStorageInfo();
+                    if (this.IsVisible)
+                    {
+                        RefreshCards();
+                        UpdateStorageInfo();
+                    }
                 });
+            };
+
+            // 窗口隐藏时主动释放内存工作集与临时缓存
+            this.IsVisibleChanged += (s, e) =>
+            {
+                if (!this.IsVisible)
+                {
+                    foreach (var it in DisplayCards)
+                    {
+                        it.ClearImageCache();
+                    }
+                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
+                }
             };
 
             // 失去焦点时交互逻辑（默认关闭，点击外部绝不自动收起/绝不最小化到托盘！）

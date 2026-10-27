@@ -73,9 +73,16 @@ namespace ClipVault
                 _monitorService.Start();
                 _hotkeyService.Start();
 
-                // 3. 初始化主窗口 与 v2.0 贴边毛玻璃双模抽屉
-                _mainWindow = new MainWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
-                _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService, _settingsService, _monitorService, _pasteSimulator);
+                // 3. 按当前形态偏好按需初始化窗口（杜绝同时加载双套完整 XAML 视觉树与全部卡片）
+                string startupMode = _settingsService.CurrentSettings.WindowMode;
+                if (startupMode == "Centered")
+                {
+                    GetOrCreateMainWindow();
+                }
+                else
+                {
+                    GetOrCreateSidebarWindow();
+                }
 
                 // 3.5 全局统一绑定存储路径变更与设置项同步 (确保 1.0 与 2.0 共享同一套数据源与配置状态)
                 _settingsService.StorageDirectoryChanged += newDir =>
@@ -113,6 +120,9 @@ namespace ClipVault
 
                 // 6. 启动后根据当前选择的模式唤起界面
                 ToggleActiveWindow();
+
+                // 7. 启动后执行内存整理与工作集轻量化收缩
+                ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
             }
             catch (Exception ex)
             {
@@ -303,6 +313,24 @@ namespace ClipVault
                 : "⏸️ " + loc.Get("TrayPause");
         }
 
+        private MainWindow GetOrCreateMainWindow()
+        {
+            if (_mainWindow == null)
+            {
+                _mainWindow = new MainWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!);
+            }
+            return _mainWindow;
+        }
+
+        private ClipVault.Views.SidebarWindow GetOrCreateSidebarWindow()
+        {
+            if (_sidebarWindow == null)
+            {
+                _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!);
+            }
+            return _sidebarWindow;
+        }
+
         /// <summary>
         /// 核心多模统一调度：按全局快捷键 (Alt+V) 或点击托盘时，仅呼出当前设置选定的单一模式
         /// </summary>
@@ -317,7 +345,7 @@ namespace ClipVault
                     {
                         _sidebarWindow.SlideOutAndHide();
                     }
-                    _mainWindow?.ToggleMainWindow();
+                    GetOrCreateMainWindow().ToggleMainWindow();
                 }
                 else
                 {
@@ -325,7 +353,7 @@ namespace ClipVault
                     {
                         _mainWindow.Hide();
                     }
-                    _sidebarWindow?.ToggleDocked();
+                    GetOrCreateSidebarWindow().ToggleDocked();
                 }
             }
             catch (Exception ex)
@@ -341,20 +369,21 @@ namespace ClipVault
         {
             Dispatcher.Invoke(() =>
             {
-                _mainWindow?.SyncSettingsFromService(refreshCards: true);
-                _sidebarWindow?.SyncSettingsFromService(refreshCards: true);
-
                 if (newMode == "Centered")
                 {
                     _sidebarWindow?.SlideOutAndHide();
-                    _mainWindow?.ShowAndActivate();
-                    _mainWindow?.OpenSettings();
+                    var mainWin = GetOrCreateMainWindow();
+                    mainWin.SyncSettingsFromService(refreshCards: true);
+                    mainWin.ShowAndActivate();
+                    mainWin.OpenSettings();
                 }
                 else
                 {
                     _mainWindow?.Hide();
-                    _sidebarWindow?.ShowDocked();
-                    _sidebarWindow?.ShowSettings();
+                    var sideWin = GetOrCreateSidebarWindow();
+                    sideWin.SyncSettingsFromService(refreshCards: true);
+                    sideWin.ShowDocked();
+                    sideWin.ShowSettings();
                 }
             });
         }
@@ -374,7 +403,7 @@ namespace ClipVault
                     {
                         _mainWindow.Hide();
                     }
-                    _sidebarWindow?.ShowSettings();
+                    GetOrCreateSidebarWindow().ShowSettings();
                 }
                 else
                 {
@@ -382,8 +411,9 @@ namespace ClipVault
                     {
                         _sidebarWindow.SlideOutAndHide();
                     }
-                    _mainWindow?.ShowAndActivate();
-                    _mainWindow?.OpenSettings();
+                    var mainWin = GetOrCreateMainWindow();
+                    mainWin.ShowAndActivate();
+                    mainWin.OpenSettings();
                 }
             });
         }

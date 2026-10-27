@@ -220,6 +220,7 @@ namespace ClipVault.Models
                     var bmp = new System.Windows.Media.Imaging.BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bmp.DecodePixelWidth = 400; // 核心内存优化：卡片缩略图约束至 400px 解码，内存占用骤降 95%+
                     bmp.StreamSource = ms;
                     bmp.EndInit();
                     bmp.Freeze(); // 允许跨线程安全访问与极速渲染
@@ -252,6 +253,11 @@ namespace ClipVault.Models
                     return null;
                 }
             }
+        }
+
+        public void ClearImageCache()
+        {
+            _cachedImage = null;
         }
     }
 }

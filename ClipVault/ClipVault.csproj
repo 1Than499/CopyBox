@@ -18,6 +18,10 @@
     <Description>CopyBox - 现代化、100% 纯本地离线、高颜值的 Windows 剪贴板与效率抽屉助手</Description>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- 桌面客户端专属内存优化：关闭服务端垃圾回收，启用工作站敏捷 GC 与 .NET 8 DATAS 动态自适应堆收缩 -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
   </PropertyGroup>
 
   <ItemGroup>

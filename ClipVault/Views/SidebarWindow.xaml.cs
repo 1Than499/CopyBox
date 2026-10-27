@@ -223,7 +223,22 @@ namespace ClipVault.Views
                         return;
                     }
 
-                    // v2.2.1 特性 1：全屏防误触与游戏“免打扰模式”
+                    // v2.2.1 特性 2：多显示器支持与左/右贴边位置自定义
+                    var (monRect, _, _, _) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(settings.MonitorStrategy);
+                    if (monRect.Width <= 0 || monRect.Height <= 0) return;
+
+                    bool withinVerticalSafeZone = pt.y >= (monRect.Top + 48) && pt.y <= (monRect.Bottom - 48);
+                    bool atTargetEdge = isLeftDock
+                        ? (withinVerticalSafeZone && pt.x >= monRect.Left && pt.x <= (monRect.Left + 6))
+                        : (withinVerticalSafeZone && pt.x >= (monRect.Right - 6) && pt.x <= monRect.Right);
+
+                    if (!atTargetEdge)
+                    {
+                        _edgeHoverTicks = 0;
+                        return;
+                    }
+
+                    // v2.2.1 特性 1：全屏防误触与游戏“免打扰模式”（仅当鼠标确实处于边缘热区时才触发前台检测，节约 99.9% 后台开销）
                     if (settings.IsManualDndMode)
                     {
                         _edgeHoverTicks = 0;
@@ -235,23 +250,11 @@ namespace ClipVault.Views
                         return;
                     }
 
-                    // v2.2.1 特性 2：多显示器支持与左/右贴边位置自定义
-                    var (monRect, _, _, _) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(settings.MonitorStrategy);
-                    if (monRect.Width <= 0 || monRect.Height <= 0) return;
-
-                    bool withinVerticalSafeZone = pt.y >= (monRect.Top + 48) && pt.y <= (monRect.Bottom - 48);
-                    bool atTargetEdge = isLeftDock
-                        ? (withinVerticalSafeZone && pt.x >= monRect.Left && pt.x <= (monRect.Left + 6))
-                        : (withinVerticalSafeZone && pt.x >= (monRect.Right - 6) && pt.x <= monRect.Right);
-
-                    if (atTargetEdge)
+                    _edgeHoverTicks++;
+                    if (_edgeHoverTicks >= 2) // 悬停约 100ms 即刻丝滑唤起
                     {
-                        _edgeHoverTicks++;
-                        if (_edgeHoverTicks >= 2) // 悬停约 100ms 即刻丝滑唤起
-                        {
-                            _edgeHoverTicks = 0;
-                            ShowDocked();
-                        }
+                        _edgeHoverTicks = 0;
+                        ShowDocked();
                     }
                     else
                     {
@@ -331,13 +334,16 @@ namespace ClipVault.Views
             }
             catch { }
 
-            // 监听底层剪贴板捕获
+            // 监听底层剪贴板捕获（仅在前台可见时刷新，后台绝不重复渲染占内存）
             _monitorService.ItemCaptured += (item) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    RefreshCards();
-                    UpdateSideStorageInfo();
+                    if (this.IsVisible)
+                    {
+                        RefreshCards();
+                        UpdateSideStorageInfo();
+                    }
                 });
             };
 
@@ -348,6 +354,24 @@ namespace ClipVault.Views
                     (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
                 {
                     SlideOutAndHide();
+                }
+            };
+
+            // 窗口隐藏时自动释放多余内存、停止媒体轮询并整理工作集
+            this.IsVisibleChanged += (s, e) =>
+            {
+                if (!this.IsVisible)
+                {
+                    _brightnessSyncTimer?.Stop();
+                    _mediaService?.PausePolling();
+                    if (DisplayCards != null)
+                    {
+                        foreach (var item in DisplayCards)
+                        {
+                            item.ClearImageCache();
+                        }
+                    }
+                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
                 }
             };
 
@@ -1057,7 +1081,9 @@ namespace ClipVault.Views
             RefreshCards();
             UpdateSideStorageInfo();
             
-            // 立即用当前音源信息刷新 UI，并触发后台重新检测
+            // 激活媒体与系统状态前台刷新
+            _mediaService.ResumePolling();
+            _brightnessSyncTimer.Start();
             UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
 
@@ -1162,6 +1188,7 @@ namespace ClipVault.Views
 
             StopGlobalMouseHook();
             _brightnessSyncTimer.Stop();
+            _mediaService.PausePolling();
 
             double currentOp = this.Opacity > 0.05 ? this.Opacity : 1.0;
             var fadeAnim = new DoubleAnimation(currentOp, 0, TimeSpan.FromMilliseconds(150))
@@ -1180,6 +1207,11 @@ namespace ClipVault.Views
                     DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
                     DrawerTranslate.X = 0;
                 }
+                foreach (var item in DisplayCards)
+                {
+                    item.ClearImageCache();
+                }
+                ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
             };
             this.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
 

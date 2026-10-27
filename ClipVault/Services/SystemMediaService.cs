@@ -46,15 +46,32 @@ namespace ClipVault.Services
             }
             catch { }
 
-            // 1 秒心跳轮询，实时捕获后台播放器状态
+            // 1 秒心跳轮询，按需监听后台播放器状态（仅在侧边栏显示时启动）
             _pollTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(1000)
             };
             _pollTimer.Tick += async (s, e) => await RefreshMediaAsync();
-            _pollTimer.Start();
-
+            // 默认暂停轮询，侧边栏滑出显示时激活，收起隐藏时休眠，彻底消除后台 COM/WASAPI 内存与 CPU 开销
+            
             _ = InitializeGsmtcAsync();
+        }
+
+        public void PausePolling()
+        {
+            if (_pollTimer.IsEnabled)
+            {
+                _pollTimer.Stop();
+            }
+        }
+
+        public void ResumePolling()
+        {
+            if (!_pollTimer.IsEnabled)
+            {
+                _pollTimer.Start();
+                _ = RefreshMediaAsync();
+            }
         }
 
         private async Task InitializeGsmtcAsync()
