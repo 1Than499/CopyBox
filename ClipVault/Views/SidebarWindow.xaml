@@ -407,7 +407,7 @@
                             </Border>
                             <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
-                                <TextBlock Text="v2.2.1" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
+                                <TextBlock x:Name="TxtAppVersion" Text="v2.2.2" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
 

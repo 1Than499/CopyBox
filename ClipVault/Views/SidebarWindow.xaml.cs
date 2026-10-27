@@ -317,6 +317,16 @@ namespace ClipVault.Views
 
             InitializeComponent();
 
+            try
+            {
+                var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                if (ver != null && TxtAppVersion != null)
+                {
+                    TxtAppVersion.Text = $"v{ver.Major}.{ver.Minor}.{ver.Build}";
+                }
+            }
+            catch { }
+
             CardsListBox.ItemsSource = DisplayCards;
 
             // 加载图标
