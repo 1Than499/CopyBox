@@ -23,7 +23,7 @@ namespace ClipVault
 
         private static System.Threading.Mutex? _singleInstanceMutex;
 
-        private static void LogError(string tag, object? ex)
+        public static void LogError(string tag, object? ex)
         {
             try
             {

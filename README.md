@@ -62,7 +62,7 @@
 2. **⚡ 彻底修复首次点击「设置」崩溃问题**：
    - 移除单文件打包环境下存在字体流寻址隐患的第三方 UI 依赖，重构为 100% 原生 WPF 矢量 Fluent 控件样式，并加固初始化生命周期保护锁，首次及任意时刻打开设置均零崩溃、秒级响应。
 3. **📁 便携版本地数据存储路径默认与程序根目录一致**：
-   - 绿色便携版默认将配置文件（`settings.json`）、本地 SQLite 数据库（`clipvault.db`）及图片/壁纸缓存直接保存在程序所在根目录，真正实现「整个文件夹拷入 U 盘或移动硬盘即插即用，数据随身走」。
+   - 绿色便携版默认将配置文件（`settings.json`）、本地 SQLite 数据库（`clipboard.db`，同时自动兼容 `clipvault.db`）及图片/壁纸缓存直接保存在程序所在根目录，真正实现「整个文件夹拷入 U 盘或移动硬盘即插即用，数据随身走」。
 4. **🔄 v1.0 居中浮窗与 v2.0 侧边栏双形态设置 100% 同源互通**：
    - 彻底统一两套界面形态下的全部设置项（6 大主题、自定义壁纸、背景透明度、本地存储路径与 SQLite 状态统计、关闭动作、双击卡片行为等），修改任意一项设置或迁移数据目录均在双形态间实时双向同步。
 5. **🎨 「背景透明度」逻辑修正与 120FPS 满帧丝滑拖动**：
@@ -215,9 +215,9 @@ CopyBox v2.2.1 默认采用便携式根目录存储（与 `CopyBox.exe` 同目�
 CopyBox/
 ├── CopyBox.exe           # 主程序
 ├── settings.json         # 用户偏好设置 (双形态 100% 实时互通)
-├── clipvault.db          # SQLite 索引与元数据 (文本内容、来源应用、字符数、置顶标记等)
-├── clipvault.db-shm      # SQLite WAL 共享内存索引
-├── clipvault.db-wal      # SQLite 高性能并发预写日志
+├── clipboard.db          # SQLite 索引与元数据 (首次运行自动创建，亦完全兼容 clipvault.db)
+├── clipboard.db-shm      # SQLite WAL 共享内存索引
+├── clipboard.db-wal      # SQLite 高性能并发预写日志
 ├── images/               # 截图与图片独立缓存目录 (sha256_hash.png)
 └── Wallpapers/           # 自定义背景壁纸持久化目录
 ```
@@ -237,7 +237,7 @@ Windows' built-in clipboard history frequently suffers from sluggish popups, slo
 1. **100% Offline & Automatic Sensitive Data Masking**: Zero network connections, zero telemetry. Automatically detects API Keys/Tokens, passwords, private keys, bank cards, ID cards, and phone numbers—masking them on UI cards to prevent shoulder-surfing or screen-sharing leaks while pasting 100% original text;
 2. **Multi-Monitor Support & Left/Right Dock Customization**: Wake the drawer on whichever monitor your mouse cursor is on (`FollowCursor`) or lock it to your primary monitor (`Primary`) with full Per-Monitor DPI scaling; freely dock to either the **Right Edge** or **Left Edge** of your screen;
 3. **Fullscreen Anti-Mistouch & Gaming DND Mode**: Automatically detects fullscreen games (Direct3D exclusive & borderless fullscreen), fullscreen videos, and presentations to suppress edge-hover wake—plus a manual DND toggle in the system tray and settings;
-4. **True Portable Root Storage & Private Cloud Sync**: Stores configuration (`settings.json`), database (`clipvault.db`), and image caches directly in the app root directory by default—or point it to your **OneDrive / Dropbox / Google Drive** directory for zero-config multi-device sync;
+4. **True Portable Root Storage & Private Cloud Sync**: Stores configuration (`settings.json`), database (`clipboard.db` / `clipvault.db`), and image caches directly in the app root directory by default—or point it to your **OneDrive / Dropbox / Google Drive** directory for zero-config multi-device sync;
 5. **Dual-View Architecture & Unified Dual Window Modes**: Toggle effortlessly between `[ 📋 Clipboard Center ]` and `[ ⚡ Quick Dashboard ]`, and switch between the **Sidebar Acrylic Drawer** and **Centered Palette** with 100% synchronized settings;
 6. **120FPS Blazing Native Performance**: Pure native .NET 8 and WPF vector styles with in-place DirectX brush alpha updates and razor-sharp ClearType rendering.
 

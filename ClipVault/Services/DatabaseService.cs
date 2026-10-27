@@ -22,13 +22,32 @@ namespace ClipVault.Services
             lock (_lock)
             {
                 _storageDir = newStorageDir;
-                _dbPath = Path.Combine(_storageDir, "clipboard.db");
+                _dbPath = ResolveDatabasePath(_storageDir);
                 InitializeDatabase();
             }
         }
 
+        private static string ResolveDatabasePath(string storageDir)
+        {
+            if (string.IsNullOrWhiteSpace(storageDir)) return "clipboard.db";
+
+            string defaultDb = Path.Combine(storageDir, "clipboard.db");
+            string aliasDb = Path.Combine(storageDir, "clipvault.db");
+
+            // 若用户目录中已存在 clipvault.db 且不存在 clipboard.db，则无缝兼容 clipvault.db
+            if (!File.Exists(defaultDb) && File.Exists(aliasDb))
+            {
+                return aliasDb;
+            }
+            return defaultDb;
+        }
+
         private SqliteConnection CreateConnection()
         {
+            if (!string.IsNullOrEmpty(_storageDir) && !Directory.Exists(_storageDir))
+            {
+                try { Directory.CreateDirectory(_storageDir); } catch { }
+            }
             var conn = new SqliteConnection($"Data Source={_dbPath};");
             conn.Open();
             // 开启 WAL 模式与 3秒 busy_timeout：高并发读写、零锁库卡顿
@@ -75,6 +94,7 @@ namespace ClipVault.Services
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to init SQLite: {ex.Message}");
+                App.LogError("SQLite Init Error", ex);
             }
         }
 

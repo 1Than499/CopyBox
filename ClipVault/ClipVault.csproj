@@ -16,6 +16,8 @@
     <FileVersion>2.2.1.0</FileVersion>
     <AssemblyVersion>2.2.1.0</AssemblyVersion>
     <Description>CopyBox - 现代化、100% 纯本地离线、高颜值的 Windows 剪贴板与效率抽屉助手</Description>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

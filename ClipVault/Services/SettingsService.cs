@@ -147,9 +147,16 @@ namespace ClipVault.Services
 
                 string oldDb = Path.Combine(oldPath, "clipboard.db");
                 string newDb = Path.Combine(newPath, "clipboard.db");
-                if (File.Exists(oldDb) && !File.Exists(newDb))
+                string targetAliasDb = Path.Combine(newPath, "clipvault.db");
+                if (File.Exists(oldDb) && !File.Exists(newDb) && !File.Exists(targetAliasDb))
                 {
                     File.Copy(oldDb, newDb, true);
+                }
+
+                string oldDb2 = Path.Combine(oldPath, "clipvault.db");
+                if (File.Exists(oldDb2) && !File.Exists(newDb) && !File.Exists(Path.Combine(newPath, "clipvault.db")))
+                {
+                    File.Copy(oldDb2, Path.Combine(newPath, "clipvault.db"), true);
                 }
 
                 string oldImages = Path.Combine(oldPath, "images");
