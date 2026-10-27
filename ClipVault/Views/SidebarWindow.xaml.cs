@@ -227,10 +227,10 @@ namespace ClipVault.Views
                     var (monRect, _, _, _) = ClipVault.Interop.NativeMethods.GetTargetMonitorBounds(settings.MonitorStrategy);
                     if (monRect.Width <= 0 || monRect.Height <= 0) return;
 
-                    bool withinVerticalSafeZone = pt.y >= (monRect.Top + 48) && pt.y <= (monRect.Bottom - 48);
+                    bool withinVerticalSafeZone = pt.y >= (monRect.Top + 32) && pt.y <= (monRect.Bottom - 32);
                     bool atTargetEdge = isLeftDock
-                        ? (withinVerticalSafeZone && pt.x >= monRect.Left && pt.x <= (monRect.Left + 6))
-                        : (withinVerticalSafeZone && pt.x >= (monRect.Right - 6) && pt.x <= monRect.Right);
+                        ? (withinVerticalSafeZone && pt.x >= (monRect.Left - 2) && pt.x <= (monRect.Left + 8))
+                        : (withinVerticalSafeZone && pt.x >= (monRect.Right - 8) && pt.x <= (monRect.Right + 2));
 
                     if (!atTargetEdge)
                     {
@@ -255,10 +255,6 @@ namespace ClipVault.Views
                     {
                         _edgeHoverTicks = 0;
                         ShowDocked();
-                    }
-                    else
-                    {
-                        _edgeHoverTicks = 0;
                     }
                     return;
                 }
@@ -1199,6 +1195,8 @@ namespace ClipVault.Views
             {
                 if (gen != _animGeneration) return;
                 _isHiding = false;
+                _isModalOrMenuOpen = false;
+                _isDraggingCard = false;
                 this.Hide();
                 this.BeginAnimation(UIElement.OpacityProperty, null);
                 this.Opacity = 1.0;
