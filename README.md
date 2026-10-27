@@ -1,23 +1,40 @@
 <div align="center">
 
-# CopyBox 📦 v2.2.1
+# CopyBox 📦 v2.2.2
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v2.2.1-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v2.2.2-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **🆕 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **📜 v2.1 更新内容** ](#-v21-版本更新说明-whats-new-in-v21) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **🆕 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **📜 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **📜 v2.1 更新内容** ](#-v21-版本更新说明-whats-new-in-v21) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
 
 ---
 
-## 🆕 v2.2.1 版本更新说明 (What's New in v2.2.1)
+## 🆕 v2.2.2 版本更新说明 (What's New in v2.2.2)
+
+### 🛠️ 1. 单文件独立建库与核心驱动内嵌 (Embedded SQLite Driver & Auto-Creation)
+- **解决复制内容不显示 Bug**：彻底解决便携单文件运行由于缺少外部 `e_sqlite3.dll` 导致 SQLite 初始化静默失败、数据库未能自动建立、复制内容在卡片中心不展示的严重问题。
+- **SQLite 原生驱动深度固化**：启用 .NET 8 原生自解压嵌入（`IncludeNativeLibrariesForSelfExtract`），`CopyBox.exe` 作为单文件在任意空白文件夹中双击运行，无需任何外挂 DLL 即可 100% 自动秒建数据库并初始化；
+- **双数据库文件名智能兼容**：默认创建并使用 `clipboard.db`，同时全自动识别并沿用历史 `clipvault.db`，无缝迁移不产生多余库文件。
+
+### 🚀 2. 极限轻量化重构，内存占用大降 ~67% (Massive Memory Reduction & True Dormancy)
+- **后台彻底静默休眠**：增加 `if (this.IsVisible)` 守卫，抽屉与浮窗在后台隐藏收起状态下，复制新内容时仅写入数据库并更新角标，**彻底切断后台无谓的卡片全量重绘与 UI 分配**，终结“后台前台一样大”的假休眠现象；
+- **图片缩略图约束解码**：卡片图片预览增加 `DecodePixelWidth = 400` 约束，4K 截图解码内存开销从 30MB+ 骤降至 ~200KB（节省 95%+），收起隐藏时自动释放临时图片缓存；
+- **满血 UI 虚拟化与容器回收**：`VirtualizingStackPanel` 开启像素级滚动与容器重用（`VirtualizationMode="Recycling"`），视口外卡片即刻释放，长历史记录零内存暴增；
+- **音频轮询与边缘检测动态休眠**：后台收起时暂停 GSMTC/WASAPI 轮询，边缘检测仅在光标真正触及 6px 热区时才触发前台全屏检测；
+- **物理内存工作集自动收缩**：隐藏至贴边/托盘时主动触发轻量 GC 并调用 Windows `EmptyWorkingSet`，多余物理内存页立即归还操作系统；
+- **.NET 8 DATAS 敏捷堆**：启用 `<GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>` 与工作站 GC，日常内存平稳在 50MB~65MB 左右，回归“极致小巧”初心！
+
+---
+
+## 📜 v2.2.1 版本更新说明 (What's New in v2.2.1)
 
 ### 🛡️ 三大核心新特性进化
 1. **🎮 全屏防误触与游戏“免打扰模式” (Fullscreen Anti-Mistouch & Gaming DND Mode)**：
@@ -33,11 +50,11 @@
 ---
 
 <p align="center">
-  <img src="assets/v2_clipboard.png" alt="CopyBox v2.2.1 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
-  <img src="assets/v2_dashboard.png" alt="CopyBox v2.2.1 偏好设置与新特性" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v2_clipboard.png" alt="CopyBox v2.2.2 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v2_dashboard.png" alt="CopyBox v2.2.2 偏好设置与新特性" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
 </p>
 <p align="center">
-  <em>左图：v2.2.1 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.2.1 偏好设置（多显示器唤醒策略、左右贴边自定义、全屏游戏免打扰、敏感隐私自动遮罩）</em>
+  <em>左图：v2.2.2 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.2.2 偏好设置（多显示器唤醒策略、左右贴边自定义、全屏游戏免打扰、敏感隐私自动遮罩）</em>
 </p>
 
 <div align="center">
@@ -45,7 +62,7 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.2.1--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.2.1/CopyBox-v2.2.1-Windows-x64-Portable.zip)  
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.2.2--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.2.2/CopyBox-v2.2.2-Windows-x64-Portable.zip)  
 [![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
 
 *(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
@@ -74,11 +91,11 @@
 
 # 🇨🇳 简体中文
 
-## 🌟 为什么选择 CopyBox 2.2.1？
+## 🌟 为什么选择 CopyBox 2.2.2？
 
 在日常使用 Windows 时，自带的剪贴板历史经常呼出迟缓、图片加载卡顿、缺少快速搜索和常用内容置顶功能；而市面上大多数第三方剪贴板工具不仅体积臃肿（基于 Electron 动辄占用几百兆内存），甚至强制捆绑云端同步，让密码、API Token、私信记录等极度敏感的数据面临泄露风险。
 
-**CopyBox 2.2.1 全面进化**，它不仅是一个极速轻量的离线隐私剪贴板，更是 Windows 桌面边缘优雅的 **多屏自适应生产力抽屉**：
+**CopyBox 2.2.2 全面进化**，它不仅是一个极速轻量的离线隐私剪贴板，更是 Windows 桌面边缘优雅的 **多屏自适应生产力抽屉**：
 1. **绝对隐私，100% 纯本地离线 + 敏感信息自动遮罩**：不发起任何网络请求、不收集任何用户遥测，所有历史数据物理留存在本地磁盘；自动识别 API Key、密码、银行卡、身份证、手机号并在卡片上安全打码，防止录屏、投屏或旁人窥屏泄密；
 2. **多显示器智能跨屏 & 左右贴边自由定制**：支持 **跟随鼠标所在显示器唤醒（智能多屏）** 或 **固定主显示器唤醒**，内置 Per-Monitor DPI 独立缩放适配；支持 **屏幕右侧贴边** 与 **屏幕左侧贴边** 一键切换；
 3. **全屏防误触与游戏“免打扰模式”**：自动感知 Direct3D 独占全屏游戏、无边框全屏游戏/视频/演示并暂停鼠标边缘唤醒，杜绝打游戏甩鼠标误触弹窗，同时支持托盘与设置面板一键开启强制免打扰；
@@ -137,7 +154,7 @@
 
 ## 🎨 6 大高级预设主题、自定义壁纸与真背景透明度调节
 
-CopyBox 2.2.1 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
+CopyBox 2.2.2 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
 
 1. 🌙 **深色模式 (Dark)**：经典极夜蓝黑，深沉护眼，高对比度；
 2. ☀️ **明亮模式 (Light)**：象牙冷白，纯净素雅，浅灰底盘彻底告别黑块；
@@ -209,7 +226,7 @@ dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile
 
 ## 📁 本地数据目录规范
 
-CopyBox v2.2.1 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
+CopyBox v2.2.2 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
 
 ```text
 CopyBox/
@@ -228,11 +245,11 @@ CopyBox/
 
 # 🇺🇸 English
 
-## 🌟 Why CopyBox 2.2.1?
+## 🌟 Why CopyBox 2.2.2?
 
 Windows' built-in clipboard history frequently suffers from sluggish popups, slow thumbnail loading, and a lack of quick search or pinning capabilities. Most third-party alternatives are bloated Electron apps that consume hundreds of megabytes of RAM while forcing mandatory cloud synchronization—exposing sensitive credentials, private notes, and source code tokens to potential data leaks.
 
-**CopyBox 2.2.1 evolves further**: it is not just a lightweight, 100% offline privacy clipboard manager, but an intelligent, **multi-monitor productivity drawer** on your Windows desktop.
+**CopyBox 2.2.2 evolves further**: it is not just a lightweight, 100% offline privacy clipboard manager, but an intelligent, **multi-monitor productivity drawer** on your Windows desktop.
 
 1. **100% Offline & Automatic Sensitive Data Masking**: Zero network connections, zero telemetry. Automatically detects API Keys/Tokens, passwords, private keys, bank cards, ID cards, and phone numbers—masking them on UI cards to prevent shoulder-surfing or screen-sharing leaks while pasting 100% original text;
 2. **Multi-Monitor Support & Left/Right Dock Customization**: Wake the drawer on whichever monitor your mouse cursor is on (`FollowCursor`) or lock it to your primary monitor (`Primary`) with full Per-Monitor DPI scaling; freely dock to either the **Right Edge** or **Left Edge** of your screen;
