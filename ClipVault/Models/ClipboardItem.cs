@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -18,6 +19,10 @@ namespace ClipVault.Models
         // 全局敏感信息遮罩开关状态 (与 AppSettings.AutoMaskSensitiveData 实时同步)
         public static bool GlobalAutoMaskEnabled { get; set; } = true;
 
+        // 静态轻量级结果缓存：彻底消除搜索与刷新时对相同历史卡片重复执行 7 重正则扫描与磁盘图片重解码
+        private static readonly ConcurrentDictionary<int, (string contentSample, bool isSens, string badgeKey, string maskedContent, string maskedSummary)> SensitiveStateCache = new();
+        private static readonly ConcurrentDictionary<string, System.Windows.Media.ImageSource> ThumbnailMemoryCache = new(StringComparer.OrdinalIgnoreCase);
+
         public int Id { get; set; }
         public string ItemType { get; set; } = "Text"; // Text, Code, Image, File, Color
 
@@ -28,7 +33,7 @@ namespace ClipVault.Models
             set
             {
                 _content = value ?? string.Empty;
-                RecomputeSensitiveState();
+                _sensitiveEvaluated = false;
             }
         }
 
@@ -39,7 +44,7 @@ namespace ClipVault.Models
             set
             {
                 _summary = value ?? string.Empty;
-                RecomputeSensitiveState();
+                _sensitiveEvaluated = false;
             }
         }
 
@@ -51,15 +56,85 @@ namespace ClipVault.Models
         public int CharCount { get; set; }
         public string Sha256 { get; set; } = string.Empty;
 
-        // ==================== v2.2.1 敏感信息自动遮罩属性 ====================
+        // ==================== v3.0 自定义分类标签、模板变量与原生离线 OCR 属性 ====================
+        private string _customTag = string.Empty;
+        public string CustomTag
+        {
+            get => _customTag;
+            set
+            {
+                string next = value?.Trim() ?? string.Empty;
+                if (_customTag == next) return;
+                _customTag = next;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasCustomTag));
+                OnPropertyChanged(nameof(CustomTagBadgeText));
+            }
+        }
+
+        public bool HasCustomTag => !string.IsNullOrWhiteSpace(_customTag);
+        public string CustomTagBadgeText => HasCustomTag ? $"🏷 {_customTag}" : string.Empty;
+
+        private string _ocrText = string.Empty;
+        public string OcrText
+        {
+            get => _ocrText;
+            set
+            {
+                string next = value?.Trim() ?? string.Empty;
+                if (_ocrText == next) return;
+                _ocrText = next;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasOcrText));
+                OnPropertyChanged(nameof(OcrExtractBtnText));
+                OnPropertyChanged(nameof(OcrExtractTooltip));
+            }
+        }
+
+        public bool HasOcrText => IsImage && !string.IsNullOrWhiteSpace(_ocrText);
+        public string OcrExtractBtnText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "📝 OCR" : "📝 提取文字";
+        public string OcrExtractTooltip => HasOcrText
+            ? (ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
+                ? $"Click to copy extracted image text:\n{(_ocrText.Length > 120 ? _ocrText.Substring(0, 120) + "..." : _ocrText)}"
+                : $"点击一键复制图中识别文字：\n{(_ocrText.Length > 120 ? _ocrText.Substring(0, 120) + "..." : _ocrText)}")
+            : string.Empty;
+
+        private bool _isOcrKeywordMatched;
+        public bool IsOcrKeywordMatched
+        {
+            get => _isOcrKeywordMatched;
+            set
+            {
+                if (_isOcrKeywordMatched == value) return;
+                _isOcrKeywordMatched = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(OcrMatchedBadgeText));
+            }
+        }
+
+        public string OcrMatchedBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
+            ? "🔍 Matched Image Text"
+            : "🔍 命中图中文字";
+
+        public bool HasTemplateMacro => !IsImage && ItemType != "File" && TemplateMacroHelper.ContainsMacro(_content);
+        public string TemplateMacroBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "⚡ Macro" : "⚡ 动态模板";
+        public string TemplateMacroTooltip => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
+            ? "Contains dynamic template placeholders ({{date}}, {{time}}, {{clipboard}}, etc.) that auto-expand on paste"
+            : "包含动态模板变量（如 {{date}}、{{time}}、{{clipboard}}），粘贴时自动实时替换";
+
+        // ==================== v2.2.1 敏感信息自动遮罩属性 (v3.0 升级为按需惰性求值 + O(1) 内存缓存) ====================
+        private bool _sensitiveEvaluated;
         private bool _isSensitive;
         private string _sensitiveBadgeKey = string.Empty;
         private string _maskedContent = string.Empty;
         private string _maskedSummary = string.Empty;
         private bool _isMaskRevealed;
 
-        private void RecomputeSensitiveState()
+        private void EnsureSensitiveEvaluated()
         {
+            if (_sensitiveEvaluated) return;
+            _sensitiveEvaluated = true;
+
             if (IsImage || ItemType == "File" || string.IsNullOrEmpty(_content))
             {
                 _isSensitive = false;
@@ -69,7 +144,19 @@ namespace ClipVault.Models
                 return;
             }
 
-            var (sens, badgeKey, masked) = SensitiveDataHelper.InspectAndMask(_content);
+            // 卡片 UI 最多展示前几行，对超长文本截取前 2500 字符做检测与展示，杜绝几万字日志阻塞 UI 线程
+            string sampleContent = _content.Length > 2500 ? _content.Substring(0, 2500) : _content;
+
+            if (Id > 0 && SensitiveStateCache.TryGetValue(Id, out var cached) && cached.contentSample == sampleContent)
+            {
+                _isSensitive = cached.isSens;
+                _sensitiveBadgeKey = cached.badgeKey;
+                _maskedContent = cached.maskedContent;
+                _maskedSummary = cached.maskedSummary;
+                return;
+            }
+
+            var (sens, badgeKey, masked) = SensitiveDataHelper.InspectAndMask(sampleContent);
             _isSensitive = sens;
             _sensitiveBadgeKey = badgeKey;
             _maskedContent = masked;
@@ -83,14 +170,35 @@ namespace ClipVault.Models
             {
                 _maskedSummary = _summary;
             }
+
+            if (Id > 0)
+            {
+                if (SensitiveStateCache.Count > 500) SensitiveStateCache.Clear();
+                SensitiveStateCache[Id] = (sampleContent, _isSensitive, _sensitiveBadgeKey, _maskedContent, _maskedSummary);
+            }
         }
 
-        public bool IsSensitive => _isSensitive;
-        public bool ShowSensitiveBadge => GlobalAutoMaskEnabled && _isSensitive;
+        public bool IsSensitive
+        {
+            get
+            {
+                EnsureSensitiveEvaluated();
+                return _isSensitive;
+            }
+        }
 
-        public string SensitiveTypeTag => string.IsNullOrEmpty(_sensitiveBadgeKey)
-            ? string.Empty
-            : ClipVault.Services.LocalizationService.Instance.Get(_sensitiveBadgeKey);
+        public bool ShowSensitiveBadge => GlobalAutoMaskEnabled && IsSensitive;
+
+        public string SensitiveTypeTag
+        {
+            get
+            {
+                EnsureSensitiveEvaluated();
+                return string.IsNullOrEmpty(_sensitiveBadgeKey)
+                    ? string.Empty
+                    : ClipVault.Services.LocalizationService.Instance.Get(_sensitiveBadgeKey);
+            }
+        }
 
         public bool IsMaskRevealed
         {
@@ -107,13 +215,30 @@ namespace ClipVault.Models
             }
         }
 
-        public string DisplayContent => (GlobalAutoMaskEnabled && _isSensitive && !_isMaskRevealed)
-            ? _maskedContent
-            : _content;
+        public string DisplayContent
+        {
+            get
+            {
+                if (GlobalAutoMaskEnabled && !_isMaskRevealed && IsSensitive)
+                {
+                    return _maskedContent;
+                }
+                // 普通文本卡片 UI 展示截断至 1200 字符以内，避免超长文本撑慢 WPF TextBlock 测量（复制/粘贴仍使用完整 Content）
+                return _content.Length > 1200 ? _content.Substring(0, 1200) + "..." : _content;
+            }
+        }
 
-        public string DisplaySummary => (GlobalAutoMaskEnabled && _isSensitive && !_isMaskRevealed)
-            ? _maskedSummary
-            : _summary;
+        public string DisplaySummary
+        {
+            get
+            {
+                if (GlobalAutoMaskEnabled && !_isMaskRevealed && IsSensitive)
+                {
+                    return _maskedSummary;
+                }
+                return _summary;
+            }
+        }
 
         public string MaskToggleIcon => _isMaskRevealed ? "🙈" : "👁";
 
@@ -132,8 +257,20 @@ namespace ClipVault.Models
         }
 
         // UI 绑定展示辅助属性
-        public string DisplayBadge { get; set; } = string.Empty; // [1], [2] 等数字快捷键
-        public bool HasBadge => !string.IsNullOrEmpty(DisplayBadge);
+        private string _displayBadge = string.Empty;
+        public string DisplayBadge
+        {
+            get => _displayBadge;
+            set
+            {
+                string next = value ?? string.Empty;
+                if (_displayBadge == next) return;
+                _displayBadge = next;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasBadge));
+            }
+        }
+        public bool HasBadge => !string.IsNullOrEmpty(_displayBadge);
 
         public bool IsImage => ItemType == "Image";
         public bool IsCode => ItemType == "Code";
@@ -209,6 +346,12 @@ namespace ClipVault.Models
                 string imgPath = ResolvedImagePath;
                 if (string.IsNullOrEmpty(imgPath) || !File.Exists(imgPath)) return null;
 
+                if (ThumbnailMemoryCache.TryGetValue(imgPath, out var cachedThumb))
+                {
+                    _cachedImage = cachedThumb;
+                    return _cachedImage;
+                }
+
                 try
                 {
                     // 使用非排他 FileShare.ReadWrite 读取内存流，彻底杜绝文件锁死并提升加载性能
@@ -245,6 +388,12 @@ namespace ClipVault.Models
                     else
                     {
                         _cachedImage = bmp;
+                    }
+
+                    if (_cachedImage != null)
+                    {
+                        if (ThumbnailMemoryCache.Count > 36) ThumbnailMemoryCache.Clear();
+                        ThumbnailMemoryCache[imgPath] = _cachedImage;
                     }
                     return _cachedImage;
                 }

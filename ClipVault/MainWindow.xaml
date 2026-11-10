@@ -428,24 +428,32 @@
                 </Grid>
             </Border>
 
-            <!-- 2. 胶囊分类选择器 (1:1 还原概念图 All, Text, Images, Code, Starred) -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,14">
-                <Button x:Name="TabAll" Content="📋  All" Tag="all" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="#FF0078D4" Foreground="White" BorderThickness="0" FontSize="11.5" FontWeight="SemiBold">
-                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
-                </Button>
-                <Button x:Name="TabText" Content="≡  Text" Tag="Text" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5">
-                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
-                </Button>
-                <Button x:Name="TabImages" Content="🖼  Images" Tag="Image" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5">
-                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
-                </Button>
-                <Button x:Name="TabCode" Content="&lt;/&gt;  Code" Tag="Code" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5">
-                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
-                </Button>
-                <Button x:Name="TabStarred" Content="⭐  Starred" Tag="pinned" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5">
-                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
-                </Button>
-            </StackPanel>
+            <!-- 2. 胶囊分类选择器与 v3.0 动态自定义标签栏 (支持鼠标滚轮横向丝滑滚动) -->
+            <ScrollViewer x:Name="MainCategoryScrollViewer" Grid.Row="2"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled"
+                          Margin="0,0,0,14"
+                          PreviewMouseWheel="MainCategoryScrollViewer_PreviewMouseWheel">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="TabAll" Content="📋  All" Tag="all" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="#FF0078D4" Foreground="White" BorderThickness="0" FontSize="11.5" FontWeight="SemiBold" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
+                    <Button x:Name="TabText" Content="≡  Text" Tag="Text" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
+                    <Button x:Name="TabImages" Content="🖼  Images" Tag="Image" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
+                    <Button x:Name="TabCode" Content="&lt;/&gt;  Code" Tag="Code" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
+                    <Button x:Name="TabStarred" Content="⭐  Starred" Tag="pinned" Click="TabCategory_Click" Margin="0,0,8,0" Padding="14,5" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource SubTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
+                    <!-- v3.0 用户自定义标签动态药丸容器 -->
+                    <StackPanel x:Name="MainCustomTagsPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ScrollViewer>
 
             <!-- 3. 双列卡片网格列表 (1:1 还原概念图双列排版与选中高亮发光) -->
             <Grid Grid.Row="3">
@@ -542,6 +550,29 @@
 
                                     <!-- 右侧快捷键角标 [1], [2] 与三点菜单 ··· (1:1 概念图) -->
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- v3.0 自定义标签徽标 -->
+                                        <Border Background="#2210B981" BorderBrush="#5510B981" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                Visibility="{Binding HasCustomTag, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding CustomTagBadgeText}" Foreground="#34D399" FontSize="9" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <!-- v3.0 动态模板宏变量徽标 -->
+                                        <Border Background="#228B5CF6" BorderBrush="#558B5CF6" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                Visibility="{Binding HasTemplateMacro, Converter={StaticResource BoolToVis}}"
+                                                ToolTip="{Binding TemplateMacroTooltip}">
+                                            <TextBlock Text="{Binding TemplateMacroBadgeText}" Foreground="#A78BFA" FontSize="9" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <!-- v3.0 离线 OCR 文字提取按钮 / 命中徽标 -->
+                                        <Border Background="#260EA5E9" BorderBrush="#660EA5E9" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                Visibility="{Binding IsOcrKeywordMatched, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding OcrMatchedBadgeText}" Foreground="#38BDF8" FontSize="9" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <Button Content="{Binding OcrExtractBtnText}"
+                                                ToolTip="{Binding OcrExtractTooltip}"
+                                                Visibility="{Binding HasOcrText, Converter={StaticResource BoolToVis}}"
+                                                Click="BtnMainExtractOcr_Click"
+                                                Background="#220EA5E9" Foreground="#38BDF8" BorderBrush="#550EA5E9" BorderThickness="1"
+                                                FontSize="9" FontWeight="SemiBold" Padding="4,1" Margin="0,0,4,0" Cursor="Hand"/>
+
                                         <!-- 敏感隐私标签与明文/掩码切换按钮 -->
                                         <Border Background="#2DF59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center"
                                                 Visibility="{Binding ShowSensitiveBadge, Converter={StaticResource BoolToVis}}">
@@ -840,6 +871,18 @@
                                         <Slider x:Name="SliderOpacity" Style="{StaticResource ModernFluentSliderStyle}" Grid.Column="1" Minimum="0" Maximum="85" Value="8" SmallChange="1" LargeChange="5" ValueChanged="SliderOpacity_ValueChanged" VerticalAlignment="Center"/>
                                         <TextBlock x:Name="TxtOpacityValue" Grid.Column="2" Text="8%" Foreground="{DynamicResource CardTextBrush}" FontSize="11" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
                                     </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 2.5. Windows 11 原生云母/亚克力材质与微触感音效 (v3.0 新增) -->
+                            <Border Background="{DynamicResource CodeBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock x:Name="TxtMainBackdropAndAudioTitle" Text="✨ Windows 11 原生材质与微触感音效：" Foreground="#0078D4" FontWeight="SemiBold" FontSize="11" Margin="0,0,0,6"/>
+                                    <TextBlock x:Name="TxtMainBackdropLabel" Text="窗口底层材质 (Win11 专属硬件合成，Win10 自动降级)：" Foreground="{DynamicResource SubTextBrush}" FontSize="10.5" Margin="0,0,0,4"/>
+                                    <RadioButton x:Name="RadioMainBackdropDefault" GroupName="MainBackdropGroup" Tag="Default" Content="🎨 经典高帧率毛玻璃 (默认兼容)" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Margin="0,0,0,4" Checked="MainBackdropRadio_Changed"/>
+                                    <RadioButton x:Name="RadioMainBackdropMica" GroupName="MainBackdropGroup" Tag="Mica" Content="☁️ Win11 原生云母材质 (Mica)" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Margin="0,0,0,4" Checked="MainBackdropRadio_Changed"/>
+                                    <RadioButton x:Name="RadioMainBackdropAcrylic" GroupName="MainBackdropGroup" Tag="Acrylic" Content="💎 Win11 原生亚克力材质 (Acrylic)" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Margin="0,0,0,7" Checked="MainBackdropRadio_Changed"/>
+                                    <CheckBox x:Name="ChkMainSoundEffects" Content="🔊 开启轻量微触感音效 (复制捕获、抽屉弹出、贴入确认微音效；全屏免打扰时自动静音)" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Click="ChkMainSoundEffects_Click"/>
                                 </StackPanel>
                             </Border>
 

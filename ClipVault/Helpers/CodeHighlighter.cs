@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +10,30 @@ namespace ClipVault.Helpers
 {
     public static class CodeHighlighter
     {
+        private static readonly Regex CodeTokenRegex = new(
+            @"(?<Key>""[^""\r\n]+""\s*:)|(?<String>""[^""\r\n]*"")|(?<Brace>[{}[\],:])|(?<Number>\b\d+(\.\d+)?\b)|(?<Keyword>\b(true|false|null|const|let|var|function|return|if|else|import|export)\b)|(?<Other>[^""{}[\],:\d\s]+|\s+)",
+            RegexOptions.Compiled);
+
+        private static readonly SolidColorBrush KeyBrush;
+        private static readonly SolidColorBrush StrBrush;
+        private static readonly SolidColorBrush BraceBrush;
+        private static readonly SolidColorBrush NumBrush;
+        private static readonly SolidColorBrush DefBrush;
+
+        static CodeHighlighter()
+        {
+            KeyBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));   // #38BDF8 天蓝键名
+            StrBrush = new SolidColorBrush(Color.FromRgb(251, 146, 60));   // #FB923C 浅橙字符串
+            BraceBrush = new SolidColorBrush(Color.FromRgb(251, 191, 36)); // #FBBF24 金黄括号
+            NumBrush = new SolidColorBrush(Color.FromRgb(167, 139, 250));  // #A78BFA 淡紫数字/布尔
+            DefBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));  // #CBD5E1 浅灰标点
+            KeyBrush.Freeze();
+            StrBrush.Freeze();
+            BraceBrush.Freeze();
+            NumBrush.Freeze();
+            DefBrush.Freeze();
+        }
+
         public static readonly DependencyProperty HighlightCodeProperty =
             DependencyProperty.RegisterAttached(
                 "HighlightCode",
@@ -26,21 +51,14 @@ namespace ClipVault.Helpers
             tb.Inlines.Clear();
             if (string.IsNullOrEmpty(text)) return;
 
-            // 限制前 1000 字符展示，保障极致秒级流畅渲染
-            if (text.Length > 1000)
+            // 卡片可视区域最多展示 4~5 行，截取前 420 字符并一次性批量添加 Run，消除逐个 Add 触发的布局风暴
+            if (text.Length > 420)
             {
-                text = text.Substring(0, 1000) + "...";
+                text = text.Substring(0, 420) + "...";
             }
 
-            // 语法高亮微扫描器：精准支持 JSON 与主流代码语法 (1:1 概念图质感)
-            var pattern = @"(?<Key>""[^""\r\n]+""\s*:)|(?<String>""[^""\r\n]*"")|(?<Brace>[{}[\],:])|(?<Number>\b\d+(\.\d+)?\b)|(?<Keyword>\b(true|false|null|const|let|var|function|return|if|else|import|export)\b)|(?<Other>[^""{}[\],:\d\s]+|\s+)";
-            var matches = Regex.Matches(text, pattern, RegexOptions.Compiled);
-
-            var keyBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));      // #38BDF8 天蓝键名
-            var strBrush = new SolidColorBrush(Color.FromRgb(251, 146, 60));      // #FB923C 浅橙字符串
-            var braceBrush = new SolidColorBrush(Color.FromRgb(251, 191, 36));    // #FBBF24 金黄括号
-            var numBrush = new SolidColorBrush(Color.FromRgb(167, 139, 250));     // #A78BFA 淡紫数字/布尔
-            var defBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));     // #CBD5E1 浅灰标点
+            var matches = CodeTokenRegex.Matches(text);
+            var runs = new List<Inline>(matches.Count + 2);
 
             foreach (Match m in matches)
             {
@@ -50,31 +68,33 @@ namespace ClipVault.Helpers
                     int colonIdx = kVal.LastIndexOf(':');
                     if (colonIdx > 0)
                     {
-                        tb.Inlines.Add(new Run(kVal.Substring(0, colonIdx)) { Foreground = keyBrush });
-                        tb.Inlines.Add(new Run(":") { Foreground = defBrush });
+                        runs.Add(new Run(kVal.Substring(0, colonIdx)) { Foreground = KeyBrush });
+                        runs.Add(new Run(":") { Foreground = DefBrush });
                     }
                     else
                     {
-                        tb.Inlines.Add(new Run(kVal) { Foreground = keyBrush });
+                        runs.Add(new Run(kVal) { Foreground = KeyBrush });
                     }
                 }
                 else if (m.Groups["String"].Success)
                 {
-                    tb.Inlines.Add(new Run(m.Value) { Foreground = strBrush });
+                    runs.Add(new Run(m.Value) { Foreground = StrBrush });
                 }
                 else if (m.Groups["Brace"].Success)
                 {
-                    tb.Inlines.Add(new Run(m.Value) { Foreground = braceBrush, FontWeight = FontWeights.SemiBold });
+                    runs.Add(new Run(m.Value) { Foreground = BraceBrush, FontWeight = FontWeights.SemiBold });
                 }
                 else if (m.Groups["Number"].Success || m.Groups["Keyword"].Success)
                 {
-                    tb.Inlines.Add(new Run(m.Value) { Foreground = numBrush });
+                    runs.Add(new Run(m.Value) { Foreground = NumBrush });
                 }
                 else
                 {
-                    tb.Inlines.Add(new Run(m.Value) { Foreground = defBrush });
+                    runs.Add(new Run(m.Value) { Foreground = DefBrush });
                 }
             }
+
+            tb.Inlines.AddRange(runs);
         }
     }
 }

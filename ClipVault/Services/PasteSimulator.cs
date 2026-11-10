@@ -40,6 +40,7 @@ namespace ClipVault.Services
                     bitmap.UriSource = new Uri(item.FullImagePath, UriKind.Absolute);
                     bitmap.EndInit();
                     bitmap.Freeze();
+                    _monitorService.NotifyInternalImageWrite(bitmap.PixelWidth, bitmap.PixelHeight, 2500);
                     Clipboard.SetImage(bitmap);
                 }
                 else if (item.ItemType == "File")
@@ -51,7 +52,21 @@ namespace ClipVault.Services
                 }
                 else
                 {
-                    Clipboard.SetText(item.Content);
+                    // v3.0 智能模板变量：在覆盖系统剪贴板前先读取当前剪贴板文本供 {{clipboard}} 宏使用，再单遍安全展开所有变量
+                    string? priorClip = null;
+                    if (ClipVault.Helpers.TemplateMacroHelper.ContainsMacro(item.Content))
+                    {
+                        try
+                        {
+                            priorClip = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+                        }
+                        catch
+                        {
+                            priorClip = string.Empty;
+                        }
+                    }
+                    string finalContent = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content, priorClip);
+                    Clipboard.SetText(finalContent);
                 }
 
                 // 3. 隐藏悬浮窗
@@ -65,6 +80,7 @@ namespace ClipVault.Services
 
                 // 5. 毫秒级等待确保原窗口接管键盘事件，然后模拟按下 Ctrl + V
                 await Task.Delay(65);
+                ClipVault.Helpers.SoundEffectHelper.PlayPasteCue(_monitorService.CurrentSettings);
                 NativeMethods.SimulateCtrlV();
             }
             catch (Exception ex)

@@ -66,6 +66,14 @@ namespace ClipVault.Models
         // 开启后，自动对密码、API Key/Token、身份证号、银行卡号、手机号等敏感内容脱敏打码显示，支持单条点击小眼睛查看明文
         public bool AutoMaskSensitiveData { get; set; } = true;
 
+        // ==================== v3.0 原生材质与微触感音效配置 ====================
+
+        // 窗口底层材质: "Default" (经典高帧率毛玻璃), "Mica" (Win11 原生云母), "Acrylic" (Win11 原生亚克力)
+        public string BackdropMaterial { get; set; } = "Default";
+
+        // 是否开启轻量微触感音效 (复制捕获、抽屉弹出、秒贴确认微音效；全屏游戏免打扰时自动静音)
+        public bool EnableSoundEffects { get; set; } = false;
+
         // 顶部随手记临时便签内容
         public string ScratchpadContent { get; set; } = string.Empty;
 

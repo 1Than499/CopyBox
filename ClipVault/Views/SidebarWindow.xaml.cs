@@ -25,6 +25,7 @@ namespace ClipVault.Views
         private readonly ClipboardMonitorService _monitorService;
         private readonly PasteSimulator _pasteSimulator;
         private readonly SystemMediaService _mediaService;
+        private readonly LanSyncService _lanSyncService;
         private readonly DispatcherTimer _brightnessSyncTimer;
         private readonly DispatcherTimer _edgeDetectTimer;
 
@@ -57,6 +58,21 @@ namespace ClipVault.Views
         private bool _isModalOrMenuOpen = false;
         private int _animGeneration = 0;
         private bool _isHiding = false;
+        private bool _isCardsDirty = true;
+        private bool _isSyncingHwStatus = false;
+        private long _lastUserBrightnessTick = 0;
+        private long _lastUserVolumeTick = 0;
+        private IntPtr _lastBackdropHwnd = IntPtr.Zero;
+        private string _lastBackdropMode = string.Empty;
+        private bool? _lastBackdropDark = null;
+        private DispatcherTimer? _searchDebounceTimer = null;
+        private ClipboardItem? _pendingCardForNewTag = null;
+        private DispatcherTimer? _sidebarToastTimer = null;
+
+        private bool IsAnyOverlayOpen =>
+            (AddActionOverlay != null && AddActionOverlay.Visibility == Visibility.Visible) ||
+            (AddTagOverlay != null && AddTagOverlay.Visibility == Visibility.Visible) ||
+            (LanSyncOverlay != null && LanSyncOverlay.Visibility == Visibility.Visible);
 
         #region 全局外部点击监听、贴边悬停自动唤醒与智能失焦收起
 
@@ -169,12 +185,9 @@ namespace ClipVault.Views
                                 // 点击落在侧边栏物理边界外部，且当前没有模态或自定义动作弹窗
                                 Dispatcher.InvokeAsync(() =>
                                 {
-                                    if (this.IsVisible && !_isHiding && !_isPinned && !_isModalOrMenuOpen)
+                                    if (this.IsVisible && !_isHiding && !_isPinned && !_isModalOrMenuOpen && !IsAnyOverlayOpen)
                                     {
-                                        if (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible)
-                                        {
-                                            SlideOutAndHide();
-                                        }
+                                        SlideOutAndHide();
                                     }
                                 });
                             }
@@ -281,7 +294,7 @@ namespace ClipVault.Views
                             if (_mouseHasEnteredAfterShow &&
                                 movedOutsideDrawer &&
                                 (SettingsViewPanel == null || SettingsViewPanel.Visibility != Visibility.Visible) &&
-                                (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
+                                !IsAnyOverlayOpen)
                             {
                                 _outsideHoverTicks++;
                                 if (_outsideHoverTicks >= 9) // 移出抽屉约 450ms 自动贴边收起
@@ -300,6 +313,7 @@ namespace ClipVault.Views
         protected override void OnClosed(EventArgs e)
         {
             _edgeDetectTimer?.Stop();
+            _lanSyncService?.Dispose();
             StopGlobalMouseHook();
             base.OnClosed(e);
         }
@@ -314,6 +328,7 @@ namespace ClipVault.Views
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
             _mediaService = new SystemMediaService();
+            _lanSyncService = new LanSyncService(_dbService, _settingsService, _monitorService);
 
             InitializeComponent();
 
@@ -340,12 +355,13 @@ namespace ClipVault.Views
             }
             catch { }
 
-            // 监听底层剪贴板捕获（仅在前台可见时刷新，后台绝不重复渲染占内存）
+            // 监听底层剪贴板捕获（仅在前台可见时刷新，后台置脏标记延后刷新，绝不重复渲染占内存）
             _monitorService.ItemCaptured += (item) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    if (this.IsVisible)
+                    _isCardsDirty = true;
+                    if (this.IsVisible && !_isHiding)
                     {
                         RefreshCards();
                         UpdateSideStorageInfo();
@@ -353,30 +369,73 @@ namespace ClipVault.Views
                 });
             };
 
+            // 监听 v3.0 后台异步离线 OCR 完成事件，实时更新当前可见卡片的 [📝 提取文字] 按钮
+            _monitorService.ItemOcrCompleted += (itemId, ocrText) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var card = DisplayCards.FirstOrDefault(x => x.Id == itemId);
+                    if (card != null)
+                    {
+                        card.OcrText = ocrText;
+                    }
+                    else
+                    {
+                        _isCardsDirty = true;
+                    }
+                });
+            };
+
+            // 监听 v3.0 局域网手机快传/对端同步收到新卡片事件
+            _lanSyncService.ItemReceivedFromLan += (item) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _isCardsDirty = true;
+                    if (this.IsVisible && !_isHiding)
+                    {
+                        RefreshCards();
+                        UpdateSideStorageInfo();
+                    }
+                    ShowSidebarToast($"📱 已接收局域网快传 ({item.ItemType})");
+                });
+            };
+
+            _lanSyncService.StatusMessageChanged += (msg) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (TxtLanSyncLiveStatus != null) TxtLanSyncLiveStatus.Text = msg;
+                });
+            };
+
             // 监听失焦自动收起 (图钉锁定状态下常驻，未锁定状态下失焦自动收起)
             this.Deactivated += (s, e) =>
             {
-                if (!_isPinned && this.IsVisible && !_isHiding && !_isModalOrMenuOpen &&
-                    (AddActionOverlay == null || AddActionOverlay.Visibility != Visibility.Visible))
+                if (!_isPinned && this.IsVisible && !_isHiding && !_isModalOrMenuOpen && !IsAnyOverlayOpen)
                 {
                     SlideOutAndHide();
                 }
             };
 
-            // 窗口隐藏时自动释放多余内存、停止媒体轮询并整理工作集
+            // 监听 v3.0 自定义标签变更事件，实时刷新动态药丸栏
+            _dbService.CustomTagsChanged += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    _isCardsDirty = true;
+                    RefreshCustomTagPills();
+                    if (this.IsVisible && !_isHiding) RefreshCards();
+                });
+            };
+
+            // 窗口隐藏时停止媒体轮询并在后台温和整理工作集（保留热缩略图与 UI 页以保障下次边缘秒出 120FPS 零掉帧）
             this.IsVisibleChanged += (s, e) =>
             {
                 if (!this.IsVisible)
                 {
                     _brightnessSyncTimer?.Stop();
                     _mediaService?.PausePolling();
-                    if (DisplayCards != null)
-                    {
-                        foreach (var item in DisplayCards)
-                        {
-                            item.ClearImageCache();
-                        }
-                    }
                     ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
                 }
             };
@@ -409,107 +468,28 @@ namespace ClipVault.Views
             // 纯净化 Gamma 色彩，杜绝残留压暗色彩失真
             SystemControlService.ResetGammaRamp();
 
-            // 初始化系统亮度与系统主音量双向同步定时器 (每 600ms 检查一次 Windows 系统外部调节，双向无缝对齐)
+            // 初始化系统亮度与系统主音量双向同步定时器 (每 800ms 在后台线程非阻塞检查一次，仅当快捷看板可见时运行)
             _brightnessSyncTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(600)
+                Interval = TimeSpan.FromMilliseconds(800)
             };
             _brightnessSyncTimer.Tick += (s, e) =>
             {
                 if (this.IsVisible && SystemActionsPanel.Visibility == Visibility.Visible)
                 {
-                    // 1. 同步系统屏幕真实亮度 (当用户未正在拖动时才进行外部变化同步)
-                    if (!_isUpdatingBrightnessUi && SliderBrightness != null && !SliderBrightness.IsMouseCaptureWithin)
-                    {
-                        try
-                        {
-                            int currentSys = SystemControlService.GetCurrentBrightness();
-                            if (Math.Abs(currentSys - (int)SliderBrightness.Value) >= 1)
-                            {
-                                try
-                                {
-                                    _isUpdatingBrightnessUi = true;
-                                    SliderBrightness.Value = currentSys;
-                                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{currentSys}%";
-                                }
-                                finally
-                                {
-                                    _isUpdatingBrightnessUi = false;
-                                }
-
-                                if (!SystemControlService.HasHardwareSupport)
-                                {
-                                    SystemControlService.ApplyVisualBrightness(currentSys);
-                                }
-                                else
-                                {
-                                    SystemControlService.ResetGammaRamp();
-                                }
-                            }
-                            UpdateBrightnessIconText(currentSys);
-                        }
-                        catch { }
-                    }
-
-                    // 2. 同步系统真实主音量 (当用户未正在拖动时才进行外部变化同步)
-                    if (!_isUpdatingVolumeUi && SliderVolume != null && !SliderVolume.IsMouseCaptureWithin)
-                    {
-                        try
-                        {
-                            int currentVol = SystemControlService.GetMasterVolume();
-                            if (Math.Abs(currentVol - (int)SliderVolume.Value) >= 1)
-                            {
-                                try
-                                {
-                                    _isUpdatingVolumeUi = true;
-                                    SliderVolume.Value = currentVol;
-                                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{currentVol}%";
-                                }
-                                finally
-                                {
-                                    _isUpdatingVolumeUi = false;
-                                }
-                            }
-                            bool isMuted = SystemControlService.GetIsMuted();
-                            UpdateVolumeIconText(currentVol, isMuted);
-                        }
-                        catch { }
-                    }
+                    SyncBrightnessAndVolumeAsync();
                 }
             };
 
-            // 加载自定义动作磁贴
+            // 加载自定义动作磁贴与 v3.0 自定义分类标签药丸
             RefreshCustomActions();
+            RefreshCustomTagPills();
+            RefreshCards();
 
-            // 实时同步当前系统屏幕真实亮度与系统真实主音量 (首次启动 100% 贴合系统当前真实值)
-            try
-            {
-                _isUpdatingBrightnessUi = true;
-                _isUpdatingVolumeUi = true;
-
-                int sysBrightness = SystemControlService.GetCurrentBrightness();
-                if (SliderBrightness != null)
-                {
-                    SliderBrightness.Value = sysBrightness;
-                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
-                }
-                UpdateBrightnessIconText(sysBrightness);
-
-                int sysVol = SystemControlService.GetMasterVolume();
-                if (SliderVolume != null)
-                {
-                    SliderVolume.Value = sysVol;
-                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
-                }
-                bool isMuted = SystemControlService.GetIsMuted();
-                UpdateVolumeIconText(sysVol, isMuted);
-            }
-            catch { }
-            finally
-            {
-                _isUpdatingBrightnessUi = false;
-                _isUpdatingVolumeUi = false;
-            }
+            // 解除 XAML 初始化期间的滑块事件锁，并立即后台同步一次真实亮度与主音量
+            _isUpdatingBrightnessUi = false;
+            _isUpdatingVolumeUi = false;
+            SyncBrightnessAndVolumeAsync();
 
             // 恢复随手记轻量便签内容 (杀手级功能 4)
             try
@@ -530,6 +510,96 @@ namespace ClipVault.Views
             UpdateLocalizedTexts();
 
             _isInternalSettingUpdate = false;
+        }
+
+        private void SyncBrightnessAndVolumeAsync()
+        {
+            if (_isSyncingHwStatus) return;
+            _isSyncingHwStatus = true;
+
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    int sysBrightness = SystemControlService.GetCurrentBrightness();
+                    int sysVol = SystemControlService.GetMasterVolume();
+                    bool isMuted = SystemControlService.GetIsMuted();
+
+                    Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+                    {
+                        try
+                        {
+                            if (SliderBrightness != null && !SliderBrightness.IsMouseCaptureWithin &&
+                                (Environment.TickCount64 - _lastUserBrightnessTick) > 900)
+                            {
+                                _isUpdatingBrightnessUi = true;
+                                try
+                                {
+                                    if (Math.Abs(sysBrightness - (int)SliderBrightness.Value) >= 1 ||
+                                        TxtBrightnessValue?.Text != $"{sysBrightness}%")
+                                    {
+                                        SliderBrightness.Value = sysBrightness;
+                                        if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
+                                    }
+                                    UpdateBrightnessIconText(sysBrightness);
+                                }
+                                finally
+                                {
+                                    _isUpdatingBrightnessUi = false;
+                                }
+                            }
+
+                            if (SliderVolume != null && !SliderVolume.IsMouseCaptureWithin &&
+                                (Environment.TickCount64 - _lastUserVolumeTick) > 900)
+                            {
+                                _isUpdatingVolumeUi = true;
+                                try
+                                {
+                                    if (Math.Abs(sysVol - (int)SliderVolume.Value) >= 1 ||
+                                        TxtVolumeValue?.Text != $"{sysVol}%")
+                                    {
+                                        SliderVolume.Value = sysVol;
+                                        if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
+                                    }
+                                    UpdateVolumeIconText(sysVol, isMuted);
+                                }
+                                finally
+                                {
+                                    _isUpdatingVolumeUi = false;
+                                }
+                            }
+                        }
+                        catch { }
+                    }));
+                }
+                catch { }
+                finally
+                {
+                    _isSyncingHwStatus = false;
+                }
+            });
+        }
+
+        private void EnsureBackdropApplied(string? themeOverride = null)
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            string theme = themeOverride ?? _settingsService?.CurrentSettings.ThemeMode ?? "Dark";
+            string backdropMode = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
+            bool isDark = !string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase);
+
+            if (_lastBackdropHwnd == hwnd &&
+                string.Equals(_lastBackdropMode, backdropMode, StringComparison.OrdinalIgnoreCase) &&
+                _lastBackdropDark == isDark)
+            {
+                return;
+            }
+
+            _lastBackdropHwnd = hwnd;
+            _lastBackdropMode = backdropMode;
+            _lastBackdropDark = isDark;
+            ClipVault.Interop.NativeMethods.ApplyWindowBackdrop(hwnd, backdropMode, isDark);
         }
 
         private void UpdateBrightnessIconText(int brightness)
@@ -751,8 +821,19 @@ namespace ClipVault.Views
         public void ApplyTheme(string theme)
         {
             double bgOpacityFactor = Math.Clamp(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92, 0.15, 1.0);
-            byte bgAlpha = (byte)Math.Clamp((int)Math.Round(bgOpacityFactor * 255), 35, 255);
-            byte headerAlpha = (byte)Math.Clamp((int)Math.Round(Math.Min(1.0, bgOpacityFactor + 0.04) * 255), 45, 255);
+            string backdropMode = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
+            double effectiveBgFactor = bgOpacityFactor;
+            if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveBgFactor = Math.Min(bgOpacityFactor, 0.78);
+            }
+            else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveBgFactor = Math.Min(bgOpacityFactor, 0.65);
+            }
+
+            byte bgAlpha = (byte)Math.Clamp((int)Math.Round(effectiveBgFactor * 255), 35, 255);
+            byte headerAlpha = (byte)Math.Clamp((int)Math.Round(Math.Min(1.0, effectiveBgFactor + 0.04) * 255), 45, 255);
             byte cardAlpha = (byte)Math.Clamp((int)Math.Round((0.55 + 0.45 * bgOpacityFactor) * 255), 140, 255);
 
             switch (theme)
@@ -931,6 +1012,9 @@ namespace ClipVault.Views
 
             // 更新视图切换栏指示与高亮
             UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
+
+            // v3.0：应用 Windows 11 原生云母/亚克力硬件合成与 DWM 底层高斯层（带状态防重缓存）
+            EnsureBackdropApplied(theme);
         }
 
         /// <summary>
@@ -951,6 +1035,15 @@ namespace ClipVault.Views
             if (RadioImages != null) RadioImages.Content = loc.Get("SidebarFilterImage");
             if (RadioCode != null) RadioCode.Content = loc.Get("SidebarFilterCode");
             if (RadioPinned != null) RadioPinned.Content = loc.Get("SidebarFilterPinned");
+            if (BtnAddCustomTag != null) BtnAddCustomTag.ToolTip = loc.Get("TagAddBtnTip");
+            if (TxtAddTagDialogTitle != null) TxtAddTagDialogTitle.Text = loc.Get("AddTagDialogTitle");
+            if (TxtAddTagIconLabel != null) TxtAddTagIconLabel.Text = loc.Get("AddTagIconLabel");
+            if (TxtAddTagNameLabel != null) TxtAddTagNameLabel.Text = loc.Get("AddTagNameLabel");
+            if (TxtAddTagTemplateLabel != null) TxtAddTagTemplateLabel.Text = loc.Get("AddTagTemplateLabel");
+            if (TxtAddTagMacroTip != null) TxtAddTagMacroTip.Text = loc.Get("AddTagMacroTip");
+            if (BtnCancelAddTag != null) BtnCancelAddTag.Content = loc.Get("BtnCancel");
+            if (BtnConfirmAddTag != null) BtnConfirmAddTag.Content = loc.Get("BtnSaveTag");
+            RefreshCustomTagPills();
 
             // 随手记与连续粘贴队列多语言
             if (TxtScratchpadTitle != null) TxtScratchpadTitle.Text = loc.Get("ScratchpadTitle");
@@ -1006,6 +1099,16 @@ namespace ClipVault.Views
             if (TxtThemeOceanShort2 != null) TxtThemeOceanShort2.Text = loc.Get("ThemeOceanShort");
             if (TxtThemeCustomShort2 != null) TxtThemeCustomShort2.Text = loc.Get("ThemeCustomShort");
             if (TxtSetOpacityTitle != null) TxtSetOpacityTitle.Text = loc.Get("OpacityLabel");
+            if (TxtSetBackdropAndAudioTitle != null) TxtSetBackdropAndAudioTitle.Text = loc.Get("BackdropAndAudioTitle");
+            if (TxtSetBackdropLabel != null) TxtSetBackdropLabel.Text = loc.Get("BackdropLabel");
+            if (RadioBackdropDefault2 != null) RadioBackdropDefault2.Content = loc.Get("BackdropDefault");
+            if (RadioBackdropMica2 != null) RadioBackdropMica2.Content = loc.Get("BackdropMica");
+            if (RadioBackdropAcrylic2 != null) RadioBackdropAcrylic2.Content = loc.Get("BackdropAcrylic");
+            if (ChkSoundEffects2 != null) ChkSoundEffects2.Content = loc.Get("ChkSoundEffects");
+            if (BtnLanSync != null) BtnLanSync.ToolTip = loc.Get("LanSyncBtnTip");
+            if (TxtLanSyncTitle != null) TxtLanSyncTitle.Text = loc.Get("LanSyncTitle");
+            if (TxtLanSyncSubTitle != null) TxtLanSyncSubTitle.Text = loc.Get("LanSyncSubTitle");
+            if (BtnStopLanSync != null) BtnStopLanSync.Content = loc.Get("LanSyncCloseBtn");
             if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
             if (TxtSideCloseActionTitle != null) TxtSideCloseActionTitle.Text = loc.Get("CloseActionTitle");
@@ -1069,7 +1172,7 @@ namespace ClipVault.Views
         }
 
         /// <summary>
-        /// 精准吸附至目标显示器左/右侧工作区全高，并执行顺滑贴边滑入显现
+        /// 精准吸附至目标显示器左/右侧工作区全高，并执行 120FPS 零阻塞贴边滑入显现
         /// </summary>
         public void ShowDocked()
         {
@@ -1084,14 +1187,11 @@ namespace ClipVault.Views
             this.WindowState = WindowState.Normal;
             this.Topmost = true;
 
-            RefreshCards();
-            UpdateSideStorageInfo();
-            
-            // 激活媒体与系统状态前台刷新
-            _mediaService.ResumePolling();
-            _brightnessSyncTimer.Start();
-            UpdateMediaUI(_mediaService.CurrentMedia);
-            _ = _mediaService.RefreshMediaAsync();
+            // 仅当后台有新捕获内容或列表为空时才增量刷新卡片，消除贴边唤出时的 SQLite 与 UI 重建卡顿
+            if (_isCardsDirty || DisplayCards.Count == 0)
+            {
+                RefreshCards();
+            }
 
             // 实时校准图钉状态与设置项保持绝对一致
             if (_settingsService != null)
@@ -1100,84 +1200,80 @@ namespace ClipVault.Views
                 UpdatePinUiState();
             }
 
-            // 同步当前系统真实亮度与主音量
-            try
-            {
-                _isUpdatingBrightnessUi = true;
-                _isUpdatingVolumeUi = true;
-
-                int sysBrightness = SystemControlService.GetCurrentBrightness();
-                if (SliderBrightness != null)
-                {
-                    SliderBrightness.Value = sysBrightness;
-                    if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{sysBrightness}%";
-                }
-                UpdateBrightnessIconText(sysBrightness);
-
-                int sysVol = SystemControlService.GetMasterVolume();
-                if (SliderVolume != null)
-                {
-                    SliderVolume.Value = sysVol;
-                    if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{sysVol}%";
-                }
-                bool isMuted = SystemControlService.GetIsMuted();
-                UpdateVolumeIconText(sysVol, isMuted);
-            }
-            catch { }
-            finally
-            {
-                _isUpdatingBrightnessUi = false;
-                _isUpdatingVolumeUi = false;
-            }
-
-            _brightnessSyncTimer.Start();
-
             if (!_isPinned)
             {
                 StartGlobalMouseHook();
             }
 
+            bool isLeftDock = string.Equals(_settingsService?.CurrentSettings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
+            double startX = isLeftDock ? -32 : 32;
+
             this.BeginAnimation(UIElement.OpacityProperty, null);
-            DrawerTranslate?.BeginAnimation(TranslateTransform.XProperty, null);
+            this.Opacity = 1.0;
+
+            if (RootBorder != null)
+            {
+                RootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+                RootBorder.Opacity = 0;
+            }
+            if (DrawerTranslate != null)
+            {
+                DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                DrawerTranslate.X = startX;
+            }
 
             this.Show();
             this.Activate();
 
-            // 顺畅贴边滑入 + 渐显动画，前景保持 100% 清晰，背景透明度由画刷承载
-            this.Opacity = 0;
-            var fadeAnim = new DoubleAnimation(0, 1.0, TimeSpan.FromMilliseconds(180))
+            EnsureBackdropApplied();
+            ClipVault.Helpers.SoundEffectHelper.PlayPopCue(_settingsService?.CurrentSettings);
+
+            // 使用 GPU 加速的 RootBorder.Opacity + DrawerTranslate.X 动画（避免改变 LayeredWindow 顶层 Opacity 引发软件重绘）
+            var easeOut = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var duration = TimeSpan.FromMilliseconds(155);
+
+            if (RootBorder != null)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            fadeAnim.Completed += (s, e) =>
-            {
-                if (gen != _animGeneration) return;
-                this.BeginAnimation(UIElement.OpacityProperty, null);
-                this.Opacity = 1.0;
-            };
-            this.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+                var fadeAnim = new DoubleAnimation(0, 1.0, duration) { EasingFunction = easeOut };
+                Timeline.SetDesiredFrameRate(fadeAnim, 120);
+                fadeAnim.Completed += (s, e) =>
+                {
+                    if (gen != _animGeneration) return;
+                    RootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+                    RootBorder.Opacity = 1.0;
+                };
+                RootBorder.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+            }
 
             if (DrawerTranslate != null)
             {
-                bool isLeftDock = string.Equals(_settingsService?.CurrentSettings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
-                double startX = isLeftDock ? -48 : 48;
-                DrawerTranslate.X = startX;
-                var slideAnim = new DoubleAnimation(startX, 0, TimeSpan.FromMilliseconds(180))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
+                var slideAnim = new DoubleAnimation(startX, 0, duration) { EasingFunction = easeOut };
+                Timeline.SetDesiredFrameRate(slideAnim, 120);
                 slideAnim.Completed += (s, e) =>
                 {
                     if (gen != _animGeneration) return;
                     DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
                     DrawerTranslate.X = 0;
+
+                    // 滑入动画结束后再于后台低优先级同步媒体、音量亮度及存储统计，确保滑入过程 100% 满帧丝滑
+                    _mediaService.ResumePolling();
+                    _brightnessSyncTimer.Start();
+                    if (SystemActionsPanel.Visibility == Visibility.Visible)
+                    {
+                        UpdateMediaUI(_mediaService.CurrentMedia);
+                        _ = _mediaService.RefreshMediaAsync();
+                        SyncBrightnessAndVolumeAsync();
+                    }
+                    if (SettingsViewPanel.Visibility == Visibility.Visible)
+                    {
+                        UpdateSideStorageInfo();
+                    }
+                    if (ClipboardViewPanel.Visibility == Visibility.Visible)
+                    {
+                        TxtSearch?.Focus();
+                    }
                 };
                 DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, slideAnim);
-            }
-
-            if (ClipboardViewPanel.Visibility == Visibility.Visible)
-            {
-                TxtSearch?.Focus();
             }
         }
 
@@ -1196,48 +1292,46 @@ namespace ClipVault.Views
             _brightnessSyncTimer.Stop();
             _mediaService.PausePolling();
 
-            double currentOp = this.Opacity > 0.05 ? this.Opacity : 1.0;
-            var fadeAnim = new DoubleAnimation(currentOp, 0, TimeSpan.FromMilliseconds(150))
+            var easeIn = new CubicEase { EasingMode = EasingMode.EaseIn };
+            var duration = TimeSpan.FromMilliseconds(135);
+
+            if (RootBorder != null)
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
-            fadeAnim.Completed += (s, e) =>
-            {
-                if (gen != _animGeneration) return;
-                _isHiding = false;
-                _isModalOrMenuOpen = false;
-                _isDraggingCard = false;
-                this.Hide();
-                this.BeginAnimation(UIElement.OpacityProperty, null);
-                this.Opacity = 1.0;
-                if (DrawerTranslate != null)
+                double currentOp = RootBorder.Opacity > 0.05 ? RootBorder.Opacity : 1.0;
+                var fadeAnim = new DoubleAnimation(currentOp, 0, duration) { EasingFunction = easeIn };
+                Timeline.SetDesiredFrameRate(fadeAnim, 120);
+                fadeAnim.Completed += (s, e) =>
                 {
-                    DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-                    DrawerTranslate.X = 0;
-                }
-                foreach (var item in DisplayCards)
-                {
-                    item.ClearImageCache();
-                }
-                ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
-            };
-            this.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+                    if (gen != _animGeneration) return;
+                    _isHiding = false;
+                    _isModalOrMenuOpen = false;
+                    _isDraggingCard = false;
+                    this.Hide();
+                    RootBorder.BeginAnimation(UIElement.OpacityProperty, null);
+                    RootBorder.Opacity = 1.0;
+                    if (DrawerTranslate != null)
+                    {
+                        DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                        DrawerTranslate.X = 0;
+                    }
+                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
+                };
+                RootBorder.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+            }
 
             if (DrawerTranslate != null)
             {
                 bool isLeftDock = string.Equals(_settingsService?.CurrentSettings.DockEdge, "Left", StringComparison.OrdinalIgnoreCase);
-                double endX = isLeftDock ? -48 : 48;
-                var slideAnim = new DoubleAnimation(DrawerTranslate.X, endX, TimeSpan.FromMilliseconds(150))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-                };
+                double endX = isLeftDock ? -32 : 32;
+                var slideAnim = new DoubleAnimation(DrawerTranslate.X, endX, duration) { EasingFunction = easeIn };
+                Timeline.SetDesiredFrameRate(slideAnim, 120);
                 DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, slideAnim);
             }
         }
 
         public void ToggleDocked()
         {
-            if (this.IsVisible && !_isHiding && this.Opacity > 0.1)
+            if (this.IsVisible && !_isHiding && (RootBorder == null || RootBorder.Opacity > 0.1))
             {
                 SlideOutAndHide();
             }
@@ -1288,9 +1382,10 @@ namespace ClipVault.Views
 
             UpdateTabVisuals(isClipboard: false);
 
-            // 切换到看板时立即渲染音源 UI
+            // 切换到看板时立即渲染音源 UI 并同步一次真实亮度与音量
             UpdateMediaUI(_mediaService.CurrentMedia);
             _ = _mediaService.RefreshMediaAsync();
+            SyncBrightnessAndVolumeAsync();
         }
 
         private void UpdateTabVisuals(bool isClipboard)
@@ -1356,6 +1451,73 @@ namespace ClipVault.Views
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
             ShowSettings();
+        }
+
+        private void BtnLanSync_Click(object sender, RoutedEventArgs e)
+        {
+            OpenLanSyncOverlay();
+        }
+
+        public void OpenLanSyncOverlay()
+        {
+            try
+            {
+                if (!_lanSyncService.IsRunning)
+                {
+                    _lanSyncService.Start();
+                }
+
+                string url = _lanSyncService.PairingUrl;
+                if (TxtLanSyncUrl != null) TxtLanSyncUrl.Text = url;
+                if (ImgLanQrCode != null)
+                {
+                    ImgLanQrCode.Source = ClipVault.Helpers.QrCodeHelper.GenerateQrBitmap(url, 220);
+                }
+                if (TxtLanSyncLiveStatus != null)
+                {
+                    TxtLanSyncLiveStatus.Text = _lanSyncService.IsRunning
+                        ? $"🟢 局域网快传已就绪 ({_lanSyncService.ActiveIp}:{_lanSyncService.ActivePort})"
+                        : "🔴 端口绑定失败，请检查网络";
+                }
+                if (LanSyncOverlay != null)
+                {
+                    LanSyncOverlay.Visibility = Visibility.Visible;
+                }
+            }
+            catch { }
+        }
+
+        private void BtnCopyLanUrl_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_lanSyncService.IsRunning)
+                {
+                    if (_monitorService != null) _monitorService.IsInternalOperation = true;
+                    Clipboard.SetText(_lanSyncService.PairingUrl);
+                    ShowSidebarToast("✓ 已复制局域网快传链接");
+                }
+            }
+            catch { }
+            finally
+            {
+                if (_monitorService != null)
+                {
+                    _ = Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
+                }
+            }
+        }
+
+        private void BtnHideLanSyncOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (LanSyncOverlay != null) LanSyncOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnStopLanSync_Click(object sender, RoutedEventArgs e)
+        {
+            _lanSyncService.Stop();
+            if (LanSyncOverlay != null) LanSyncOverlay.Visibility = Visibility.Collapsed;
+            ShowSidebarToast("🛑 已关闭局域网快传服务并释放端口");
         }
 
         private void BtnBackFromSettings_Click(object sender, RoutedEventArgs e)
@@ -1436,23 +1598,46 @@ namespace ClipVault.Views
         {
             try
             {
+                _isCardsDirty = false;
                 var query = TxtSearch?.Text?.Trim() ?? string.Empty;
-                var allItems = _dbService.GetRecentItems(query, _currentCategory, 100);
+                var allItems = _dbService.GetRecentItems(query, _currentCategory, 80);
 
-                DisplayCards.Clear();
-                int idx = 1;
-                foreach (var item in allItems)
+                for (int i = 0; i < allItems.Count; i++)
                 {
-                    if (idx <= 9)
+                    allItems[i].DisplayBadge = (i < 9) ? $"[{i + 1}]" : string.Empty;
+                }
+
+                // 原位增量差量更新 DisplayCards：复用现有虚拟化容器，杜绝 Clear() + 80 次 Add() 引发的整表销毁与重排卡顿
+                int commonCount = Math.Min(DisplayCards.Count, allItems.Count);
+                for (int i = 0; i < commonCount; i++)
+                {
+                    var existing = DisplayCards[i];
+                    var incoming = allItems[i];
+                    if (existing.Id == incoming.Id &&
+                        existing.IsPinned == incoming.IsPinned &&
+                        existing.CustomTag == incoming.CustomTag)
                     {
-                        item.DisplayBadge = $"[{idx}]";
+                        existing.DisplayBadge = incoming.DisplayBadge;
+                        existing.IsOcrKeywordMatched = incoming.IsOcrKeywordMatched;
+                        if (!string.IsNullOrEmpty(incoming.OcrText) && string.IsNullOrEmpty(existing.OcrText))
+                        {
+                            existing.OcrText = incoming.OcrText;
+                        }
                     }
                     else
                     {
-                        item.DisplayBadge = string.Empty;
+                        DisplayCards[i] = incoming;
                     }
-                    DisplayCards.Add(item);
-                    idx++;
+                }
+
+                while (DisplayCards.Count > allItems.Count)
+                {
+                    DisplayCards.RemoveAt(DisplayCards.Count - 1);
+                }
+
+                for (int i = commonCount; i < allItems.Count; i++)
+                {
+                    DisplayCards.Add(allItems[i]);
                 }
 
                 if (TxtStatusLeft != null)
@@ -1472,14 +1657,16 @@ namespace ClipVault.Views
                         }
                         else
                         {
-                            string catName = _currentCategory.ToLowerInvariant() switch
-                            {
-                                "text" => "文本",
-                                "image" => "图片",
-                                "code" => "代码",
-                                "pinned" => "置顶",
-                                _ => "全部"
-                            };
+                            string catName = _currentCategory.StartsWith("tag:", StringComparison.OrdinalIgnoreCase)
+                                ? _currentCategory.Substring(4)
+                                : _currentCategory.ToLowerInvariant() switch
+                                {
+                                    "text" => "文本",
+                                    "image" => "图片",
+                                    "code" => "代码",
+                                    "pinned" => "置顶",
+                                    _ => "全部"
+                                };
                             TxtEmptyCategoryTip.Text = $"当前【{catName}】分类暂无记录";
                         }
                     }
@@ -1493,7 +1680,28 @@ namespace ClipVault.Views
             bool hasText = !string.IsNullOrEmpty(TxtSearch.Text);
             TxtSearchPlaceholder.Visibility = hasText ? Visibility.Collapsed : Visibility.Visible;
             BtnClearSearch.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
-            RefreshCards();
+
+            if (!hasText)
+            {
+                _searchDebounceTimer?.Stop();
+                RefreshCards();
+                return;
+            }
+
+            if (_searchDebounceTimer == null)
+            {
+                _searchDebounceTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(95)
+                };
+                _searchDebounceTimer.Tick += (s, args) =>
+                {
+                    _searchDebounceTimer.Stop();
+                    RefreshCards();
+                };
+            }
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
         }
 
         private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
@@ -1513,6 +1721,115 @@ namespace ClipVault.Views
                     CardsListBox.ScrollIntoView(CardsListBox.Items[0]);
                 }
             }
+        }
+
+        private void CategoryScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (CategoryScrollViewer != null)
+            {
+                double offset = CategoryScrollViewer.HorizontalOffset - (e.Delta * 0.45);
+                CategoryScrollViewer.ScrollToHorizontalOffset(Math.Max(0, offset));
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// 动态渲染 v3.0 自定义标签分组药丸按钮（支持点击筛选与右键删除分组）
+        /// </summary>
+        public void RefreshCustomTagPills()
+        {
+            if (CustomTagsPillPanel == null || _dbService == null) return;
+            try
+            {
+                CustomTagsPillPanel.Children.Clear();
+                var tags = _dbService.GetCustomTags();
+                var loc = LocalizationService.Instance;
+                var pillStyle = TryFindResource("FilterPillStyle") as Style;
+
+                foreach (var tagItem in tags)
+                {
+                    var rb = new RadioButton
+                    {
+                        Content = tagItem.DisplayLabel,
+                        Tag = tagItem.FilterKey,
+                        GroupName = "SidebarCategoryFilter",
+                        ToolTip = loc.Get("TagRightClickTip"),
+                        IsChecked = string.Equals(_currentCategory, tagItem.FilterKey, StringComparison.OrdinalIgnoreCase)
+                    };
+                    if (pillStyle != null) rb.Style = pillStyle;
+
+                    rb.Checked += Filter_Checked;
+                    rb.MouseRightButtonUp += (s, args) =>
+                    {
+                        args.Handled = true;
+                        ShowCustomTagPillContextMenu(tagItem, rb);
+                    };
+
+                    CustomTagsPillPanel.Children.Add(rb);
+                }
+            }
+            catch { }
+        }
+
+        private void ShowCustomTagPillContextMenu(CustomTagItem tagItem, FrameworkElement placementTarget)
+        {
+            var loc = LocalizationService.Instance;
+            var menu = new ContextMenu();
+            if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
+            Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+            var delIcon = new TextBlock
+            {
+                Text = "✕",
+                Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68)),
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var delMenu = new MenuItem
+            {
+                Icon = delIcon,
+                Header = loc.Get("TagDeleteMenu", tagItem.TagName)
+            };
+            if (itemStyle != null) delMenu.Style = itemStyle;
+            delMenu.Click += (s, e) =>
+            {
+                bool wasSelected = string.Equals(_currentCategory, tagItem.FilterKey, StringComparison.OrdinalIgnoreCase);
+                _dbService.DeleteCustomTag(tagItem.TagName);
+                if (wasSelected)
+                {
+                    _currentCategory = "all";
+                    if (RadioAll != null) RadioAll.IsChecked = true;
+                }
+                RefreshCustomTagPills();
+                RefreshCards();
+            };
+
+            menu.Items.Add(delMenu);
+            menu.PlacementTarget = placementTarget;
+            menu.Resources = this.Resources;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+
+        private void ShowSidebarToast(string message)
+        {
+            if (TxtSidebarToast == null) return;
+            TxtSidebarToast.Text = message;
+            TxtSidebarToast.Visibility = Visibility.Visible;
+
+            _sidebarToastTimer?.Stop();
+            _sidebarToastTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2.0)
+            };
+            _sidebarToastTimer.Tick += (s, e) =>
+            {
+                _sidebarToastTimer.Stop();
+                if (TxtSidebarToast != null) TxtSidebarToast.Visibility = Visibility.Collapsed;
+            };
+            _sidebarToastTimer.Start();
         }
 
         private void TxtSearch_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -1582,11 +1899,15 @@ namespace ClipVault.Views
                         }
                         else if (!string.IsNullOrEmpty(targetItem.Content))
                         {
+                            string priorClip = string.Empty;
+                            try { if (Clipboard.ContainsText()) priorClip = Clipboard.GetText(); } catch { }
+                            string expanded = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(targetItem.Content, priorClip);
+
                             // 1. Unicode 纯文本格式 (供所有现代应用、VS Code、记事本、浏览器、聊天窗口接收)
-                            data.SetText(targetItem.Content, TextDataFormat.UnicodeText);
-                            data.SetData(DataFormats.UnicodeText, targetItem.Content);
-                            data.SetData(DataFormats.Text, targetItem.Content);
-                            data.SetData(DataFormats.StringFormat, targetItem.Content);
+                            data.SetText(expanded, TextDataFormat.UnicodeText);
+                            data.SetData(DataFormats.UnicodeText, expanded);
+                            data.SetData(DataFormats.Text, expanded);
+                            data.SetData(DataFormats.StringFormat, expanded);
                         }
 
                         // 执行系统级 OLE 拖拽 (支持 Copy 与 Move)
@@ -1801,6 +2122,29 @@ namespace ClipVault.Views
             menu.Items.Add(queueItem);
             menu.Items.Add(copyItem);
 
+            if (item.IsImage)
+            {
+                var ocrIcon = new TextBlock
+                {
+                    Text = "📝",
+                    Foreground = new SolidColorBrush(Color.FromRgb(56, 189, 248)),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var ocrItem = new MenuItem
+                {
+                    Icon = ocrIcon,
+                    Header = loc.Get("OcrExtractBtn")
+                };
+                if (itemStyle != null) ocrItem.Style = itemStyle;
+                ocrItem.Click += async (s, args) =>
+                {
+                    await ExtractAndCopyOcrTextAsync(item);
+                };
+                menu.Items.Add(ocrItem);
+            }
+
             if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
             {
                 var maskIcon = new TextBlock
@@ -1823,6 +2167,27 @@ namespace ClipVault.Views
                 };
                 menu.Items.Add(maskItem);
             }
+
+            // v3.0 归入自定义分类标签菜单项
+            var tagMenuIcon = new TextBlock
+            {
+                Text = "🏷",
+                Foreground = new SolidColorBrush(Color.FromRgb(52, 211, 153)),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var assignTagItem = new MenuItem
+            {
+                Icon = tagMenuIcon,
+                Header = loc.Get("TagAssignBtnTip").Split(' ')[0] + "..."
+            };
+            if (itemStyle != null) assignTagItem.Style = itemStyle;
+            assignTagItem.Click += (s, args) =>
+            {
+                ShowCardTagAssignMenu(item, placementTarget);
+            };
+            menu.Items.Add(assignTagItem);
 
             var sep = new Separator();
             if (TryFindResource("ModernMenuSeparatorStyle") is Style sepStyle)
@@ -1859,6 +2224,245 @@ namespace ClipVault.Views
             }
         }
 
+        private void BtnCardTag_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                ShowCardTagAssignMenu(item, elem);
+            }
+        }
+
+        private async void BtnCardExtractOcr_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                await ExtractAndCopyOcrTextAsync(item);
+            }
+        }
+
+        private async System.Threading.Tasks.Task ExtractAndCopyOcrTextAsync(ClipboardItem item)
+        {
+            if (item == null) return;
+            try
+            {
+                if (string.IsNullOrWhiteSpace(item.OcrText) && !string.IsNullOrWhiteSpace(item.ResolvedImagePath))
+                {
+                    string recognized = await NativeOcrService.RecognizeImageFileAsync(item.ResolvedImagePath);
+                    if (!string.IsNullOrWhiteSpace(recognized))
+                    {
+                        item.OcrText = recognized;
+                        _dbService.UpdateItemOcrText(item.Id, recognized);
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(item.OcrText))
+                {
+                    ShowSidebarToast(LocalizationService.Instance.CurrentLanguage == "en-US" ? "No text detected in image" : "未在图片中检测到可识别文字");
+                    return;
+                }
+
+                if (_monitorService != null) _monitorService.IsInternalOperation = true;
+                Clipboard.SetText(item.OcrText);
+                ShowSidebarToast(LocalizationService.Instance.Get("OcrCopiedToast", item.OcrText.Length));
+            }
+            catch { }
+            finally
+            {
+                if (_monitorService != null)
+                {
+                    _ = Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
+                }
+            }
+        }
+
+        private void ShowCardTagAssignMenu(ClipboardItem item, FrameworkElement placementTarget)
+        {
+            if (item == null) return;
+            var loc = LocalizationService.Instance;
+            var menu = new ContextMenu();
+            if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
+            Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+            var customTags = _dbService.GetCustomTags();
+            foreach (var tag in customTags)
+            {
+                bool isCurrent = string.Equals(item.CustomTag, tag.TagName, StringComparison.OrdinalIgnoreCase);
+                var iconTb = new TextBlock
+                {
+                    Text = isCurrent ? "✓" : tag.TagIcon,
+                    Foreground = new SolidColorBrush(Color.FromRgb(52, 211, 153)),
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var tagMi = new MenuItem
+                {
+                    Icon = iconTb,
+                    Header = loc.Get("TagAssignTo", tag.TagName)
+                };
+                if (itemStyle != null) tagMi.Style = itemStyle;
+                tagMi.Click += (s, e) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, tag.TagName);
+                    item.CustomTag = tag.TagName;
+                    RefreshCards();
+                };
+                menu.Items.Add(tagMi);
+            }
+
+            if (item.HasCustomTag)
+            {
+                var rmIcon = new TextBlock
+                {
+                    Text = "✕",
+                    Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                var rmMi = new MenuItem
+                {
+                    Icon = rmIcon,
+                    Header = loc.Get("TagRemoveItem", item.CustomTag)
+                };
+                if (itemStyle != null) rmMi.Style = itemStyle;
+                rmMi.Click += (s, e) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, string.Empty);
+                    item.CustomTag = string.Empty;
+                    RefreshCards();
+                };
+                menu.Items.Add(rmMi);
+            }
+
+            if (menu.Items.Count > 0)
+            {
+                var sep = new Separator();
+                if (TryFindResource("ModernMenuSeparatorStyle") is Style sepStyle) sep.Style = sepStyle;
+                menu.Items.Add(sep);
+            }
+
+            var newIcon = new TextBlock
+            {
+                Text = "＋",
+                Foreground = new SolidColorBrush(Color.FromRgb(96, 165, 250)),
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var newTagMi = new MenuItem
+            {
+                Icon = newIcon,
+                Header = loc.Get("TagCreateNewMenu")
+            };
+            if (itemStyle != null) newTagMi.Style = itemStyle;
+            newTagMi.Click += (s, e) =>
+            {
+                OpenAddTagOverlay(item);
+            };
+            menu.Items.Add(newTagMi);
+
+            menu.PlacementTarget = placementTarget;
+            menu.Resources = this.Resources;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+
+        private void BtnAddCustomTag_Click(object sender, RoutedEventArgs e)
+        {
+            OpenAddTagOverlay(null);
+        }
+
+        private void OpenAddTagOverlay(ClipboardItem? cardToAssign)
+        {
+            _pendingCardForNewTag = cardToAssign;
+            if (TxtNewTagIcon != null) TxtNewTagIcon.Text = "🏷";
+            if (TxtNewTagName != null) TxtNewTagName.Text = string.Empty;
+            if (TxtNewTagTemplateContent != null) TxtNewTagTemplateContent.Text = string.Empty;
+            if (AddTagOverlay != null)
+            {
+                AddTagOverlay.Visibility = Visibility.Visible;
+                this.Activate();
+                TxtNewTagName?.Focus();
+            }
+        }
+
+        private void BtnInsertMacroToken_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string token && TxtNewTagTemplateContent != null)
+            {
+                int caret = TxtNewTagTemplateContent.CaretIndex;
+                string current = TxtNewTagTemplateContent.Text ?? string.Empty;
+                if (caret < 0 || caret > current.Length) caret = current.Length;
+                TxtNewTagTemplateContent.Text = current.Insert(caret, token);
+                TxtNewTagTemplateContent.CaretIndex = caret + token.Length;
+                this.Activate();
+                TxtNewTagTemplateContent.Focus();
+            }
+        }
+
+        private void BtnCancelAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            _pendingCardForNewTag = null;
+            if (AddTagOverlay != null) AddTagOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnConfirmAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            string tagName = TxtNewTagName?.Text?.Trim() ?? string.Empty;
+            string tagIcon = TxtNewTagIcon?.Text?.Trim() ?? "🏷";
+            if (string.IsNullOrEmpty(tagIcon)) tagIcon = "🏷";
+
+            if (string.IsNullOrEmpty(tagName))
+            {
+                TxtNewTagName?.Focus();
+                return;
+            }
+
+            _dbService.AddCustomTag(tagName, tagIcon);
+
+            // 若用户填写了初始模板/动态短语，自动创建一条归属该标签的卡片
+            string templateText = TxtNewTagTemplateContent?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(templateText))
+            {
+                string summary = templateText.Replace("\r", " ").Replace("\n", " ");
+                if (summary.Length > 50) summary = summary.Substring(0, 50) + "...";
+
+                using var sha = System.Security.Cryptography.SHA256.Create();
+                byte[] hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("TPL:" + tagName + ":" + templateText));
+                string hash = Convert.ToHexString(hashBytes);
+
+                var tplItem = new ClipboardItem
+                {
+                    CreatedAt = DateTime.Now,
+                    ItemType = "Text",
+                    Content = templateText,
+                    Summary = $"{summary} ({templateText.Length} 字符)",
+                    SourceApp = "CopyBox Template",
+                    Sha256 = hash,
+                    CharCount = templateText.Length,
+                    CustomTag = tagName
+                };
+                _dbService.InsertItem(tplItem);
+            }
+
+            if (_pendingCardForNewTag != null)
+            {
+                _dbService.SetItemCustomTag(_pendingCardForNewTag.Id, tagName);
+                _pendingCardForNewTag = null;
+            }
+
+            if (AddTagOverlay != null) AddTagOverlay.Visibility = Visibility.Collapsed;
+
+            _currentCategory = $"tag:{tagName}";
+            RefreshCustomTagPills();
+            RefreshCards();
+        }
+
         private void BtnCardCopy_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
@@ -1880,20 +2484,14 @@ namespace ClipVault.Views
                 if (item.IsImage && !string.IsNullOrEmpty(item.ResolvedImagePath) && File.Exists(item.ResolvedImagePath))
                 {
                     var data = new DataObject();
-                    if (item.ImagePreview is BitmapSource bmp)
-                    {
-                        data.SetImage(bmp);
-                    }
-                    else
-                    {
-                        var bitmap = new BitmapImage();
-                        bitmap.BeginInit();
-                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmap.UriSource = new Uri(item.ResolvedImagePath, UriKind.Absolute);
-                        bitmap.EndInit();
-                        bitmap.Freeze();
-                        data.SetImage(bitmap);
-                    }
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.UriSource = new Uri(item.ResolvedImagePath, UriKind.Absolute);
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    _monitorService?.NotifyInternalImageWrite(bitmap.PixelWidth, bitmap.PixelHeight, 2500);
+                    data.SetImage(bitmap);
 
                     var files = new System.Collections.Specialized.StringCollection { item.ResolvedImagePath };
                     data.SetFileDropList(files);
@@ -1908,15 +2506,21 @@ namespace ClipVault.Views
                 }
                 else
                 {
-                    Clipboard.SetText(item.Content ?? string.Empty);
+                    string priorClip = string.Empty;
+                    try { if (Clipboard.ContainsText()) priorClip = Clipboard.GetText(); } catch { }
+                    string textToCopy = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content ?? string.Empty, priorClip);
+                    Clipboard.SetText(textToCopy);
                 }
+
+                ShowSidebarToast(LocalizationService.Instance.Get("ToastCopied"));
+                ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService?.CurrentSettings);
             }
             catch { }
             finally
             {
                 if (_monitorService != null)
                 {
-                    Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
+                    _ = Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
                 }
             }
         }
@@ -2125,6 +2729,7 @@ namespace ClipVault.Views
         private void SliderBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingBrightnessUi) return;
+            _lastUserBrightnessTick = Environment.TickCount64;
             int val = (int)e.NewValue;
             if (TxtBrightnessValue != null) TxtBrightnessValue.Text = $"{val}%";
             SystemControlService.SetBrightness(val);
@@ -2152,6 +2757,7 @@ namespace ClipVault.Views
         private void SliderVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingVolumeUi) return;
+            _lastUserVolumeTick = Environment.TickCount64;
             int val = (int)e.NewValue;
             if (TxtVolumeValue != null) TxtVolumeValue.Text = $"{val}%";
             SystemControlService.SetMasterVolume(val);
@@ -2680,6 +3286,22 @@ namespace ClipVault.Views
                     if (TxtSideOpacityVal != null) TxtSideOpacityVal.Text = $"{transparencyPct}%";
                 }
 
+                // 4.5 Windows 11 原生材质与微触感音效回显
+                string backdrop = s.BackdropMaterial ?? "Default";
+                if (string.Equals(backdrop, "Mica", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (RadioBackdropMica2 != null) RadioBackdropMica2.IsChecked = true;
+                }
+                else if (string.Equals(backdrop, "Acrylic", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (RadioBackdropAcrylic2 != null) RadioBackdropAcrylic2.IsChecked = true;
+                }
+                else
+                {
+                    if (RadioBackdropDefault2 != null) RadioBackdropDefault2.IsChecked = true;
+                }
+                if (ChkSoundEffects2 != null) ChkSoundEffects2.IsChecked = s.EnableSoundEffects;
+
                 // 立即应用当前主题与背景透明度
                 ApplyTheme(s.ThemeMode);
 
@@ -2908,6 +3530,33 @@ namespace ClipVault.Views
             _settingsService.CurrentSettings.WindowOpacity = windowOpacity;
             UpdateBackgroundOpacityLive(windowOpacity);
             ScheduleDebouncedSaveSettings();
+        }
+
+        private void BackdropRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            if (sender is not RadioButton rb || rb.Tag is not string mode || rb.IsChecked != true) return;
+            if (!string.Equals(_settingsService.CurrentSettings.BackdropMaterial, mode, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.BackdropMaterial = mode;
+                ApplyTheme(_settingsService.CurrentSettings.ThemeMode);
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void ChkSoundEffects_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || ChkSoundEffects2 == null) return;
+            bool enabled = ChkSoundEffects2.IsChecked == true;
+            if (_settingsService.CurrentSettings.EnableSoundEffects != enabled)
+            {
+                _settingsService.CurrentSettings.EnableSoundEffects = enabled;
+                _settingsService.SaveSettings();
+                if (enabled)
+                {
+                    ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService.CurrentSettings);
+                }
+            }
         }
 
         private void SideCloseActionRadio_Changed(object sender, RoutedEventArgs e)

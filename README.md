@@ -1,23 +1,46 @@
 <div align="center">
 
-# CopyBox 📦 v2.2.2
+# CopyBox 📦 v3.0.0
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v2.2.2-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v3.0.0-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **🆕 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **📜 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **📜 v2.1 更新内容** ](#-v21-版本更新说明-whats-new-in-v21) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **📜 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **📜 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
 
 ---
 
-## 🆕 v2.2.2 版本更新说明 (What's New in v2.2.2)
+## 🔥 v3.0.0 版本更新说明 (What's New in v3.0.0)
+
+### 1. 🖼️ Windows 原生离线 OCR 文字提取与“以文搜图” (Native Offline OCR & Visual Search)
+- **0MB 外部依赖，100% 离线提取**：深度集成 Windows 10/11 系统底层 `Windows.Media.Ocr` 引擎，无需打包数百兆的模型文件、不联网上传任何图片，后台闲时约 20~50ms 自动提取截图中的中英文文字并建立 SQLite 索引（智能消除了中文字符间的多余空格）；
+- **搜词直接出图**：在顶部搜索框输入任何记得的关键词（如报错码、订单号、发票抬头），即使那是一张截图，也能直接检索命中并高亮显示 **`🔍 命中图中文字`** 角标；
+- **一键提取图片文字**：识别成功的图片卡片右上角自动呈现 **`[ 📝 提取文字 ]`** 按钮（对旧版历史截图亦支持按需即时识别），单击即可直接将图片中的纯文本复制出来。
+
+### 2. 📱 局域网离线双向快传 & 跨设备加密同步 (Offline LAN Quick Drop & Encrypted Sync)
+- **手机免安装扫码双向秒传**：点击侧边栏顶栏新增的 **`📱`** 按钮，按需唤醒轻量级局域网微服务并借助内置纯算法 ISO/IEC 18004 二维码引擎（0 第三方库依赖）实时生成配对二维码；手机相机或浏览器扫码即可打开现代化 HTML5 快传网页，**手机发文字/发照片秒进电脑剪贴板，电脑复制的内容手机端一键复制**；
+- **多端 AES-256-GCM 端到端加密**：支持局域网 PC 间基于 PBKDF2-SHA256 与 AES-256-GCM 认证加密的点对点同步，且移动端列表自动对敏感 API Key/密码脱敏保护；
+- **标准用户免管理员权限 & 零闲置开销**：采用纯用户态 `TcpListener`（端口冲突自动顺延 `28560~28575`）与一次性会话安全令牌（`?t=...`），无需管理员权限即可运行，关闭浮层或停止服务时立即释放端口与内存。
+
+### 3. 🏷️ 动态分类标签药丸栏 & 智能模板变量 (Dynamic Tag Pills & Smart Template Macros)
+- **横向滚轮滑动胶囊栏**：分类栏升级为无滚动条横向药丸流，鼠标悬停滚动滚轮即可丝滑横向滑动；点击末尾 **`[ ＋ ]`** 即可创建带 Emoji 图标的自定义标签分组（如 `💬 常用回复`、`🗄️ SQL`、`🤖 Prompt`）；
+- **卡片一键归类与防清空保护**：点击卡片右上角 **`🏷`** 按钮（或右键菜单）可将任意历史记录归入自定义标签；所有归入自定义标签的卡片与置顶项一样，**在执行“清空历史”时受到永久保护**；
+- **单遍安全动态模板宏**：支持在常用短语中嵌入 `{{date}}`、`{{time}}`、`{{datetime}}`、`{{year}}`、`{{weekday}}`、`{{guid}}`、`{{clipboard}}` 动态变量，复制、双击秒贴或拖拽释放时自动单遍替换为实时值（内置防递归自引用保护）。
+
+### 4. ✨ Windows 11 原生云母/亚克力材质与微触感音效 (Win11 Native Mica/Acrylic & Micro-Audio)
+- **Win11 原生 DWM 硬件材质**：设置面板新增 **🎨 经典高帧率毛玻璃**、**☁️ Win11 原生云母材质 (Mica)**、**💎 Win11 原生亚克力材质 (Acrylic)** 切换，由系统 DWM 硬件合成器渲染，120FPS 零鼠标延迟，并在 Win10 下自动优雅降级；
+- **0KB 内存合成微触感音效**：内置纯算法 16-bit PCM WAV 柔和泛音合成器（带指数衰减防爆音包络），提供复制捕获、抽屉滑出、秒贴确认三款清脆微音效，并在全屏游戏免打扰模式下自动静默。
+
+---
+
+## 📜 v2.2.2 版本更新说明 (What's New in v2.2.2)
 
 ### 🛠️ 1. 单文件独立建库与核心驱动内嵌 (Embedded SQLite Driver & Auto-Creation)
 - **解决复制内容不显示 Bug**：彻底解决便携单文件运行由于缺少外部 `e_sqlite3.dll` 导致 SQLite 初始化静默失败、数据库未能自动建立、复制内容在卡片中心不展示的严重问题。
@@ -50,11 +73,12 @@
 ---
 
 <p align="center">
-  <img src="assets/v2_clipboard.png" alt="CopyBox v2.2.2 剪贴板中心" width="46%" style="border-radius: 12px; margin-right: 2%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
-  <img src="assets/v2_dashboard.png" alt="CopyBox v2.2.2 偏好设置与新特性" width="46%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v3_clipboard_ocr.jpg" alt="CopyBox v3.0.0 剪贴板中心与离线OCR提取" width="31%" style="border-radius: 12px; margin-right: 1.5%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v3_lan_sync_qr.png" alt="CopyBox v3.0.0 局域网离线双向快传" width="31%" style="border-radius: 12px; margin-right: 1.5%; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
+  <img src="assets/v3_settings_mica.jpg" alt="CopyBox v3.0.0 偏好设置与Win11云母/亚克力材质" width="31%" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);" />
 </p>
 <p align="center">
-  <em>左图：v2.2.2 剪贴板中心（历史卡片、随手记便签、分类药丸、快速秒贴） &nbsp;|&nbsp; 右图：v2.2.2 偏好设置（多显示器唤醒策略、左右贴边自定义、全屏游戏免打扰、敏感隐私自动遮罩）</em>
+  <em>左图：v3.0.0 剪贴板中心（离线 OCR 提取文字、手机快传卡片、自定义标签分组） &nbsp;|&nbsp; 中图：局域网离线双向快传（手机免安装扫码秒传文字与图片） &nbsp;|&nbsp; 右图：偏好设置（Win11 云母/亚克力原生材质、微触感音效、6 大主题与透明度）</em>
 </p>
 
 <div align="center">
@@ -62,7 +86,7 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v2.2.2--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v2.2.2/CopyBox-v2.2.2-Windows-x64-Portable.zip)  
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.0.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.0/CopyBox-v3.0.0-Windows-x64-Portable.zip)  
 [![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
 
 *(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
@@ -91,11 +115,11 @@
 
 # 🇨🇳 简体中文
 
-## 🌟 为什么选择 CopyBox 2.2.2？
+## 🌟 为什么选择 CopyBox 3.0.0？
 
 在日常使用 Windows 时，自带的剪贴板历史经常呼出迟缓、图片加载卡顿、缺少快速搜索和常用内容置顶功能；而市面上大多数第三方剪贴板工具不仅体积臃肿（基于 Electron 动辄占用几百兆内存），甚至强制捆绑云端同步，让密码、API Token、私信记录等极度敏感的数据面临泄露风险。
 
-**CopyBox 2.2.2 全面进化**，它不仅是一个极速轻量的离线隐私剪贴板，更是 Windows 桌面边缘优雅的 **多屏自适应生产力抽屉**：
+**CopyBox 3.0.0 全面进化**，它不仅是一个极速轻量的离线隐私剪贴板，更是 Windows 桌面边缘优雅的 **多屏自适应生产力抽屉**：
 1. **绝对隐私，100% 纯本地离线 + 敏感信息自动遮罩**：不发起任何网络请求、不收集任何用户遥测，所有历史数据物理留存在本地磁盘；自动识别 API Key、密码、银行卡、身份证、手机号并在卡片上安全打码，防止录屏、投屏或旁人窥屏泄密；
 2. **多显示器智能跨屏 & 左右贴边自由定制**：支持 **跟随鼠标所在显示器唤醒（智能多屏）** 或 **固定主显示器唤醒**，内置 Per-Monitor DPI 独立缩放适配；支持 **屏幕右侧贴边** 与 **屏幕左侧贴边** 一键切换；
 3. **全屏防误触与游戏“免打扰模式”**：自动感知 Direct3D 独占全屏游戏、无边框全屏游戏/视频/演示并暂停鼠标边缘唤醒，杜绝打游戏甩鼠标误触弹窗，同时支持托盘与设置面板一键开启强制免打扰；
@@ -154,7 +178,7 @@
 
 ## 🎨 6 大高级预设主题、自定义壁纸与真背景透明度调节
 
-CopyBox 2.2.2 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
+CopyBox 3.0.0 拥有精心打磨的 Fluent 视觉系统，在双形态设置中心均提供完整一致的外观定制：
 
 1. 🌙 **深色模式 (Dark)**：经典极夜蓝黑，深沉护眼，高对比度；
 2. ☀️ **明亮模式 (Light)**：象牙冷白，纯净素雅，浅灰底盘彻底告别黑块；
@@ -226,7 +250,7 @@ dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile
 
 ## 📁 本地数据目录规范
 
-CopyBox v2.2.2 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
+CopyBox v3.0.0 默认采用便携式根目录存储（与 `CopyBox.exe` 同目录），当你使用默认路径或自定义保存路径后，会在本地维护清晰的数据拓扑：
 
 ```text
 CopyBox/
@@ -245,18 +269,18 @@ CopyBox/
 
 # 🇺🇸 English
 
-## 🌟 Why CopyBox 2.2.2?
+## 🌟 Why CopyBox 3.0.0?
 
 Windows' built-in clipboard history frequently suffers from sluggish popups, slow thumbnail loading, and a lack of quick search or pinning capabilities. Most third-party alternatives are bloated Electron apps that consume hundreds of megabytes of RAM while forcing mandatory cloud synchronization—exposing sensitive credentials, private notes, and source code tokens to potential data leaks.
 
-**CopyBox 2.2.2 evolves further**: it is not just a lightweight, 100% offline privacy clipboard manager, but an intelligent, **multi-monitor productivity drawer** on your Windows desktop.
+**CopyBox 3.0.0 is a major milestone release**: combining a lightweight, 100% offline privacy clipboard manager with **Native Offline OCR**, **Phone-to-PC QR LAN Quick Drop**, **Dynamic Tag Pills & Smart Template Macros**, and **Windows 11 Native Mica/Acrylic Backdrops**.
 
-1. **100% Offline & Automatic Sensitive Data Masking**: Zero network connections, zero telemetry. Automatically detects API Keys/Tokens, passwords, private keys, bank cards, ID cards, and phone numbers—masking them on UI cards to prevent shoulder-surfing or screen-sharing leaks while pasting 100% original text;
-2. **Multi-Monitor Support & Left/Right Dock Customization**: Wake the drawer on whichever monitor your mouse cursor is on (`FollowCursor`) or lock it to your primary monitor (`Primary`) with full Per-Monitor DPI scaling; freely dock to either the **Right Edge** or **Left Edge** of your screen;
-3. **Fullscreen Anti-Mistouch & Gaming DND Mode**: Automatically detects fullscreen games (Direct3D exclusive & borderless fullscreen), fullscreen videos, and presentations to suppress edge-hover wake—plus a manual DND toggle in the system tray and settings;
-4. **True Portable Root Storage & Private Cloud Sync**: Stores configuration (`settings.json`), database (`clipboard.db` / `clipvault.db`), and image caches directly in the app root directory by default—or point it to your **OneDrive / Dropbox / Google Drive** directory for zero-config multi-device sync;
-5. **Dual-View Architecture & Unified Dual Window Modes**: Toggle effortlessly between `[ 📋 Clipboard Center ]` and `[ ⚡ Quick Dashboard ]`, and switch between the **Sidebar Acrylic Drawer** and **Centered Palette** with 100% synchronized settings;
-6. **120FPS Blazing Native Performance**: Pure native .NET 8 and WPF vector styles with in-place DirectX brush alpha updates and razor-sharp ClearType rendering.
+1. **🖼️ Native Offline OCR & Visual Image Search**: Powered by Windows' built-in `Windows.Media.Ocr` engine (0MB extra binary size, 100% offline). Automatically indexes text inside copied screenshots so you can search for images by typing any word inside them, or click **`[ 📝 Extract Text ]`** on any image card to copy its text;
+2. **📱 Phone-to-PC QR Code LAN Quick Drop & AES-256-GCM Sync**: Click **`📱`** in the top bar to display an offline QR code generated in-memory. Scan with your phone camera/browser on the same Wi-Fi to send text or photos directly to your PC clipboard or copy PC items to your phone—zero app install required on mobile, zero cloud servers;
+3. **🏷️ Dynamic Category Tag Pills & Smart Template Macros**: Scroll horizontally through category pills with your mouse wheel, click **`[ ＋ ]`** to create custom Emoji tags (`💬 Replies`, `🗄️ SQL`, `🤖 Prompts`), and use dynamic macros (`{{date}}`, `{{time}}`, `{{datetime}}`, `{{clipboard}}`, `{{guid}}`) that expand automatically on paste;
+4. **✨ Windows 11 Native Mica/Acrylic & Micro-Audio Feedback**: Switch between Classic 120FPS Acrylic, Windows 11 Native Mica, and Windows 11 Native Acrylic hardware backdrops, paired with click-free in-memory synthesized PCM audio cues (automatically muted in Fullscreen Gaming DND mode);
+5. **100% Offline & Automatic Sensitive Data Masking**: Zero cloud connections, zero telemetry. Automatically detects API Keys/Tokens, passwords, private keys, bank cards, ID cards, and phone numbers—masking them on UI cards to prevent shoulder-surfing or screen-sharing leaks while pasting 100% original text;
+6. **Multi-Monitor Support, Left/Right Dock & Gaming DND Mode**: Wake the drawer on whichever monitor your mouse cursor is on (`FollowCursor`) or lock it to your primary monitor (`Primary`) with full Per-Monitor DPI scaling; freely dock to either the **Right Edge** or **Left Edge**, with automatic fullscreen game anti-mistouch protection.
 
 ---
 

@@ -59,7 +59,17 @@ namespace ClipVault
             // 加载配置、主题与卡片
             LoadSettingsToUI();
             UpdateAllLocalizedTexts();
+            RefreshMainCustomTagPills();
             RefreshCards();
+
+            _dbService.CustomTagsChanged += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    RefreshMainCustomTagPills();
+                    if (this.IsVisible) RefreshCards();
+                });
+            };
 
             // 监听语言变化，毫秒级热刷新全界面文案
             LocalizationService.Instance.LanguageChanged += () =>
@@ -81,6 +91,18 @@ namespace ClipVault
                     {
                         RefreshCards();
                         UpdateStorageInfo();
+                    }
+                });
+            };
+
+            _monitorService.ItemOcrCompleted += (itemId, ocrText) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var card = DisplayCards.FirstOrDefault(x => x.Id == itemId);
+                    if (card != null)
+                    {
+                        card.OcrText = ocrText;
                     }
                 });
             };
@@ -225,6 +247,21 @@ namespace ClipVault
                 SliderOpacity.Value = Math.Clamp(transparencyPct, 0, 85);
                 TxtOpacityValue.Text = $"{(int)SliderOpacity.Value}%";
 
+                string backdrop = s.BackdropMaterial ?? "Default";
+                if (string.Equals(backdrop, "Mica", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (RadioMainBackdropMica != null) RadioMainBackdropMica.IsChecked = true;
+                }
+                else if (string.Equals(backdrop, "Acrylic", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (RadioMainBackdropAcrylic != null) RadioMainBackdropAcrylic.IsChecked = true;
+                }
+                else
+                {
+                    if (RadioMainBackdropDefault != null) RadioMainBackdropDefault.IsChecked = true;
+                }
+                if (ChkMainSoundEffects != null) ChkMainSoundEffects.IsChecked = s.EnableSoundEffects;
+
                 this.Opacity = 1.0;
                 ApplyTheme(theme);
 
@@ -314,6 +351,12 @@ namespace ClipVault
             if (BtnMainResetBg != null) BtnMainResetBg.Content = isEn ? "Reset" : "重置";
             if (TxtMainBgOverlayLabel != null) TxtMainBgOverlayLabel.Text = isEn ? "Dim Overlay:" : "壁纸暗化遮罩:";
             if (TxtOpacityLabel != null) TxtOpacityLabel.Text = loc.Get("OpacityLabel");
+            if (TxtMainBackdropAndAudioTitle != null) TxtMainBackdropAndAudioTitle.Text = loc.Get("BackdropAndAudioTitle");
+            if (TxtMainBackdropLabel != null) TxtMainBackdropLabel.Text = loc.Get("BackdropLabel");
+            if (RadioMainBackdropDefault != null) RadioMainBackdropDefault.Content = loc.Get("BackdropDefault");
+            if (RadioMainBackdropMica != null) RadioMainBackdropMica.Content = loc.Get("BackdropMica");
+            if (RadioMainBackdropAcrylic != null) RadioMainBackdropAcrylic.Content = loc.Get("BackdropAcrylic");
+            if (ChkMainSoundEffects != null) ChkMainSoundEffects.Content = loc.Get("ChkSoundEffects");
 
             if (TxtCloseActionTitle != null) TxtCloseActionTitle.Text = loc.Get("CloseActionTitle");
             if (RadioCloseMinimize != null) RadioCloseMinimize.Content = loc.Get("CloseActionTray");
@@ -467,8 +510,13 @@ namespace ClipVault
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             if (hwnd != IntPtr.Zero)
             {
+                string theme = _settingsService?.CurrentSettings.ThemeMode ?? "Dark";
+                string backdropMode = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
+                bool isDark = !string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase);
+                ClipVault.Interop.NativeMethods.ApplyWindowBackdrop(hwnd, backdropMode, isDark);
                 ClipVault.Interop.NativeMethods.SetForegroundWindow(hwnd);
             }
+            ClipVault.Helpers.SoundEffectHelper.PlayPopCue(_settingsService?.CurrentSettings);
 
             SearchInputBox.Focus();
         }
@@ -487,20 +535,46 @@ namespace ClipVault
 
         public void RefreshCards()
         {
-            DisplayCards.Clear();
             string keyword = SearchInputBox.Text.Trim();
             var items = _dbService.GetRecentItems(keyword, _currentCategory, 60);
 
             for (int i = 0; i < items.Count; i++)
             {
-                if (i < 9)
+                items[i].DisplayBadge = i < 9 ? $"[{i + 1}]" : string.Empty;
+            }
+
+            int common = Math.Min(DisplayCards.Count, items.Count);
+            for (int i = 0; i < common; i++)
+            {
+                var existing = DisplayCards[i];
+                var next = items[i];
+                if (existing.Id == next.Id &&
+                    existing.IsPinned == next.IsPinned &&
+                    existing.CreatedAt == next.CreatedAt &&
+                    string.Equals(existing.CustomTag, next.CustomTag, StringComparison.Ordinal))
                 {
-                    items[i].DisplayBadge = $"[{i + 1}]";
+                    if (!string.Equals(existing.DisplayBadge, next.DisplayBadge, StringComparison.Ordinal))
+                    {
+                        existing.DisplayBadge = next.DisplayBadge;
+                    }
                 }
+                else
+                {
+                    DisplayCards[i] = next;
+                }
+            }
+
+            for (int i = common; i < items.Count; i++)
+            {
                 DisplayCards.Add(items[i]);
             }
 
-            if (DisplayCards.Count > 0)
+            while (DisplayCards.Count > items.Count)
+            {
+                DisplayCards.RemoveAt(DisplayCards.Count - 1);
+            }
+
+            if (DisplayCards.Count > 0 && CardsListBox.SelectedIndex < 0)
             {
                 CardsListBox.SelectedIndex = 0;
             }
@@ -584,7 +658,17 @@ namespace ClipVault
             }
 
             double opacity = Math.Clamp(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92, 0.15, 1.00);
-            byte bgAlpha = (byte)Math.Clamp(opacity * 255, 38, 255);
+            string backdropMode = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
+            double effectiveOpacity = opacity;
+            if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveOpacity = Math.Min(opacity, 0.78);
+            }
+            else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
+            {
+                effectiveOpacity = Math.Min(opacity, 0.65);
+            }
+            byte bgAlpha = (byte)Math.Clamp(effectiveOpacity * 255, 38, 255);
             byte cardAlpha = (byte)Math.Clamp((0.35 + opacity * 0.65) * 255, 95, 255);
 
             if (isCustom)
@@ -756,6 +840,12 @@ namespace ClipVault
 
             UpdateCloseButtonToolTip();
             UpdateCategoryTabsAppearance();
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ClipVault.Interop.NativeMethods.ApplyWindowBackdrop(hwnd, backdropMode, isDark);
+            }
         }
 
         private void UpdateCloseButtonToolTip()
@@ -983,6 +1073,33 @@ namespace ClipVault
         {
             if (_isInternalSettingUpdate || _settingsService == null || MainBorder == null) return;
             ApplyOpacity(e.NewValue, save: true);
+        }
+
+        private void MainBackdropRadio_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            if (sender is not RadioButton rb || rb.Tag is not string mode || rb.IsChecked != true) return;
+            if (!string.Equals(_settingsService.CurrentSettings.BackdropMaterial, mode, StringComparison.OrdinalIgnoreCase))
+            {
+                _settingsService.CurrentSettings.BackdropMaterial = mode;
+                ApplyTheme(_settingsService.CurrentSettings.ThemeMode);
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void ChkMainSoundEffects_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || ChkMainSoundEffects == null) return;
+            bool enabled = ChkMainSoundEffects.IsChecked == true;
+            if (_settingsService.CurrentSettings.EnableSoundEffects != enabled)
+            {
+                _settingsService.CurrentSettings.EnableSoundEffects = enabled;
+                _settingsService.SaveSettings();
+                if (enabled)
+                {
+                    ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService.CurrentSettings);
+                }
+            }
         }
 
         // ================= 窗口控制与退出行为 =================
@@ -1225,6 +1342,70 @@ namespace ClipVault
             }
         }
 
+        private void MainCategoryScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (MainCategoryScrollViewer != null)
+            {
+                double offset = MainCategoryScrollViewer.HorizontalOffset - (e.Delta * 0.45);
+                MainCategoryScrollViewer.ScrollToHorizontalOffset(Math.Max(0, offset));
+                e.Handled = true;
+            }
+        }
+
+        public void RefreshMainCustomTagPills()
+        {
+            if (MainCustomTagsPanel == null || _dbService == null) return;
+            try
+            {
+                MainCustomTagsPanel.Children.Clear();
+                var tags = _dbService.GetCustomTags();
+                var loc = LocalizationService.Instance;
+
+                foreach (var tagItem in tags)
+                {
+                    var btn = new Button
+                    {
+                        Content = tagItem.DisplayLabel,
+                        Tag = tagItem.FilterKey,
+                        Margin = new Thickness(0, 0, 8, 0),
+                        Padding = new Thickness(12, 5, 12, 5),
+                        FontSize = 11.5,
+                        Cursor = Cursors.Hand,
+                        ToolTip = loc.Get("TagRightClickTip")
+                    };
+                    var borderStyle = new Style(typeof(Border));
+                    borderStyle.Setters.Add(new Setter(Border.CornerRadiusProperty, new CornerRadius(14)));
+                    btn.Resources.Add(typeof(Border), borderStyle);
+
+                    btn.Click += TabCategory_Click;
+                    btn.MouseRightButtonUp += (s, args) =>
+                    {
+                        args.Handled = true;
+                        var menu = new ContextMenu();
+                        if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
+                        Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+                        var delMi = new MenuItem { Header = loc.Get("TagDeleteMenu", tagItem.TagName) };
+                        if (itemStyle != null) delMi.Style = itemStyle;
+                        delMi.Click += (_, _) =>
+                        {
+                            bool wasSelected = string.Equals(_currentCategory, tagItem.FilterKey, StringComparison.OrdinalIgnoreCase);
+                            _dbService.DeleteCustomTag(tagItem.TagName);
+                            if (wasSelected) _currentCategory = "all";
+                            RefreshMainCustomTagPills();
+                            RefreshCards();
+                        };
+                        menu.Items.Add(delMi);
+                        menu.PlacementTarget = btn;
+                        menu.IsOpen = true;
+                    };
+
+                    MainCustomTagsPanel.Children.Add(btn);
+                }
+                UpdateCategoryTabsAppearance();
+            }
+            catch { }
+        }
+
         private void UpdateCategoryTabsAppearance()
         {
             if (TabAll == null) return;
@@ -1238,6 +1419,18 @@ namespace ClipVault
             UpdateButtonTab(TabImages, _currentCategory == "Image", activeBg, inactiveBg, activeFg, inactiveFg);
             UpdateButtonTab(TabCode, _currentCategory == "Code", activeBg, inactiveBg, activeFg, inactiveFg);
             UpdateButtonTab(TabStarred, _currentCategory == "pinned", activeBg, inactiveBg, activeFg, inactiveFg);
+
+            if (MainCustomTagsPanel != null)
+            {
+                foreach (var child in MainCustomTagsPanel.Children)
+                {
+                    if (child is Button customBtn && customBtn.Tag is string filterKey)
+                    {
+                        bool isActive = string.Equals(_currentCategory, filterKey, StringComparison.OrdinalIgnoreCase);
+                        UpdateButtonTab(customBtn, isActive, activeBg, inactiveBg, activeFg, inactiveFg);
+                    }
+                }
+            }
         }
 
         private void UpdateButtonTab(Button btn, bool isActive, Brush activeBg, Brush inactiveBg, Brush activeFg, Brush inactiveFg)
@@ -1250,6 +1443,8 @@ namespace ClipVault
             btn.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
         }
 
+        private System.Windows.Threading.DispatcherTimer? _mainSearchDebounceTimer;
+
         private void SearchInputBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (SearchPlaceholder != null)
@@ -1258,7 +1453,29 @@ namespace ClipVault
                     ? Visibility.Visible 
                     : Visibility.Collapsed;
             }
-            RefreshCards();
+
+            if (string.IsNullOrEmpty(SearchInputBox.Text))
+            {
+                _mainSearchDebounceTimer?.Stop();
+                RefreshCards();
+                return;
+            }
+
+            if (_mainSearchDebounceTimer == null)
+            {
+                _mainSearchDebounceTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background)
+                {
+                    Interval = TimeSpan.FromMilliseconds(95)
+                };
+                _mainSearchDebounceTimer.Tick += (s, args) =>
+                {
+                    _mainSearchDebounceTimer.Stop();
+                    RefreshCards();
+                };
+            }
+
+            _mainSearchDebounceTimer.Stop();
+            _mainSearchDebounceTimer.Start();
         }
 
         private void SearchInputBox_KeyDown(object sender, KeyEventArgs e)
@@ -1400,15 +1617,25 @@ namespace ClipVault
 
                 if (item.IsImage && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
                 {
-                    var bmp = new BitmapImage(new Uri(item.FullImagePath, UriKind.Absolute));
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(item.FullImagePath, UriKind.Absolute);
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    _monitorService.NotifyInternalImageWrite(bmp.PixelWidth, bmp.PixelHeight, 2500);
                     Clipboard.SetImage(bmp);
                 }
                 else
                 {
-                    Clipboard.SetText(item.Content ?? string.Empty);
+                    string priorClip = string.Empty;
+                    try { if (Clipboard.ContainsText()) priorClip = Clipboard.GetText(); } catch { }
+                    string expanded = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content ?? string.Empty, priorClip);
+                    Clipboard.SetText(expanded);
                 }
 
                 ShowToast(LocalizationService.Instance.Get("ToastCopied"));
+                ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService?.CurrentSettings);
             }
             catch (Exception ex)
             {
@@ -1506,6 +1733,25 @@ namespace ClipVault
             }
         }
 
+        private void BtnMainExtractOcr_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item && !string.IsNullOrWhiteSpace(item.OcrText))
+            {
+                try
+                {
+                    _monitorService.Pause();
+                    Clipboard.SetText(item.OcrText);
+                    ShowToast(LocalizationService.Instance.Get("OcrCopiedToast", item.OcrText.Length));
+                }
+                catch { }
+                finally
+                {
+                    _monitorService.Resume();
+                }
+            }
+        }
+
         private void ShowCardContextMenu(ClipboardItem item, FrameworkElement placementTarget, bool isFromRightClick)
         {
             if (item == null) return;
@@ -1591,6 +1837,56 @@ namespace ClipVault
 
             menu.Items.Add(pinItem);
             menu.Items.Add(copyItem);
+
+            if (item.IsImage && item.HasOcrText)
+            {
+                var ocrMi = new MenuItem { Header = loc.Get("OcrExtractBtn") };
+                if (itemStyle != null) ocrMi.Style = itemStyle;
+                ocrMi.Click += (s, args) =>
+                {
+                    try
+                    {
+                        _monitorService.Pause();
+                        Clipboard.SetText(item.OcrText);
+                        ShowToast(loc.Get("OcrCopiedToast", item.OcrText.Length));
+                    }
+                    catch { }
+                    finally { _monitorService.Resume(); }
+                };
+                menu.Items.Add(ocrMi);
+            }
+
+            foreach (var tag in _dbService.GetCustomTags())
+            {
+                var tagMi = new MenuItem
+                {
+                    Header = loc.Get("TagAssignTo", tag.TagName)
+                };
+                if (itemStyle != null) tagMi.Style = itemStyle;
+                tagMi.Click += (s, args) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, tag.TagName);
+                    item.CustomTag = tag.TagName;
+                    RefreshCards();
+                };
+                menu.Items.Add(tagMi);
+            }
+
+            if (item.HasCustomTag)
+            {
+                var rmTagMi = new MenuItem
+                {
+                    Header = loc.Get("TagRemoveItem", item.CustomTag)
+                };
+                if (itemStyle != null) rmTagMi.Style = itemStyle;
+                rmTagMi.Click += (s, args) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, string.Empty);
+                    item.CustomTag = string.Empty;
+                    RefreshCards();
+                };
+                menu.Items.Add(rmTagMi);
+            }
 
             if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
             {

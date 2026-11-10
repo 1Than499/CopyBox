@@ -12,6 +12,8 @@ namespace ClipVault.Services
         private string _storageDir = string.Empty;
         private readonly object _lock = new object();
 
+        public event Action? CustomTagsChanged;
+
         public DatabaseService(string storageDir)
         {
             SwitchStorageDirectory(storageDir);
@@ -74,7 +76,17 @@ namespace ClipVault.Services
                         CreatedAt TEXT NOT NULL,
                         IsPinned INTEGER DEFAULT 0,
                         CharCount INTEGER DEFAULT 0,
-                        Sha256 TEXT
+                        Sha256 TEXT,
+                        CustomTag TEXT DEFAULT '',
+                        OcrText TEXT DEFAULT ''
+                    );
+
+                    CREATE TABLE IF NOT EXISTS CustomTags (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        TagName TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                        TagIcon TEXT DEFAULT '🏷️',
+                        SortOrder INTEGER DEFAULT 0,
+                        CreatedAt TEXT NOT NULL
                     );
 
                     CREATE INDEX IF NOT EXISTS idx_items_created ON ClipboardItems(CreatedAt DESC);
@@ -82,6 +94,9 @@ namespace ClipVault.Services
                     CREATE INDEX IF NOT EXISTS idx_items_pinned ON ClipboardItems(IsPinned);
                 ";
                 cmd.ExecuteNonQuery();
+
+                // v3.0 幂等无损迁移：检查旧版数据库是否缺少 CustomTag 与 OcrText 列，按需自动扩展
+                EnsureV3SchemaColumns(conn);
 
                 // 自动清理存量因历史复制 bug 误产生的内部图片路径纯文本垃圾记录 (例如 images\xxxx.png)
                 using var cleanCmd = conn.CreateCommand();
@@ -95,6 +110,51 @@ namespace ClipVault.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to init SQLite: {ex.Message}");
                 App.LogError("SQLite Init Error", ex);
+            }
+        }
+
+        private void EnsureV3SchemaColumns(SqliteConnection conn)
+        {
+            try
+            {
+                bool hasCustomTag = false;
+                bool hasOcrText = false;
+
+                using (var infoCmd = conn.CreateCommand())
+                {
+                    infoCmd.CommandText = "PRAGMA table_info(ClipboardItems);";
+                    using var reader = infoCmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        string colName = reader.GetString(1);
+                        if (string.Equals(colName, "CustomTag", StringComparison.OrdinalIgnoreCase)) hasCustomTag = true;
+                        else if (string.Equals(colName, "OcrText", StringComparison.OrdinalIgnoreCase)) hasOcrText = true;
+                    }
+                }
+
+                if (!hasCustomTag)
+                {
+                    using var alterCmd = conn.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE ClipboardItems ADD COLUMN CustomTag TEXT DEFAULT '';";
+                    alterCmd.ExecuteNonQuery();
+                }
+
+                if (!hasOcrText)
+                {
+                    using var alterCmd = conn.CreateCommand();
+                    alterCmd.CommandText = "ALTER TABLE ClipboardItems ADD COLUMN OcrText TEXT DEFAULT '';";
+                    alterCmd.ExecuteNonQuery();
+                }
+
+                using (var idxCmd = conn.CreateCommand())
+                {
+                    idxCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_items_custom_tag ON ClipboardItems(CustomTag);";
+                    idxCmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureV3SchemaColumns error: {ex.Message}");
             }
         }
 
@@ -218,8 +278,8 @@ namespace ClipVault.Services
                     using var conn = CreateConnection();
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
-                        INSERT INTO ClipboardItems (ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256)
-                        VALUES ($type, $content, $summary, $app, $process, $created, $pinned, $chars, $hash);
+                        INSERT INTO ClipboardItems (ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText)
+                        VALUES ($type, $content, $summary, $app, $process, $created, $pinned, $chars, $hash, $tag, $ocr);
                         SELECT last_insert_rowid();
                     ";
                     cmd.Parameters.AddWithValue("$type", item.ItemType);
@@ -231,6 +291,8 @@ namespace ClipVault.Services
                     cmd.Parameters.AddWithValue("$pinned", item.IsPinned ? 1 : 0);
                     cmd.Parameters.AddWithValue("$chars", item.CharCount);
                     cmd.Parameters.AddWithValue("$hash", item.Sha256 ?? string.Empty);
+                    cmd.Parameters.AddWithValue("$tag", item.CustomTag ?? string.Empty);
+                    cmd.Parameters.AddWithValue("$ocr", item.OcrText ?? string.Empty);
 
                     var idObj = cmd.ExecuteScalar();
                     if (idObj != null && int.TryParse(idObj.ToString(), out int id))
@@ -250,6 +312,9 @@ namespace ClipVault.Services
         public List<ClipboardItem> GetRecentItems(string? search = null, string? category = null, int limit = 100)
         {
             var list = new List<ClipboardItem>();
+            string trimmedSearch = search?.Trim() ?? string.Empty;
+            bool hasSearch = !string.IsNullOrWhiteSpace(trimmedSearch);
+
             lock (_lock)
             {
                 try
@@ -258,10 +323,10 @@ namespace ClipVault.Services
                     using var cmd = conn.CreateCommand();
 
                     var conditions = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(search))
+                    if (hasSearch)
                     {
-                        conditions.Add("(Content LIKE $search OR Summary LIKE $search OR SourceApp LIKE $search)");
-                        cmd.Parameters.AddWithValue("$search", $"%{search}%");
+                        conditions.Add("(Content LIKE $search OR Summary LIKE $search OR SourceApp LIKE $search OR CustomTag LIKE $search OR OcrText LIKE $search)");
+                        cmd.Parameters.AddWithValue("$search", $"%{trimmedSearch}%");
                     }
 
                     if (!string.IsNullOrWhiteSpace(category) && !category.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -269,6 +334,12 @@ namespace ClipVault.Services
                         if (category.Equals("pinned", StringComparison.OrdinalIgnoreCase))
                         {
                             conditions.Add("IsPinned = 1");
+                        }
+                        else if (category.StartsWith("tag:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string tagName = category.Substring(4).Trim();
+                            conditions.Add("LOWER(CustomTag) = LOWER($customTag)");
+                            cmd.Parameters.AddWithValue("$customTag", tagName);
                         }
                         else
                         {
@@ -280,7 +351,7 @@ namespace ClipVault.Services
                     string whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
 
                     cmd.CommandText = $@"
-                        SELECT Id, ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256
+                        SELECT Id, ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText
                         FROM ClipboardItems
                         {whereClause}
                         ORDER BY IsPinned DESC, CreatedAt DESC
@@ -301,12 +372,19 @@ namespace ClipVault.Services
                             CreatedAt = DateTime.TryParse(reader.GetString(6), out var dt) ? dt : DateTime.Now,
                             IsPinned = reader.GetInt32(7) == 1,
                             CharCount = reader.GetInt32(8),
-                            Sha256 = reader.IsDBNull(9) ? "" : reader.GetString(9)
+                            Sha256 = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                            CustomTag = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                            OcrText = reader.IsDBNull(11) ? "" : reader.GetString(11)
                         };
 
                         if (it.IsImage)
                         {
                             it.FullImagePath = Path.Combine(_storageDir, it.Content);
+                            if (hasSearch && !string.IsNullOrWhiteSpace(it.OcrText) &&
+                                it.OcrText.Contains(trimmedSearch, StringComparison.OrdinalIgnoreCase))
+                            {
+                                it.IsOcrKeywordMatched = true;
+                            }
                         }
 
                         list.Add(it);
@@ -385,12 +463,173 @@ namespace ClipVault.Services
                 {
                     using var conn = CreateConnection();
                     using var cmd = conn.CreateCommand();
-                    cmd.CommandText = "DELETE FROM ClipboardItems WHERE IsPinned = 0;";
+                    // v3.0 保护机制：置顶项目或已归入自定义标签分组的项目免于一键清空
+                    cmd.CommandText = "DELETE FROM ClipboardItems WHERE IsPinned = 0 AND (CustomTag IS NULL OR CustomTag = '');";
                     cmd.ExecuteNonQuery();
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to clear: {ex.Message}");
+                }
+            }
+        }
+
+        // ==================== v3.0 自定义标签分组与离线 OCR 数据库接口 ====================
+
+        public List<CustomTagItem> GetCustomTags()
+        {
+            var tags = new List<CustomTagItem>();
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT Id, TagName, TagIcon, SortOrder, CreatedAt FROM CustomTags ORDER BY SortOrder ASC, Id ASC;";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        tags.Add(new CustomTagItem
+                        {
+                            Id = reader.GetInt32(0),
+                            TagName = reader.GetString(1),
+                            TagIcon = reader.IsDBNull(2) ? "🏷️" : reader.GetString(2),
+                            SortOrder = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                            CreatedAt = (!reader.IsDBNull(4) && DateTime.TryParse(reader.GetString(4), out var dt)) ? dt : DateTime.Now
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to read custom tags: {ex.Message}");
+                }
+            }
+            return tags;
+        }
+
+        public bool AddCustomTag(string tagName, string tagIcon = "🏷️")
+        {
+            string cleanName = tagName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(cleanName)) return false;
+
+            string cleanIcon = string.IsNullOrWhiteSpace(tagIcon) ? "🏷️" : tagIcon.Trim();
+            bool added = false;
+
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var checkCmd = conn.CreateCommand();
+                    checkCmd.CommandText = "SELECT COUNT(*) FROM CustomTags WHERE LOWER(TagName) = LOWER($name);";
+                    checkCmd.Parameters.AddWithValue("$name", cleanName);
+                    long existing = Convert.ToInt64(checkCmd.ExecuteScalar());
+                    if (existing > 0) return false;
+
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        INSERT INTO CustomTags (TagName, TagIcon, SortOrder, CreatedAt)
+                        VALUES ($name, $icon, (SELECT COALESCE(MAX(SortOrder), 0) + 1 FROM CustomTags), $created);
+                    ";
+                    cmd.Parameters.AddWithValue("$name", cleanName);
+                    cmd.Parameters.AddWithValue("$icon", cleanIcon);
+                    cmd.Parameters.AddWithValue("$created", DateTime.Now.ToString("o"));
+                    cmd.ExecuteNonQuery();
+                    added = true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to add custom tag: {ex.Message}");
+                }
+            }
+
+            if (added)
+            {
+                CustomTagsChanged?.Invoke();
+            }
+            return added;
+        }
+
+        public void DeleteCustomTag(string tagName)
+        {
+            string cleanName = tagName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(cleanName)) return;
+
+            bool deleted = false;
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var tx = conn.BeginTransaction();
+
+                    using (var delCmd = conn.CreateCommand())
+                    {
+                        delCmd.Transaction = tx;
+                        delCmd.CommandText = "DELETE FROM CustomTags WHERE LOWER(TagName) = LOWER($name);";
+                        delCmd.Parameters.AddWithValue("$name", cleanName);
+                        delCmd.ExecuteNonQuery();
+                    }
+
+                    using (var clrCmd = conn.CreateCommand())
+                    {
+                        clrCmd.Transaction = tx;
+                        clrCmd.CommandText = "UPDATE ClipboardItems SET CustomTag = '' WHERE LOWER(CustomTag) = LOWER($name);";
+                        clrCmd.Parameters.AddWithValue("$name", cleanName);
+                        clrCmd.ExecuteNonQuery();
+                    }
+
+                    tx.Commit();
+                    deleted = true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to delete custom tag: {ex.Message}");
+                }
+            }
+
+            if (deleted)
+            {
+                CustomTagsChanged?.Invoke();
+            }
+        }
+
+        public void SetItemCustomTag(int itemId, string tagName)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "UPDATE ClipboardItems SET CustomTag = $tag WHERE Id = $id;";
+                    cmd.Parameters.AddWithValue("$tag", tagName?.Trim() ?? string.Empty);
+                    cmd.Parameters.AddWithValue("$id", itemId);
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to set item custom tag: {ex.Message}");
+                }
+            }
+        }
+
+        public void UpdateItemOcrText(int itemId, string ocrText)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "UPDATE ClipboardItems SET OcrText = $ocr WHERE Id = $id;";
+                    cmd.Parameters.AddWithValue("$ocr", ocrText?.Trim() ?? string.Empty);
+                    cmd.Parameters.AddWithValue("$id", itemId);
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to update item OCR text: {ex.Message}");
                 }
             }
         }

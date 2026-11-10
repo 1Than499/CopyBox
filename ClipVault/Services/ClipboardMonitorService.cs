@@ -21,9 +21,49 @@ namespace ClipVault.Services
         private readonly SettingsService _settingsService;
 
         public bool IsPaused { get; set; } = false;
-        public bool IsInternalOperation { get; set; } = false;
+
+        private bool _isInternalOperation = false;
+        private long _suppressUntilTick = 0;
+        private int _lastInternalImageWidth = 0;
+        private int _lastInternalImageHeight = 0;
+        private long _lastInternalImageExpireTick = 0;
+
+        /// <summary>
+        /// 标记当前剪贴板写入为软件内部操作（如快传接收写回、卡片复制、模拟粘贴）。
+        /// Windows OLE / ClipSVC 在写入图片或复合 DataObject 时会在 10~300ms 内连续投递 2~3 次 WM_CLIPBOARDUPDATE，
+        /// 因此启用 900ms 时间窗抑制，杜绝第二次 WM_CLIPBOARDUPDATE 被误当作新截图重复入库。
+        /// </summary>
+        public bool IsInternalOperation
+        {
+            get => _isInternalOperation || Environment.TickCount64 < Interlocked.Read(ref _suppressUntilTick);
+            set
+            {
+                _isInternalOperation = value;
+                if (value)
+                {
+                    Interlocked.Exchange(ref _suppressUntilTick, Environment.TickCount64 + 900);
+                }
+            }
+        }
+
+        public void SuppressInternalWrite(int durationMs = 900)
+        {
+            _isInternalOperation = true;
+            Interlocked.Exchange(ref _suppressUntilTick, Environment.TickCount64 + durationMs);
+        }
+
+        public void NotifyInternalImageWrite(int pixelWidth, int pixelHeight, int durationMs = 2500)
+        {
+            SuppressInternalWrite(durationMs);
+            _lastInternalImageWidth = pixelWidth;
+            _lastInternalImageHeight = pixelHeight;
+            Interlocked.Exchange(ref _lastInternalImageExpireTick, Environment.TickCount64 + durationMs);
+        }
+
+        public AppSettings CurrentSettings => _settingsService.CurrentSettings;
 
         public event Action<ClipboardItem>? ItemCaptured;
+        public event Action<int, string>? ItemOcrCompleted;
 
         // 知名密码管理器进程黑名单
         private static readonly HashSet<string> PasswordManagerProcesses = new(StringComparer.OrdinalIgnoreCase)
@@ -78,7 +118,11 @@ namespace ClipVault.Services
         }
 
         public void Pause() => IsPaused = true;
-        public void Resume() => IsPaused = false;
+        public void Resume()
+        {
+            Interlocked.Exchange(ref _suppressUntilTick, Environment.TickCount64 + 600);
+            IsPaused = false;
+        }
 
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
@@ -96,8 +140,8 @@ namespace ClipVault.Services
 
             if (IsInternalOperation)
             {
-                // 内部模拟粘贴写入的剪贴板，跳过本次监听并重置标记
-                IsInternalOperation = false;
+                // 内部写入（快传图片、复制卡片、模拟粘贴）触发的剪贴板消息（可能连续到达多次），在时间窗内全部跳过
+                _isInternalOperation = false;
                 return;
             }
 
@@ -157,6 +201,28 @@ namespace ClipVault.Services
             // 写入本地数据库并触发事件
             _dbService.InsertItem(capturedItem);
             ItemCaptured?.Invoke(capturedItem);
+            ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService.CurrentSettings);
+
+            // v3.0：若为图片/截图，后台低优先级异步执行 Windows 原生离线 OCR 文字提取并回写数据库
+            if (capturedItem.IsImage && capturedItem.Id > 0 && !string.IsNullOrWhiteSpace(capturedItem.FullImagePath))
+            {
+                int capturedId = capturedItem.Id;
+                string imgPath = capturedItem.FullImagePath;
+                _ = System.Threading.Tasks.Task.Run(async () =>
+                {
+                    try
+                    {
+                        string ocrText = await NativeOcrService.RecognizeImageFileAsync(imgPath).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(ocrText))
+                        {
+                            capturedItem.OcrText = ocrText;
+                            _dbService.UpdateItemOcrText(capturedId, ocrText);
+                            ItemOcrCompleted?.Invoke(capturedId, ocrText);
+                        }
+                    }
+                    catch { }
+                });
+            }
         }
 
         private ClipboardItem? ExtractClipboardData(string sourceApp, string sourceProcess)
@@ -170,6 +236,13 @@ namespace ClipVault.Services
                 var bitmap = Clipboard.GetImage();
                 if (bitmap != null)
                 {
+                    if (Environment.TickCount64 < Interlocked.Read(ref _lastInternalImageExpireTick) &&
+                        bitmap.PixelWidth == _lastInternalImageWidth &&
+                        bitmap.PixelHeight == _lastInternalImageHeight)
+                    {
+                        return null;
+                    }
+
                     // 智能纠正 Windows GDI / 微信 / QQ 截图 32bpp DIB 的伪 Alpha (全 0 透明度修正为 255)
                     bitmap = FixDIBAlphaChannel(bitmap) ?? bitmap;
 

@@ -369,5 +369,88 @@ namespace ClipVault.Interop
 
             return false;
         }
+
+        // ==================== v3.0 Windows 11 原生云母 (Mica) / 亚克力 (Acrylic) DWM 硬件材质 API ====================
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+        // DWMSBT 枚举值: 1 = Disable(Auto/None), 2 = MainWindow(Mica), 3 = TransientWindow(Acrylic), 4 = TabbedWindow
+        public const int DWMSBT_DISABLE = 1;
+        public const int DWMSBT_MAINWINDOW_MICA = 2;
+        public const int DWMSBT_TRANSIENTWINDOW_ACRYLIC = 3;
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ACCENT_POLICY
+        {
+            public int AccentState;
+            public int AccentFlags;
+            public uint GradientColor;
+            public int AnimationId;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWCOMPOSITIONATTRIBDATA
+        {
+            public int Attribute;
+            public IntPtr Data;
+            public int SizeOfData;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WINDOWCOMPOSITIONATTRIBDATA data);
+
+        /// <summary>
+        /// 应用 Windows 11 原生云母 (Mica) 或亚克力 (Acrylic) 硬件合成背景，并在 Win10 下自动优雅降级
+        /// </summary>
+        public static void ApplyWindowBackdrop(IntPtr hwnd, string? backdropMode, bool isDark)
+        {
+            if (hwnd == IntPtr.Zero) return;
+
+            try
+            {
+                int darkVal = isDark ? 1 : 0;
+                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkVal, sizeof(int));
+
+                string mode = backdropMode ?? "Default";
+                int dwmBackdrop = mode.Equals("Mica", StringComparison.OrdinalIgnoreCase)
+                    ? DWMSBT_MAINWINDOW_MICA
+                    : mode.Equals("Acrylic", StringComparison.OrdinalIgnoreCase)
+                        ? DWMSBT_TRANSIENTWINDOW_ACRYLIC
+                        : DWMSBT_DISABLE;
+
+                DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref dwmBackdrop, sizeof(int));
+
+                // 针对 AllowsTransparency="True" 的分层窗口，同步配置 DWM 底层高斯模糊层，确保 120FPS 零鼠标延迟
+                var accent = new ACCENT_POLICY
+                {
+                    AccentState = (dwmBackdrop == DWMSBT_DISABLE) ? 0 : 3, // 3 = ACCENT_ENABLE_BLURBEHIND (无 Win10 拖拽卡顿)
+                    AccentFlags = 2,
+                    GradientColor = isDark ? 0x99141722u : 0x99F8FAFCu
+                };
+
+                int structSize = Marshal.SizeOf(accent);
+                IntPtr accentPtr = Marshal.AllocHGlobal(structSize);
+                try
+                {
+                    Marshal.StructureToPtr(accent, accentPtr, false);
+                    var data = new WINDOWCOMPOSITIONATTRIBDATA
+                    {
+                        Attribute = 19, // WCA_ACCENT_POLICY
+                        SizeOfData = structSize,
+                        Data = accentPtr
+                    };
+                    SetWindowCompositionAttribute(hwnd, ref data);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(accentPtr);
+                }
+            }
+            catch { }
+        }
     }
 }
