@@ -15,6 +15,7 @@ namespace ClipVault
         private ClipboardMonitorService? _monitorService;
         private PasteSimulator? _pasteSimulator;
         private HotkeyService? _hotkeyService;
+        private LanSyncService? _lanSyncService;
 
         private MainWindow? _mainWindow;
         private ClipVault.Views.SidebarWindow? _sidebarWindow;
@@ -68,6 +69,7 @@ namespace ClipVault
                 _monitorService = new ClipboardMonitorService(_dbService, _settingsService);
                 _pasteSimulator = new PasteSimulator(_monitorService);
                 _hotkeyService = new HotkeyService(_settingsService);
+                _lanSyncService = new LanSyncService(_dbService, _settingsService, _monitorService);
 
                 // 2. 启动剪贴板与热键监听
                 _monitorService.Start();
@@ -317,7 +319,7 @@ namespace ClipVault
         {
             if (_mainWindow == null)
             {
-                _mainWindow = new MainWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!);
+                _mainWindow = new MainWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!, _lanSyncService);
             }
             return _mainWindow;
         }
@@ -326,7 +328,7 @@ namespace ClipVault
         {
             if (_sidebarWindow == null)
             {
-                _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!);
+                _sidebarWindow = new ClipVault.Views.SidebarWindow(_dbService!, _settingsService!, _monitorService!, _pasteSimulator!, _lanSyncService);
             }
             return _sidebarWindow;
         }
@@ -420,6 +422,7 @@ namespace ClipVault
 
         public void ExitApplication()
         {
+            _lanSyncService?.Dispose();
             _monitorService?.Stop();
             _hotkeyService?.Stop();
             if (_notifyIcon != null)
@@ -434,6 +437,7 @@ namespace ClipVault
 
         protected override void OnExit(ExitEventArgs e)
         {
+            _lanSyncService?.Dispose();
             _monitorService?.Stop();
             _hotkeyService?.Stop();
             if (_notifyIcon != null)

@@ -313,14 +313,13 @@ namespace ClipVault.Views
         protected override void OnClosed(EventArgs e)
         {
             _edgeDetectTimer?.Stop();
-            _lanSyncService?.Dispose();
             StopGlobalMouseHook();
             base.OnClosed(e);
         }
 
         #endregion
 
-        public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
+        public SidebarWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator, LanSyncService? lanSyncService = null)
         {
             _isInternalSettingUpdate = true;
             _dbService = dbService;
@@ -328,7 +327,7 @@ namespace ClipVault.Views
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
             _mediaService = new SystemMediaService();
-            _lanSyncService = new LanSyncService(_dbService, _settingsService, _monitorService);
+            _lanSyncService = lanSyncService ?? new LanSyncService(_dbService, _settingsService, _monitorService);
 
             InitializeComponent();
 
@@ -1008,6 +1007,46 @@ namespace ClipVault.Views
                     this.Resources["ScratchpadInputBorderBrush"] = new SolidColorBrush(Color.FromRgb(0x23, 0x2C, 0x3D));
                     this.Resources["QueueBarBgBrush"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x2A, 0x42));
                     break;
+            }
+
+            // Win11 云母 (Mica) / 亚克力 (Acrylic) 圆角内裁剪多层光泽材质渲染（0 外溢白边）
+            if (!string.Equals(theme, "CustomImage", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isLightTheme = string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase);
+                if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
+                {
+                    byte micaAlpha = (byte)Math.Clamp((int)bgAlpha, 185, 242);
+                    var micaBrush = isLightTheme
+                        ? new LinearGradientBrush(
+                            Color.FromArgb(micaAlpha, 0xF0, 0xF6, 0xFF),
+                            Color.FromArgb(micaAlpha, 0xF5, 0xF3, 0xFF),
+                            new Point(0, 0), new Point(1, 1))
+                        : new LinearGradientBrush(
+                            Color.FromArgb(micaAlpha, 0x13, 0x19, 0x29),
+                            Color.FromArgb(micaAlpha, 0x18, 0x16, 0x2B),
+                            new Point(0, 0), new Point(1, 1));
+                    micaBrush.GradientStops.Add(new GradientStop(
+                        isLightTheme ? Color.FromArgb(micaAlpha, 0xEB, 0xF4, 0xFD) : Color.FromArgb(micaAlpha, 0x15, 0x20, 0x33), 0.5));
+                    this.Resources["SidebarBgBrush"] = micaBrush;
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(isLightTheme ? Color.FromRgb(0xB8, 0xCA, 0xE0) : Color.FromRgb(0x36, 0x48, 0x66));
+                }
+                else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
+                {
+                    byte acrylicAlpha = (byte)Math.Clamp((int)bgAlpha, 145, 218);
+                    var acrylicBrush = isLightTheme
+                        ? new LinearGradientBrush(
+                            Color.FromArgb(acrylicAlpha, 0xE6, 0xF2, 0xFF),
+                            Color.FromArgb(acrylicAlpha, 0xF3, 0xEE, 0xFF),
+                            new Point(0, 0), new Point(1, 1))
+                        : new LinearGradientBrush(
+                            Color.FromArgb(acrylicAlpha, 0x10, 0x18, 0x27),
+                            Color.FromArgb(acrylicAlpha, 0x15, 0x1F, 0x34),
+                            new Point(0, 0), new Point(1, 1));
+                    acrylicBrush.GradientStops.Add(new GradientStop(
+                        isLightTheme ? Color.FromArgb(acrylicAlpha, 0xFF, 0xFF, 0xFF) : Color.FromArgb(acrylicAlpha, 0x1B, 0x28, 0x40), 0.45));
+                    this.Resources["SidebarBgBrush"] = acrylicBrush;
+                    this.Resources["SidebarBorderBrush"] = new SolidColorBrush(isLightTheme ? Color.FromRgb(0x93, 0xC5, 0xFD) : Color.FromRgb(0x47, 0x64, 0x8C));
+                }
             }
 
             // 更新视图切换栏指示与高亮

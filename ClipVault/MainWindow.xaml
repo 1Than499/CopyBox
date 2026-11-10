@@ -330,15 +330,26 @@
                 <RowDefinition Height="Auto"/> <!-- 4. 底部快捷指南 -->
             </Grid.RowDefinitions>
 
-            <!-- 顶栏极简微型控制行 (完全消除粗大标题，保留缩小与关闭) -->
+            <!-- 顶栏极简微型控制行 (左侧品牌与版本徽标 + 右侧控制胶囊岛) -->
             <Grid Grid.Row="0" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- 左侧纯净拖拽区 -->
-                <Rectangle Grid.Column="0" Fill="Transparent"/>
+                <!-- 左侧品牌标识与拖拽区 -->
+                <Grid Grid.Column="0">
+                    <Rectangle Fill="Transparent"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,0,0" IsHitTestVisible="False">
+                        <Border Width="18" Height="18" CornerRadius="5" Background="#FF0078D4" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <TextBlock Text="📋" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/>
+                        </Border>
+                        <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="12.5" Foreground="{DynamicResource TitleTextBrush}" VerticalAlignment="Center"/>
+                        <Border Background="#1F0078D4" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtMainAppVersion" Text="v3.0.0" FontSize="9.5" Foreground="#38BDF8" FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                </Grid>
 
                 <!-- 右侧极小幽灵控制组 (实体胶囊岛防透底座，保证低透明度下极其醒目) -->
                 <Border Grid.Column="1" 
@@ -348,6 +359,13 @@
                         CornerRadius="7" 
                         Padding="3,1">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="BtnMainLanSync" 
+                                Content="📱" 
+                                Style="{StaticResource TopIconButtonStyle}"
+                                Click="BtnMainLanSync_Click" 
+                                ToolTip="📱 局域网双向快传 (手机扫码免安装秒传文字/图片)"
+                                Margin="0,0,2,0"/>
+
                         <Button x:Name="BtnQuickTheme" 
                                 Content="🌙" 
                                 Style="{StaticResource TopIconButtonStyle}"
@@ -452,6 +470,9 @@
                     </Button>
                     <!-- v3.0 用户自定义标签动态药丸容器 -->
                     <StackPanel x:Name="MainCustomTagsPanel" Orientation="Horizontal" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnMainAddTag" Content="＋" Click="BtnMainAddTag_Click" ToolTip="新建自定义标签分组 / 动态模板 (支持 {{date}} 等宏变量，归入标签的条目免受清空历史影响)" Padding="10,4" Margin="0,0,4,0" Background="#1A0078D4" Foreground="#38BDF8" BorderBrush="#440078D4" BorderThickness="1" FontSize="12" FontWeight="Bold" Cursor="Hand">
+                        <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="14"/></Style></Button.Resources>
+                    </Button>
                 </StackPanel>
             </ScrollViewer>
 
@@ -478,6 +499,8 @@
                             <Setter Property="Padding" Value="0"/>
                             <Setter Property="Margin" Value="7,7,7,7"/>
                             <Setter Property="Background" Value="Transparent"/>
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="MainCard_PreviewMouseLeftButtonDown"/>
+                            <EventSetter Event="PreviewMouseMove" Handler="MainCard_PreviewMouseMove"/>
                             <EventSetter Event="PreviewMouseRightButtonDown" Handler="ListBoxItem_PreviewMouseRightButtonDown"/>
                             <EventSetter Event="MouseRightButtonUp" Handler="ListBoxItem_MouseRightButtonUp"/>
                             <Setter Property="Template">
@@ -568,7 +591,7 @@
                                         </Border>
                                         <Button Content="{Binding OcrExtractBtnText}"
                                                 ToolTip="{Binding OcrExtractTooltip}"
-                                                Visibility="{Binding HasOcrText, Converter={StaticResource BoolToVis}}"
+                                                Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}"
                                                 Click="BtnMainExtractOcr_Click"
                                                 Background="#220EA5E9" Foreground="#38BDF8" BorderBrush="#550EA5E9" BorderThickness="1"
                                                 FontSize="9" FontWeight="SemiBold" Padding="4,1" Margin="0,0,4,0" Cursor="Hand"/>
@@ -583,6 +606,13 @@
                                                 Visibility="{Binding ShowSensitiveBadge, Converter={StaticResource BoolToVis}}"
                                                 Click="BtnMainToggleMask_Click"
                                                 Background="Transparent" BorderThickness="0" Foreground="#FBBF24"
+                                                FontSize="10.5" Padding="3,0" Margin="0,0,4,0" Cursor="Hand"/>
+
+                                        <!-- v3.0 快捷归入标签分组按钮 -->
+                                        <Button Content="🏷"
+                                                ToolTip="归入自定义标签分组 (归入后免受清空历史影响)"
+                                                Click="BtnMainCardAssignTag_Click"
+                                                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubTextBrush}"
                                                 FontSize="10.5" Padding="3,0" Margin="0,0,4,0" Cursor="Hand"/>
 
                                         <!-- 快捷角标 [2], [3] (概念图右侧同款) -->
@@ -932,6 +962,126 @@
                 </Grid>
             </Border>
             </Grid>
+
+            <!-- 7. v3.0 新建自定义标签分组与动态模板弹窗 -->
+            <Border x:Name="MainAddTagOverlay" Grid.Row="0" Grid.RowSpan="5" Background="#AA070A0F" CornerRadius="14" Visibility="Collapsed" Panel.ZIndex="100">
+                <Border Width="360" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Background="{DynamicResource MenuBgBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}"
+                        BorderThickness="1" CornerRadius="12" Padding="18,16">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="Black" Opacity="0.55"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <TextBlock x:Name="TxtMainAddTagDialogTitle" Text="🏷 新建自定义标签与动态模板" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TitleTextBrush}" Margin="0,0,0,6"/>
+                        <TextBlock x:Name="TxtMainAddTagDialogSub" Text="归入自定义标签的记录将永久保留，清空未置顶历史时绝不误删。还可直接创建带动态宏的常用语模板：" FontSize="11" Foreground="{DynamicResource SubTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock x:Name="TxtMainAddTagIconLabel" Text="图标" FontSize="10.5" Foreground="{DynamicResource SubTextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtMainNewTagIcon" Text="🔖" MaxLength="4" FontSize="13" HorizontalContentAlignment="Center" Padding="4,6"
+                                         Background="{DynamicResource SearchBgBrush}" Foreground="{DynamicResource TitleTextBrush}"
+                                         BorderBrush="{DynamicResource SearchBorderBrush}" BorderThickness="1"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock x:Name="TxtMainAddTagNameLabel" Text="标签名称 (如：常用语 / 账号 / 灵感)" FontSize="10.5" Foreground="{DynamicResource SubTextBrush}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtMainNewTagName" MaxLength="14" FontSize="12.5" Padding="8,6"
+                                         Background="{DynamicResource SearchBgBrush}" Foreground="{DynamicResource TitleTextBrush}"
+                                         BorderBrush="{DynamicResource SearchBorderBrush}" BorderThickness="1"
+                                         KeyDown="TxtMainNewTagName_KeyDown"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock x:Name="TxtMainAddTagTemplateLabel" Text="可选：新建一条专属动态模板卡片 (留空则仅创建标签分组)" FontSize="10.5" Foreground="{DynamicResource SubTextBrush}" Margin="0,0,0,4"/>
+                        <TextBox x:Name="TxtMainNewTagTemplateContent" Height="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                 FontSize="11.5" Padding="8,6" Margin="0,0,0,6"
+                                 Background="{DynamicResource SearchBgBrush}" Foreground="{DynamicResource TitleTextBrush}"
+                                 BorderBrush="{DynamicResource SearchBorderBrush}" BorderThickness="1"/>
+
+                        <WrapPanel Margin="0,0,0,12">
+                            <TextBlock Text="点击插入动态变量：" FontSize="10" Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center" Margin="0,0,4,4"/>
+                            <Button Content="{}{{date}}" Tag="{}{{date}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="当前日期 (yyyy-MM-dd)"/>
+                            <Button Content="{}{{time}}" Tag="{}{{time}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="当前时间 (HH:mm:ss)"/>
+                            <Button Content="{}{{datetime}}" Tag="{}{{datetime}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="完整日期时间"/>
+                            <Button Content="{}{{weekday}}" Tag="{}{{weekday}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="当前星期几"/>
+                            <Button Content="{}{{clipboard}}" Tag="{}{{clipboard}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="粘贴前系统剪贴板中的文本"/>
+                            <Button Content="{}{{guid}}" Tag="{}{{guid}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="随机生成唯一 UUID"/>
+                        </WrapPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnMainCancelAddTag" Grid.Column="0" Content="取消" Click="BtnMainCancelAddTag_Click" Padding="0,7" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource CardTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="12" Cursor="Hand">
+                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
+                            </Button>
+                            <Button x:Name="BtnMainConfirmAddTag" Grid.Column="2" Content="创建" Click="BtnMainConfirmAddTag_Click" Padding="0,7" Background="#FF0078D4" Foreground="White" BorderThickness="0" FontSize="12" FontWeight="SemiBold" Cursor="Hand">
+                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Border>
+
+            <!-- 8. v3.0 局域网离线双向快传 (LAN Quick Drop) 扫码浮层 -->
+            <Border x:Name="MainLanSyncOverlay" Grid.Row="0" Grid.RowSpan="5" Background="#B8070A0F" CornerRadius="14" Visibility="Collapsed" Panel.ZIndex="105">
+                <Border Width="360" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Background="{DynamicResource MenuBgBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}"
+                        BorderThickness="1" CornerRadius="14" Padding="18,16">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="28" ShadowDepth="6" Direction="270" Color="Black" Opacity="0.6"/>
+                    </Border.Effect>
+                    <StackPanel>
+                        <Grid Margin="0,0,0,6">
+                            <TextBlock x:Name="TxtMainLanSyncTitle" Text="📱 局域网离线双向快传" FontWeight="Bold" FontSize="14.5" Foreground="{DynamicResource TitleTextBrush}" VerticalAlignment="Center"/>
+                            <Button Content="✕" Click="BtnMainHideLanSyncOverlay_Click" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubTextBrush}" FontSize="13" Cursor="Hand" Padding="4,0"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtMainLanSyncSubTitle" Text="手机与电脑处于同一 Wi-Fi / 热点下，使用手机相机或浏览器扫码即可双向秒传文字与图片（100% 局域网直连，不经任何外网服务器）" FontSize="11" Foreground="{DynamicResource SubTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                        <!-- 二维码画布区 -->
+                        <Border Background="White" CornerRadius="12" Padding="10" HorizontalAlignment="Center" Margin="0,0,0,10" BorderBrush="#330078D4" BorderThickness="1">
+                            <Image x:Name="ImgMainLanQrCode" Width="176" Height="176" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                        </Border>
+
+                        <!-- 局域网 URL 与一键复制 -->
+                        <Border Background="{DynamicResource SearchBgBrush}" BorderBrush="{DynamicResource SearchBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TxtMainLanSyncUrl" Grid.Column="0" Text="http://192.168.x.x:58620/..." FontSize="10.5" FontFamily="Consolas" Foreground="#38BDF8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                <Button x:Name="BtnMainCopyLanUrl" Grid.Column="1" Content="📋 复制" Click="BtnMainCopyLanUrl_Click" FontSize="10.5" Padding="8,3" Margin="6,0,0,0" Background="#FF0078D4" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                    <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="5"/></Style></Button.Resources>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock x:Name="TxtMainLanSyncLiveStatus" Text="🟢 局域网快传已就绪，等待手机连接..." FontSize="11" Foreground="#34D399" TextWrapping="Wrap" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="BtnMainKeepLanSyncRunning" Grid.Column="0" Content="后台保持运行" Click="BtnMainHideLanSyncOverlay_Click" Padding="0,7" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource CardTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontSize="11.5" Cursor="Hand">
+                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
+                            </Button>
+                            <Button x:Name="BtnMainStopLanSync" Grid.Column="2" Content="关闭快传服务" Click="BtnMainStopLanSync_Click" Padding="0,7" Background="#28EF4444" Foreground="#F87171" BorderBrush="#55EF4444" BorderThickness="1" FontSize="11.5" FontWeight="SemiBold" Cursor="Hand">
+                                <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="6"/></Style></Button.Resources>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Border>
         </Grid>
         </Grid>
     </Border>

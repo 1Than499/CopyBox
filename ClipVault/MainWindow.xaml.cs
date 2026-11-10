@@ -19,8 +19,13 @@ namespace ClipVault
         private readonly SettingsService _settingsService;
         private readonly ClipboardMonitorService _monitorService;
         private readonly PasteSimulator _pasteSimulator;
+        private readonly LanSyncService _lanSyncService;
 
         private string _currentCategory = "all";
+        private int? _pendingTagAssignItemId = null;
+        private Point _mainCardDragStartPoint;
+        private bool _isMainCardMouseDownForDrag = false;
+        private ClipboardItem? _dragCandidateMainCardItem = null;
         public ObservableCollection<ClipboardItem> DisplayCards { get; } = new();
 
         // 浮层设置卡片在窗口内自由拖拽状态
@@ -33,15 +38,22 @@ namespace ClipVault
         private string? _cachedMainWallpaperPath;
         private BitmapImage? _cachedMainWallpaperBitmap;
 
-        public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator)
+        public MainWindow(DatabaseService dbService, SettingsService settingsService, ClipboardMonitorService monitorService, PasteSimulator pasteSimulator, LanSyncService? lanSyncService = null)
         {
             _dbService = dbService;
             _settingsService = settingsService;
             _monitorService = monitorService;
             _pasteSimulator = pasteSimulator;
+            _lanSyncService = lanSyncService ?? new LanSyncService(_dbService, _settingsService, _monitorService);
             _isInternalSettingUpdate = true;
 
             InitializeComponent();
+
+            if (TxtMainAppVersion != null)
+            {
+                var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                TxtMainAppVersion.Text = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v3.0.0";
+            }
 
             // 加载应用图标
             try
@@ -68,6 +80,30 @@ namespace ClipVault
                 {
                     RefreshMainCustomTagPills();
                     if (this.IsVisible) RefreshCards();
+                });
+            };
+
+            _lanSyncService.ItemReceivedFromLan += (item) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    RefreshCards();
+                    UpdateStorageInfo();
+                    ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
+                        ? "📱 Received item from Phone LAN Drop"
+                        : "📱 已收到手机局域网快传内容");
+                });
+            };
+
+            _lanSyncService.StatusMessageChanged += (msg) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (TxtMainLanSyncLiveStatus != null)
+                    {
+                        TxtMainLanSyncLiveStatus.Text = msg;
+                    }
+                    UpdateMainLanSyncBtnHighlight();
                 });
             };
 
@@ -126,6 +162,8 @@ namespace ClipVault
                 if (_settingsService != null && 
                     _settingsService.CurrentSettings.HideOnDeactivate &&
                     (SettingsOverlayHost == null || SettingsOverlayHost.Visibility != Visibility.Visible) && 
+                    (MainAddTagOverlay == null || MainAddTagOverlay.Visibility != Visibility.Visible) &&
+                    (MainLanSyncOverlay == null || MainLanSyncOverlay.Visibility != Visibility.Visible) &&
                     this.WindowState != WindowState.Minimized)
                 {
                     this.Hide();
@@ -295,6 +333,8 @@ namespace ClipVault
             if (TabStarred != null) TabStarred.Content = loc.Get("TabStarred");
 
             // 顶栏按钮 ToolTip
+            if (BtnMainLanSync != null) BtnMainLanSync.ToolTip = loc.Get("LanSyncBtnTip");
+            if (BtnMainAddTag != null) BtnMainAddTag.ToolTip = loc.Get("TagAddBtnTip");
             if (BtnToggleSettings != null) BtnToggleSettings.ToolTip = loc.Get("ToolTipSettings");
             if (BtnMinimizeWindow != null) BtnMinimizeWindow.ToolTip = loc.Get("ToolTipMinimize");
             if (BtnQuickTheme != null)
@@ -303,6 +343,21 @@ namespace ClipVault
                 BtnQuickTheme.ToolTip = isDark ? loc.Get("ToolTipThemeLight") : loc.Get("ToolTipThemeDark");
             }
             UpdateCloseButtonToolTip();
+
+            // 自定义标签与局域网快传浮层国际化
+            if (TxtMainAddTagDialogTitle != null) TxtMainAddTagDialogTitle.Text = loc.Get("TagAddDialogTitle");
+            if (TxtMainAddTagDialogSub != null) TxtMainAddTagDialogSub.Text = loc.Get("TagAddDialogSub");
+            if (TxtMainAddTagIconLabel != null) TxtMainAddTagIconLabel.Text = loc.Get("TagIconLabel");
+            if (TxtMainAddTagNameLabel != null) TxtMainAddTagNameLabel.Text = loc.Get("TagNameLabel");
+            if (TxtMainAddTagTemplateLabel != null) TxtMainAddTagTemplateLabel.Text = loc.Get("TagTemplateLabel");
+            if (BtnMainCancelAddTag != null) BtnMainCancelAddTag.Content = loc.Get("BtnCancel");
+            if (BtnMainConfirmAddTag != null) BtnMainConfirmAddTag.Content = loc.Get("BtnCreate");
+
+            if (TxtMainLanSyncTitle != null) TxtMainLanSyncTitle.Text = loc.Get("LanSyncTitle");
+            if (TxtMainLanSyncSubTitle != null) TxtMainLanSyncSubTitle.Text = loc.Get("LanSyncSubTitle");
+            if (BtnMainCopyLanUrl != null) BtnMainCopyLanUrl.Content = loc.Get("LanSyncCopyUrl");
+            if (BtnMainKeepLanSyncRunning != null) BtnMainKeepLanSyncRunning.Content = loc.Get("LanSyncKeepRunning");
+            if (BtnMainStopLanSync != null) BtnMainStopLanSync.Content = loc.Get("LanSyncStopBtn");
 
             // 设置浮层面板
             if (TxtSettingsTitle != null) TxtSettingsTitle.Text = loc.Get("SettingsTitle");
@@ -473,6 +528,10 @@ namespace ClipVault
 
             SearchInputBox.Text = string.Empty;
             if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Collapsed;
+            if (MainAddTagOverlay != null) MainAddTagOverlay.Visibility = Visibility.Collapsed;
+            if (MainLanSyncOverlay != null) MainLanSyncOverlay.Visibility = Visibility.Collapsed;
+            UpdateMainLanSyncBtnHighlight();
+            RefreshMainCustomTagPills();
             RefreshCards();
 
             // 根据多显示器策略在目标显示器工作区居中展示
@@ -773,6 +832,54 @@ namespace ClipVault
                     this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 24, 28, 37));
                     this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(40, 50, 66));
                     this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(51, 64, 80));
+                }
+
+                // Windows 11 原生云母 (Mica) / 亚克力 (Acrylic) 圆角材质渐变覆写 (100% 裁剪于 MainBorder CornerRadius="16" 内，彻底消除窗口四周白边)
+                if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (isLight)
+                    {
+                        var micaLight = new LinearGradientBrush(
+                            Color.FromArgb(bgAlpha, 238, 244, 252),
+                            Color.FromArgb(bgAlpha, 245, 241, 251),
+                            new Point(0, 0), new Point(1, 1));
+                        micaLight.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 241, 247, 253), 0.5));
+                        MainBorder.Background = micaLight;
+                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(186, 214, 247));
+                    }
+                    else
+                    {
+                        var micaDark = new LinearGradientBrush(
+                            Color.FromArgb(bgAlpha, 19, 25, 38),
+                            Color.FromArgb(bgAlpha, 26, 22, 39),
+                            new Point(0, 0), new Point(1, 1));
+                        micaDark.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 22, 29, 44), 0.5));
+                        MainBorder.Background = micaDark;
+                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(59, 82, 116));
+                    }
+                }
+                else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (isLight)
+                    {
+                        var acrylicLight = new LinearGradientBrush(
+                            Color.FromArgb(bgAlpha, 232, 243, 254),
+                            Color.FromArgb(bgAlpha, 238, 249, 255),
+                            new Point(0, 0), new Point(1, 1));
+                        acrylicLight.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 248, 252, 255), 0.45));
+                        MainBorder.Background = acrylicLight;
+                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(125, 211, 252));
+                    }
+                    else
+                    {
+                        var acrylicDark = new LinearGradientBrush(
+                            Color.FromArgb(bgAlpha, 14, 24, 40),
+                            Color.FromArgb(bgAlpha, 18, 33, 52),
+                            new Point(0, 0), new Point(1, 1));
+                        acrylicDark.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 23, 39, 60), 0.45));
+                        MainBorder.Background = acrylicDark;
+                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+                    }
                 }
             }
 
@@ -1209,7 +1316,7 @@ namespace ClipVault
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // 如果点击在设置浮层内部，绝对不触发主窗口整体拖拽
+            // 如果点击在设置浮层或弹窗内部，绝对不触发主窗口整体拖拽
             if (SettingsOverlayHost != null && SettingsOverlayHost.Visibility == Visibility.Visible)
             {
                 var pos = e.GetPosition(SettingsOverlayHost);
@@ -1218,6 +1325,11 @@ namespace ClipVault
                 {
                     return;
                 }
+            }
+            if ((MainAddTagOverlay != null && MainAddTagOverlay.Visibility == Visibility.Visible) ||
+                (MainLanSyncOverlay != null && MainLanSyncOverlay.Visibility == Visibility.Visible))
+            {
+                return;
             }
 
             if (e.LeftButton == MouseButtonState.Pressed && 
@@ -1736,19 +1848,371 @@ namespace ClipVault
         private void BtnMainExtractOcr_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
-            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item && !string.IsNullOrWhiteSpace(item.OcrText))
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
             {
-                try
+                _ = ExtractAndCopyMainOcrTextAsync(item);
+            }
+        }
+
+        private async System.Threading.Tasks.Task ExtractAndCopyMainOcrTextAsync(ClipboardItem item)
+        {
+            if (item == null || !item.IsImage) return;
+            var loc = LocalizationService.Instance;
+            bool isEn = loc.CurrentLanguage == "en-US";
+
+            try
+            {
+                string text = item.OcrText ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
+                {
+                    ShowToast(isEn ? "🔍 Recognizing text from image..." : "🔍 正在离线提取图片文字...");
+                    text = await NativeOcrService.RecognizeImageFileAsync(item.FullImagePath);
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        item.OcrText = text;
+                        _dbService.UpdateItemOcrText(item.Id, text);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(text))
                 {
                     _monitorService.Pause();
-                    Clipboard.SetText(item.OcrText);
-                    ShowToast(LocalizationService.Instance.Get("OcrCopiedToast", item.OcrText.Length));
+                    try
+                    {
+                        Clipboard.SetText(text);
+                    }
+                    finally
+                    {
+                        _monitorService.Resume();
+                    }
+                    ShowToast(loc.Get("OcrCopiedToast", text.Length));
+                    ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService?.CurrentSettings);
+                }
+                else
+                {
+                    ShowToast(isEn ? "ℹ️ No recognizable text found in this image" : "ℹ️ 未在图片中识别到有效文字");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowToast($"OCR Error: {ex.Message}");
+            }
+        }
+
+        private void BtnMainLanSync_Click(object sender, RoutedEventArgs e)
+        {
+            OpenMainLanSyncOverlay();
+        }
+
+        private void OpenMainLanSyncOverlay()
+        {
+            if (MainLanSyncOverlay == null) return;
+            var loc = LocalizationService.Instance;
+            bool isEn = loc.CurrentLanguage == "en-US";
+
+            if (!_lanSyncService.IsRunning)
+            {
+                bool ok = _lanSyncService.Start();
+                if (!ok)
+                {
+                    MessageBox.Show(isEn ? "Failed to bind local LAN port." : "局域网快传端口绑定失败，请检查防火墙或更换端口。", isEn ? "LAN Quick Drop Error" : "局域网快传启动失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
+            string url = _lanSyncService.PairingUrl;
+            if (TxtMainLanSyncUrl != null) TxtMainLanSyncUrl.Text = url;
+            if (ImgMainLanQrCode != null && !string.IsNullOrWhiteSpace(url))
+            {
+                ImgMainLanQrCode.Source = ClipVault.Helpers.QrCodeHelper.GenerateQrBitmap(url, 220);
+            }
+            if (TxtMainLanSyncLiveStatus != null)
+            {
+                TxtMainLanSyncLiveStatus.Text = isEn
+                    ? $"🟢 LAN Quick Drop active on port {_lanSyncService.ActivePort} (Waiting for phone...)"
+                    : $"🟢 局域网快传已在端口 {_lanSyncService.ActivePort} 就绪，手机扫码即连";
+            }
+
+            UpdateMainLanSyncBtnHighlight();
+            MainLanSyncOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void BtnMainCopyLanUrl_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_lanSyncService.PairingUrl)) return;
+            try
+            {
+                _monitorService.Pause();
+                Clipboard.SetText(_lanSyncService.PairingUrl);
+                ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
+                    ? "✓ LAN Quick Drop URL copied"
+                    : "✓ 局域网快传链接已复制");
+            }
+            catch { }
+            finally
+            {
+                _monitorService.Resume();
+            }
+        }
+
+        private void BtnMainHideLanSyncOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (MainLanSyncOverlay != null) MainLanSyncOverlay.Visibility = Visibility.Collapsed;
+            UpdateMainLanSyncBtnHighlight();
+        }
+
+        private void BtnMainStopLanSync_Click(object sender, RoutedEventArgs e)
+        {
+            _lanSyncService.Stop();
+            if (MainLanSyncOverlay != null) MainLanSyncOverlay.Visibility = Visibility.Collapsed;
+            UpdateMainLanSyncBtnHighlight();
+            ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
+                ? "🛑 LAN Quick Drop stopped"
+                : "🛑 局域网快传服务已关闭");
+        }
+
+        private void UpdateMainLanSyncBtnHighlight()
+        {
+            if (BtnMainLanSync == null) return;
+            if (_lanSyncService != null && _lanSyncService.IsRunning)
+            {
+                BtnMainLanSync.Foreground = new SolidColorBrush(Color.FromRgb(52, 211, 153));
+            }
+            else
+            {
+                BtnMainLanSync.ClearValue(Button.ForegroundProperty);
+            }
+        }
+
+        private void BtnMainAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            OpenMainAddTagDialog(null);
+        }
+
+        private void OpenMainAddTagDialog(int? assignToItemId = null)
+        {
+            if (MainAddTagOverlay == null || TxtMainNewTagName == null || TxtMainNewTagIcon == null) return;
+            _pendingTagAssignItemId = assignToItemId;
+            TxtMainNewTagIcon.Text = "🔖";
+            TxtMainNewTagName.Text = string.Empty;
+            if (TxtMainNewTagTemplateContent != null) TxtMainNewTagTemplateContent.Text = string.Empty;
+            MainAddTagOverlay.Visibility = Visibility.Visible;
+            TxtMainNewTagName.Focus();
+        }
+
+        private void BtnMainInsertMacroToken_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string token && TxtMainNewTagTemplateContent != null)
+            {
+                int caret = TxtMainNewTagTemplateContent.CaretIndex;
+                string current = TxtMainNewTagTemplateContent.Text ?? string.Empty;
+                caret = Math.Clamp(caret, 0, current.Length);
+                TxtMainNewTagTemplateContent.Text = current.Insert(caret, token);
+                TxtMainNewTagTemplateContent.CaretIndex = caret + token.Length;
+                TxtMainNewTagTemplateContent.Focus();
+            }
+        }
+
+        private void BtnMainCancelAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            _pendingTagAssignItemId = null;
+            if (MainAddTagOverlay != null) MainAddTagOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnMainConfirmAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            ConfirmMainAddCustomTag();
+        }
+
+        private void TxtMainNewTagName_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                ConfirmMainAddCustomTag();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                _pendingTagAssignItemId = null;
+                if (MainAddTagOverlay != null) MainAddTagOverlay.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+            }
+        }
+
+        private void ConfirmMainAddCustomTag()
+        {
+            if (TxtMainNewTagName == null || TxtMainNewTagIcon == null) return;
+            string name = TxtMainNewTagName.Text.Trim();
+            string icon = string.IsNullOrWhiteSpace(TxtMainNewTagIcon.Text) ? "🔖" : TxtMainNewTagIcon.Text.Trim();
+            string templateText = TxtMainNewTagTemplateContent?.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                TxtMainNewTagName.Focus();
+                return;
+            }
+
+            if (_dbService.AddCustomTag(name, icon))
+            {
+                if (_pendingTagAssignItemId.HasValue)
+                {
+                    _dbService.SetItemCustomTag(_pendingTagAssignItemId.Value, name);
+                }
+
+                if (!string.IsNullOrWhiteSpace(templateText))
+                {
+                    string summary = templateText.Replace("\r", " ").Replace("\n", " ");
+                    if (summary.Length > 50) summary = summary.Substring(0, 50) + "...";
+
+                    using var sha = System.Security.Cryptography.SHA256.Create();
+                    byte[] hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("TPL:" + name + ":" + templateText));
+                    string hash = Convert.ToHexString(hashBytes);
+
+                    var tplItem = new ClipboardItem
+                    {
+                        CreatedAt = DateTime.Now,
+                        ItemType = "Text",
+                        Content = templateText,
+                        Summary = $"{summary} ({templateText.Length} 字符)",
+                        SourceApp = "CopyBox Template",
+                        Sha256 = hash,
+                        CharCount = templateText.Length,
+                        IsPinned = true,
+                        CustomTag = name
+                    };
+                    _dbService.InsertItem(tplItem);
+                }
+
+                _pendingTagAssignItemId = null;
+                if (MainAddTagOverlay != null) MainAddTagOverlay.Visibility = Visibility.Collapsed;
+                _currentCategory = "tag:" + name;
+                RefreshMainCustomTagPills();
+                RefreshCards();
+                UpdateStorageInfo();
+            }
+        }
+
+        private void BtnMainCardAssignTag_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is not FrameworkElement elem || elem.DataContext is not ClipboardItem item) return;
+
+            var loc = LocalizationService.Instance;
+            var menu = new ContextMenu();
+            if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
+            Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+            var tags = _dbService.GetCustomTags();
+            foreach (var tag in tags)
+            {
+                var mi = new MenuItem
+                {
+                    Header = $"{tag.DisplayLabel}" + (string.Equals(item.CustomTag, tag.TagName, StringComparison.OrdinalIgnoreCase) ? "  ✓" : "")
+                };
+                if (itemStyle != null) mi.Style = itemStyle;
+                mi.Click += (_, _) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, tag.TagName);
+                    item.CustomTag = tag.TagName;
+                    RefreshCards();
+                };
+                menu.Items.Add(mi);
+            }
+
+            if (item.HasCustomTag)
+            {
+                if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+                var rmMi = new MenuItem { Header = loc.Get("TagRemoveItem", item.CustomTag) };
+                if (itemStyle != null) rmMi.Style = itemStyle;
+                rmMi.Click += (_, _) =>
+                {
+                    _dbService.SetItemCustomTag(item.Id, string.Empty);
+                    item.CustomTag = string.Empty;
+                    RefreshCards();
+                };
+                menu.Items.Add(rmMi);
+            }
+
+            if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+            var createMi = new MenuItem { Header = "＋ " + loc.Get("TagAddBtnTip") };
+            if (itemStyle != null) createMi.Style = itemStyle;
+            createMi.Click += (_, _) =>
+            {
+                OpenMainAddTagDialog(item.Id);
+            };
+            menu.Items.Add(createMi);
+
+            menu.PlacementTarget = elem;
+            menu.IsOpen = true;
+        }
+
+        private void MainCard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is DependencyObject dep)
+            {
+                var cur = dep;
+                while (cur != null && cur is not ListBoxItem)
+                {
+                    if (cur is Button)
+                    {
+                        _isMainCardMouseDownForDrag = false;
+                        return;
+                    }
+                    cur = VisualTreeHelper.GetParent(cur);
+                }
+            }
+
+            if (sender is ListBoxItem lbi && lbi.DataContext is ClipboardItem item)
+            {
+                _mainCardDragStartPoint = e.GetPosition(this);
+                _isMainCardMouseDownForDrag = true;
+                _dragCandidateMainCardItem = item;
+            }
+        }
+
+        private void MainCard_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isMainCardMouseDownForDrag || e.LeftButton != MouseButtonState.Pressed || _dragCandidateMainCardItem == null)
+            {
+                return;
+            }
+
+            Point currentPos = e.GetPosition(this);
+            Vector diff = _mainCardDragStartPoint - currentPos;
+            if (Math.Abs(diff.X) > 10 || Math.Abs(diff.Y) > 10)
+            {
+                var item = _dragCandidateMainCardItem;
+                _isMainCardMouseDownForDrag = false;
+                _dragCandidateMainCardItem = null;
+
+                try
+                {
+                    var dataObj = new DataObject();
+                    if (item.IsImage && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
+                    {
+                        var files = new System.Collections.Specialized.StringCollection { item.FullImagePath };
+                        dataObj.SetFileDropList(files);
+                        try
+                        {
+                            var bmp = new BitmapImage(new Uri(item.FullImagePath, UriKind.Absolute));
+                            dataObj.SetImage(bmp);
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        string priorClip = string.Empty;
+                        try { if (Clipboard.ContainsText()) priorClip = Clipboard.GetText(); } catch { }
+                        string expanded = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content ?? string.Empty, priorClip);
+                        dataObj.SetText(expanded, TextDataFormat.UnicodeText);
+                        dataObj.SetText(expanded, TextDataFormat.Text);
+                    }
+
+                    if ( sender is DependencyObject dragSource)
+                    {
+                        DragDrop.DoDragDrop(dragSource, dataObj, DragDropEffects.Copy);
+                    }
                 }
                 catch { }
-                finally
-                {
-                    _monitorService.Resume();
-                }
             }
         }
 
@@ -1838,20 +2302,13 @@ namespace ClipVault
             menu.Items.Add(pinItem);
             menu.Items.Add(copyItem);
 
-            if (item.IsImage && item.HasOcrText)
+            if (item.IsImage)
             {
                 var ocrMi = new MenuItem { Header = loc.Get("OcrExtractBtn") };
                 if (itemStyle != null) ocrMi.Style = itemStyle;
                 ocrMi.Click += (s, args) =>
                 {
-                    try
-                    {
-                        _monitorService.Pause();
-                        Clipboard.SetText(item.OcrText);
-                        ShowToast(loc.Get("OcrCopiedToast", item.OcrText.Length));
-                    }
-                    catch { }
-                    finally { _monitorService.Resume(); }
+                    _ = ExtractAndCopyMainOcrTextAsync(item);
                 };
                 menu.Items.Add(ocrMi);
             }
@@ -1887,6 +2344,17 @@ namespace ClipVault
                 };
                 menu.Items.Add(rmTagMi);
             }
+
+            var newTagMi = new MenuItem
+            {
+                Header = "＋ " + loc.Get("TagAddBtnTip")
+            };
+            if (itemStyle != null) newTagMi.Style = itemStyle;
+            newTagMi.Click += (s, args) =>
+            {
+                OpenMainAddTagDialog(item.Id);
+            };
+            menu.Items.Add(newTagMi);
 
             if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
             {

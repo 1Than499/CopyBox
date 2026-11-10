@@ -404,7 +404,8 @@ namespace ClipVault.Interop
         private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WINDOWCOMPOSITIONATTRIBDATA data);
 
         /// <summary>
-        /// 应用 Windows 11 原生云母 (Mica) 或亚克力 (Acrylic) 硬件合成背景，并在 Win10 下自动优雅降级
+        /// 配置窗口沉浸式深浅色属性，并禁用会导致 AllowsTransparency 圆角窗口四周出现矩形白边的旧版未裁剪 DWM 背景属性
+        /// （云母 Mica 与亚克力 Acrylic 的多层漫反射与高透晶体光泽由 WPF 圆角 Border 内部硬件矢量层 100% 裁剪渲染）
         /// </summary>
         public static void ApplyWindowBackdrop(IntPtr hwnd, string? backdropMode, bool isDark)
         {
@@ -415,21 +416,15 @@ namespace ClipVault.Interop
                 int darkVal = isDark ? 1 : 0;
                 DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkVal, sizeof(int));
 
-                string mode = backdropMode ?? "Default";
-                int dwmBackdrop = mode.Equals("Mica", StringComparison.OrdinalIgnoreCase)
-                    ? DWMSBT_MAINWINDOW_MICA
-                    : mode.Equals("Acrylic", StringComparison.OrdinalIgnoreCase)
-                        ? DWMSBT_TRANSIENTWINDOW_ACRYLIC
-                        : DWMSBT_DISABLE;
+                // 始终将 HWND 级未裁剪矩形背景设为 Disable/0，杜绝在 Margin 阴影区和圆角外侧产生四周白边
+                int dwmDisable = DWMSBT_DISABLE;
+                DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref dwmDisable, sizeof(int));
 
-                DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref dwmBackdrop, sizeof(int));
-
-                // 针对 AllowsTransparency="True" 的分层窗口，同步配置 DWM 底层高斯模糊层，确保 120FPS 零鼠标延迟
                 var accent = new ACCENT_POLICY
                 {
-                    AccentState = (dwmBackdrop == DWMSBT_DISABLE) ? 0 : 3, // 3 = ACCENT_ENABLE_BLURBEHIND (无 Win10 拖拽卡顿)
-                    AccentFlags = 2,
-                    GradientColor = isDark ? 0x99141722u : 0x99F8FAFCu
+                    AccentState = 0, // 0 = ACCENT_DISABLED (彻底消除圆角窗口外侧矩形白框)
+                    AccentFlags = 0,
+                    GradientColor = 0
                 };
 
                 int structSize = Marshal.SizeOf(accent);
