@@ -1,19 +1,40 @@
 <div align="center">
 
-# CopyBox 📦 v3.0.0
+# CopyBox 📦 v3.0.4
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v3.0.0-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v3.0.4-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **📜 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **📜 v2.2.1 更新内容** ](#-v221-版本更新说明-whats-new-in-v221) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **⚡ v3.0.4 优化与修复说明** ](#-v304-版本更新说明-whats-new-in-v304) | [ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **📜 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
+
+---
+
+## ⚡ v3.0.4 版本更新说明 (What's New in v3.0.4)
+
+### 1. 🚀 后台内存占用深度优化，静默私有工作集重回 ~18 MB (Background Memory Optimization)
+- **智能分级延迟回收**：新增防抖空闲回收与快速唤醒取消机制（快速反复呼出保持 120FPS 零掉帧；启动完成 `1.5s`、隐藏静默 `2.5s` 或后台截图 OCR 完成后，自动释放闲置 WinRT OCR 引擎、执行 Gen2 + LOH 压缩并调用 `EmptyWorkingSet` 归还冷物理页）；实测后台常驻工作集由 ~196 MB 降至 **~53–55 MB**，Windows 任务管理器私有工作集降至 **~18–19 MB**；
+- **消除大图 LOH 内存碎片**：`NativeOcrService` 改为 `FileStream` 直接流式解码（取消整图 `byte[]` 分配）；`FixDIBAlphaChannel` 使用 `ArrayPool<byte>.Shared` 复用像素缓冲区；`ClipboardItem` 缩略图、程序图标缓存与自定义壁纸增加解码尺寸约束并在隐藏/切主题时清理释放；
+- **系统媒体引擎懒加载与句柄防泄漏**：`SystemMediaService` 延迟至面板呼出后再按需初始化 GSMTC / WASAPI COM 接口，隐藏即停并释放会话与枚举器，修复 `MMDevice`、`AudioSessionControl` 与 `Process` 句柄未释放问题，同时将媒体专辑封面限制为 `96px` 解码。
+
+### 2. 🎯 修复 PPTX / Office 等富文本复制被误判为图片
+- 调整剪贴板格式识别优先级：当剪贴板同时写入 `UnicodeText`/`Text` 与 `Bitmap` 预览图（且非文件拖放）时优先提取真实文本/代码，彻底解决从 PowerPoint 等软件中复制文字却被捕获为图片、无法粘贴纯文本的问题。
+
+### 3. 🧹 简化卡片底部栏展示，移除重复正文文本
+- 优化文本/代码卡片底栏左侧显示逻辑，由重复回显正文内容改为简洁字数统计，视觉更清爽直观。
+
+### 4. 📁 新增“与程序同目录”便携路径跟随选项（v1.0 & v2.0 同步）
+- 数据存储设置新增 **与程序同目录**（默认开启）：开启时自动锁定手动路径修改并始终绑定当前 `CopyBox.exe` 所在运行目录，移动便携软件文件夹后不会再到旧位置重建空目录或数据库；如需固定至其他盘符/路径，取消勾选后可自由指定。
+
+### 5. 🪟 自定义快捷动作支持“优先激活已有运行窗口”
+- 新建自定义快捷动作新增 **若程序已在运行则直接激活已有窗口** 选项：点击外部程序快捷磁贴时自动探测同类运行进程与窗口句柄（支持最小化窗口还原与置前），避免每次点击重复打开多个实例。
 
 ---
 

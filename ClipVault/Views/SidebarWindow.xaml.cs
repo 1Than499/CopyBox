@@ -428,14 +428,23 @@ namespace ClipVault.Views
                 });
             };
 
-            // 窗口隐藏时停止媒体轮询并在后台温和整理工作集（保留热缩略图与 UI 页以保障下次边缘秒出 120FPS 零掉帧）
+            // 窗口隐藏时停止媒体轮询、释放卡片与缩略图缓存并在静默 2.5s 后触发深度堆压缩与工作集归还
             this.IsVisibleChanged += (s, e) =>
             {
                 if (!this.IsVisible)
                 {
                     _brightnessSyncTimer?.Stop();
                     _mediaService?.PausePolling();
-                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
+                    foreach (var it in DisplayCards)
+                    {
+                        it.ClearImageCache();
+                    }
+                    ClipboardItem.ClearThumbnailCache();
+                    if (_programIconCache.Count > 24)
+                    {
+                        _programIconCache.Clear();
+                    }
+                    ClipVault.Helpers.MemoryHelper.ScheduleIdleTrim();
                 }
             };
 
@@ -731,6 +740,7 @@ namespace ClipVault.Views
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.DecodePixelWidth = 800; // 侧边栏宽度 380px，约束解码宽度避免 4K 壁纸长期占用 30MB+ 位图内存
                     bmp.UriSource = new Uri(targetPath, UriKind.Absolute);
                     bmp.EndInit();
                     bmp.Freeze();
@@ -1049,6 +1059,14 @@ namespace ClipVault.Views
                 }
             }
 
+            // 切出自定义图片主题时立即释放壁纸位图缓存
+            if (!string.Equals(theme, "CustomImage", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ImgCustomBg != null) ImgCustomBg.Source = null;
+                _cachedWallpaperBitmap = null;
+                _cachedWallpaperPath = null;
+            }
+
             // 更新视图切换栏指示与高亮
             UpdateTabVisuals(ClipboardViewPanel?.Visibility == Visibility.Visible);
 
@@ -1149,7 +1167,9 @@ namespace ClipVault.Views
             if (TxtLanSyncSubTitle != null) TxtLanSyncSubTitle.Text = loc.Get("LanSyncSubTitle");
             if (BtnStopLanSync != null) BtnStopLanSync.Content = loc.Get("LanSyncCloseBtn");
             if (TxtSetStorageTitle != null) TxtSetStorageTitle.Text = loc.Get("StoragePathTitle");
+            if (ChkFollowAppDir2 != null) ChkFollowAppDir2.Content = loc.Get("FollowAppDirCheck");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
+            UpdateStorageLockUiState(_settingsService?.CurrentSettings.FollowAppDirectory ?? true);
             if (TxtSideCloseActionTitle != null) TxtSideCloseActionTitle.Text = loc.Get("CloseActionTitle");
             if (RadioSideCloseMinimize != null) RadioSideCloseMinimize.Content = loc.Get("CloseActionTray");
             if (RadioSideCloseExit != null) RadioSideCloseExit.Content = loc.Get("CloseActionExit");
@@ -1215,6 +1235,7 @@ namespace ClipVault.Views
         /// </summary>
         public void ShowDocked()
         {
+            ClipVault.Helpers.MemoryHelper.CancelIdleTrim();
             int gen = ++_animGeneration;
             _isHiding = false;
             _mouseHasEnteredAfterShow = false;
@@ -1353,7 +1374,6 @@ namespace ClipVault.Views
                         DrawerTranslate.BeginAnimation(TranslateTransform.XProperty, null);
                         DrawerTranslate.X = 0;
                     }
-                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
                 };
                 RootBorder.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
             }
@@ -2976,13 +2996,16 @@ namespace ClipVault.Views
 
         private Button CreateActionTile(CustomActionItem action, int index)
         {
+            string modeLabel = action.ActivateExistingInstance
+                ? "模式：优先唤醒已运行程序（防重复多开）"
+                : "模式：每次点击新开实例";
             var btn = new Button
             {
                 Width = 80,
                 Height = 58,
                 Margin = new Thickness(3),
                 Cursor = Cursors.Hand,
-                ToolTip = $"{action.Name}\n{action.CommandOrPath}\n(右键删除)",
+                ToolTip = $"{action.Name}\n{action.CommandOrPath}\n{modeLabel}\n(右键可切换模式或删除)",
                 Tag = index
             };
 
@@ -3050,11 +3073,11 @@ namespace ClipVault.Views
             {
                 try
                 {
-                    Process.Start(new ProcessStartInfo
+                    bool activatedExisting = ClipVault.Helpers.AppLauncherHelper.ExecuteCustomAction(action);
+                    if (activatedExisting)
                     {
-                        FileName = action.CommandOrPath,
-                        UseShellExecute = true
-                    });
+                        ShowSidebarToast($"✓ 已唤醒运行中的「{action.Name}」");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -3072,21 +3095,60 @@ namespace ClipVault.Views
 
             btn.MouseRightButtonUp += (s, e) =>
             {
-                _isModalOrMenuOpen = true;
-                try
+                e.Handled = true;
+                var menu = new ContextMenu();
+                if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle)
                 {
-                    var result = MessageBox.Show($"确定删除快捷动作【{action.Name}】吗？", "删除快捷动作", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                    if (result == MessageBoxResult.Yes)
+                    menu.Style = ctxStyle;
+                }
+                Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+
+                var toggleExistingItem = new MenuItem
+                {
+                    Header = action.ActivateExistingInstance
+                        ? "🔄 优先唤醒已有程序 (已开启 · 防多开)"
+                        : "➕ 每次新开独立程序 (点击切换为唤醒已有)",
+                    IsCheckable = true,
+                    IsChecked = action.ActivateExistingInstance
+                };
+                if (itemStyle != null) toggleExistingItem.Style = itemStyle;
+                toggleExistingItem.Click += (_, _) =>
+                {
+                    action.ActivateExistingInstance = !action.ActivateExistingInstance;
+                    _settingsService.SaveSettings();
+                    RefreshCustomActions();
+                };
+
+                var delItem = new MenuItem
+                {
+                    Header = $"🗑 删除快捷动作「{action.Name}」"
+                };
+                if (itemStyle != null) delItem.Style = itemStyle;
+                delItem.Click += (_, _) =>
+                {
+                    _isModalOrMenuOpen = true;
+                    try
                     {
-                        _settingsService.CurrentSettings.CustomActions.RemoveAt(index);
-                        _settingsService.SaveSettings();
-                        RefreshCustomActions();
+                        var result = MessageBox.Show($"确定删除快捷动作【{action.Name}】吗？", "删除快捷动作", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        if (result == MessageBoxResult.Yes && index >= 0 && index < _settingsService.CurrentSettings.CustomActions.Count)
+                        {
+                            _settingsService.CurrentSettings.CustomActions.RemoveAt(index);
+                            _settingsService.SaveSettings();
+                            RefreshCustomActions();
+                        }
                     }
-                }
-                finally
-                {
-                    _isModalOrMenuOpen = false;
-                }
+                    finally
+                    {
+                        _isModalOrMenuOpen = false;
+                    }
+                };
+
+                menu.Items.Add(toggleExistingItem);
+                menu.Items.Add(delItem);
+                menu.Opened += (_, _) => _isModalOrMenuOpen = true;
+                menu.Closed += (_, _) => _isModalOrMenuOpen = false;
+                menu.PlacementTarget = btn;
+                menu.IsOpen = true;
             };
 
             return btn;
@@ -3136,6 +3198,7 @@ namespace ClipVault.Views
             TxtNewActionName.Text = "";
             TxtNewActionIcon.Text = ""; // 默认留空以自动拉取目标程序图标，用户也可自行输入 Emoji
             TxtNewActionCommand.Text = "";
+            if (ChkNewActionActivateExisting != null) ChkNewActionActivateExisting.IsChecked = true;
             UpdateNewActionIconPreview();
             AddActionOverlay.Visibility = Visibility.Visible;
             TxtNewActionCommand.Focus();
@@ -3198,7 +3261,8 @@ namespace ClipVault.Views
                 Id = Guid.NewGuid().ToString("N"),
                 Name = name,
                 CommandOrPath = cmd,
-                Icon = icon
+                Icon = icon,
+                ActivateExistingInstance = ChkNewActionActivateExisting?.IsChecked ?? true
             });
             _settingsService.SaveSettings();
 
@@ -3241,6 +3305,8 @@ namespace ClipVault.Views
             {
                 var s = _settingsService.CurrentSettings;
                 if (TxtSideStoragePath != null) TxtSideStoragePath.Text = s.StorageDirectory;
+                if (ChkFollowAppDir2 != null) ChkFollowAppDir2.IsChecked = s.FollowAppDirectory;
+                UpdateStorageLockUiState(s.FollowAppDirectory);
 
                 // 1. 模式单选
                 if (RadioModeCentered2 != null && RadioModeSidebar2 != null)
@@ -3643,8 +3709,48 @@ namespace ClipVault.Views
             }
         }
 
+        private void UpdateStorageLockUiState(bool followAppDir)
+        {
+            if (BtnBrowseStorage != null)
+            {
+                BtnBrowseStorage.IsEnabled = !followAppDir;
+                BtnBrowseStorage.Opacity = followAppDir ? 0.45 : 1.0;
+                BtnBrowseStorage.Cursor = followAppDir ? System.Windows.Input.Cursors.Arrow : System.Windows.Input.Cursors.Hand;
+                BtnBrowseStorage.ToolTip = followAppDir ? LocalizationService.Instance.Get("FollowAppDirLockedTip") : null;
+            }
+            if (BdSideStoragePath != null)
+            {
+                BdSideStoragePath.Opacity = followAppDir ? 0.75 : 1.0;
+            }
+        }
+
+        private void ChkFollowAppDir_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || ChkFollowAppDir2 == null) return;
+            bool follow = ChkFollowAppDir2.IsChecked == true;
+            bool migrated = _settingsService.SetFollowAppDirectory(follow, true);
+            UpdateStorageLockUiState(follow);
+            if (TxtSideStoragePath != null) TxtSideStoragePath.Text = _settingsService.CurrentSettings.StorageDirectory;
+            if (migrated)
+            {
+                RefreshCards();
+                UpdateSideStorageInfo();
+                var loc = LocalizationService.Instance;
+                _isModalOrMenuOpen = true;
+                try
+                {
+                    MessageBox.Show(loc.Get("StorageMigratedMsg", _settingsService.CurrentSettings.StorageDirectory), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                finally
+                {
+                    _isModalOrMenuOpen = false;
+                }
+            }
+        }
+
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
+            if (_settingsService == null || _settingsService.CurrentSettings.FollowAppDirectory) return;
             _isModalOrMenuOpen = true;
             try
             {

@@ -221,7 +221,15 @@ namespace ClipVault.Services
                         }
                     }
                     catch { }
+                    finally
+                    {
+                        ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
+                    }
                 });
+            }
+            else if (capturedItem.IsImage)
+            {
+                ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
             }
         }
 
@@ -230,8 +238,22 @@ namespace ClipVault.Services
             var dataObject = Clipboard.GetDataObject();
             if (dataObject == null) return null;
 
-            // 1. 图片格式识别
-            if (dataObject.GetDataPresent(DataFormats.Bitmap) || Clipboard.ContainsImage())
+            bool hasBitmap = dataObject.GetDataPresent(DataFormats.Bitmap) || Clipboard.ContainsImage();
+            bool hasFileDrop = dataObject.GetDataPresent(DataFormats.FileDrop);
+            bool hasText = dataObject.GetDataPresent(DataFormats.UnicodeText) || dataObject.GetDataPresent(DataFormats.Text);
+
+            // 1. 优先识别真实文本/代码（解决 PPTX/Word/Excel/WPS 等同时向剪贴板写入 Text 与 Bitmap 预览图时，文字被误判为纯图片导致无法粘贴文本的问题）
+            if (hasText && !hasFileDrop)
+            {
+                var textItem = TryExtractTextItem(sourceApp, sourceProcess, hasBitmap);
+                if (textItem != null)
+                {
+                    return textItem;
+                }
+            }
+
+            // 2. 图片格式识别
+            if (hasBitmap)
             {
                 var bitmap = Clipboard.GetImage();
                 if (bitmap != null)
@@ -283,8 +305,8 @@ namespace ClipVault.Services
                 }
             }
 
-            // 2. 文件拖拽列表
-            if (dataObject.GetDataPresent(DataFormats.FileDrop))
+            // 3. 文件拖拽列表
+            if (hasFileDrop)
             {
                 var files = Clipboard.GetFileDropList();
                 if (files != null && files.Count > 0)
@@ -312,53 +334,81 @@ namespace ClipVault.Services
                 }
             }
 
-            // 3. 纯文本与代码格式
-            if (dataObject.GetDataPresent(DataFormats.UnicodeText) || dataObject.GetDataPresent(DataFormats.Text))
+            // 4. 兜底纯文本与代码格式
+            if (hasText)
             {
-                if (IsInternalOperation) return null;
-
-                string text = Clipboard.GetText();
-                if (string.IsNullOrWhiteSpace(text)) return null;
-
-                // 核心安全过滤：绝不将内部图片相对路径/存储路径作为普通纯文本收录 (例如 images\xxx.png)
-                string trimmedText = text.Trim();
-                if (Regex.IsMatch(trimmedText, @"^images[\\/][a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase) ||
-                    Regex.IsMatch(trimmedText, @"^[a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase))
-                {
-                    return null;
-                }
-
-                // 若来源应用即为 CopyBox 且内容符合内部路径模式，直接跳过
-                if (string.Equals(sourceProcess, "CopyBox.exe", StringComparison.OrdinalIgnoreCase) && 
-                    trimmedText.StartsWith("images", StringComparison.OrdinalIgnoreCase))
-                {
-                    return null;
-                }
-
-                string hash = ComputeHash(Encoding.UTF8.GetBytes(text));
-                bool isCode = DetectIsCode(text);
-
-                string cleanSummary = text.Trim();
-                cleanSummary = Regex.Replace(cleanSummary, @"\s+", " ");
-                if (cleanSummary.Length > 80)
-                {
-                    cleanSummary = cleanSummary.Substring(0, 80) + "...";
-                }
-
-                return new ClipboardItem
-                {
-                    ItemType = isCode ? "Code" : "Text",
-                    Content = text,
-                    Summary = isCode ? $"[代码] {cleanSummary}" : cleanSummary,
-                    SourceApp = sourceApp,
-                    SourceProcess = sourceProcess,
-                    CreatedAt = DateTime.Now,
-                    Sha256 = hash,
-                    CharCount = text.Length
-                };
+                return TryExtractTextItem(sourceApp, sourceProcess, hasBitmap);
             }
 
             return null;
+        }
+
+        private ClipboardItem? TryExtractTextItem(string sourceApp, string sourceProcess, bool hasBitmap)
+        {
+            if (IsInternalOperation) return null;
+
+            string text = Clipboard.ContainsText(TextDataFormat.UnicodeText)
+                ? Clipboard.GetText(TextDataFormat.UnicodeText)
+                : Clipboard.GetText();
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            // 过滤仅包含 RichEdit 对象占位符 (\uFFFC) 或零宽字符的假文本（避免 QQ/微信等纯图复制被误抓为文本）
+            string visibleText = text.Replace("\uFFFC", string.Empty).Replace("\u200B", string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(visibleText)) return null;
+
+            // 将 PowerPoint 文本框内软回车符 (\u000B 垂直制表符) 规范化为换行符，避免在其他应用中粘贴或展示时出现异常字符
+            if (text.Contains('\u000B'))
+            {
+                text = text.Replace("\r\u000B", Environment.NewLine).Replace("\u000B", Environment.NewLine);
+            }
+
+            string trimmedText = visibleText;
+
+            // 核心安全过滤：绝不将内部图片相对路径/存储路径作为普通纯文本收录 (例如 images\xxx.png)
+            if (Regex.IsMatch(trimmedText, @"^images[\\/][a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase) ||
+                Regex.IsMatch(trimmedText, @"^[a-f0-9]{32,64}\.png$", RegexOptions.IgnoreCase))
+            {
+                return null;
+            }
+
+            // 若来源应用即为 CopyBox 且内容符合内部路径模式，直接跳过
+            if (string.Equals(sourceProcess, "CopyBox.exe", StringComparison.OrdinalIgnoreCase) &&
+                trimmedText.StartsWith("images", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            // 若剪贴板同时包含图片，需排除聊天软件随图附带的 "[图片]" 占位词或本地图片文件路径，确保纯图仍识别为 Image
+            if (hasBitmap)
+            {
+                if (string.Equals(trimmedText, "[图片]", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(trimmedText, "[Image]", StringComparison.OrdinalIgnoreCase) ||
+                    Regex.IsMatch(trimmedText, @"^(?:[a-zA-Z]:\\|\\\\)[^\r\n]+\.(?:png|jpe?g|gif|bmp|webp|ico)$", RegexOptions.IgnoreCase))
+                {
+                    return null;
+                }
+            }
+
+            string hash = ComputeHash(Encoding.UTF8.GetBytes(text));
+            bool isCode = DetectIsCode(text);
+
+            string cleanSummary = Regex.Replace(trimmedText, @"\s+", " ");
+            if (cleanSummary.Length > 80)
+            {
+                cleanSummary = cleanSummary.Substring(0, 80) + "...";
+            }
+
+            return new ClipboardItem
+            {
+                ItemType = isCode ? "Code" : "Text",
+                Content = text,
+                Summary = isCode ? $"[代码] {cleanSummary}" : cleanSummary,
+                SourceApp = sourceApp,
+                SourceProcess = sourceProcess,
+                CreatedAt = DateTime.Now,
+                Sha256 = hash,
+                CharCount = text.Length
+            };
         }
 
         private static bool DetectIsCode(string text)
@@ -409,24 +459,34 @@ namespace ClipVault.Services
         {
             if (source == null) return null;
 
+            byte[]? rentedPixels = null;
             try
             {
-                var converted = new FormatConvertedBitmap();
-                converted.BeginInit();
-                converted.Source = source;
-                converted.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
-                converted.EndInit();
+                BitmapSource bgraSource = source;
+                if (source.Format != System.Windows.Media.PixelFormats.Bgra32)
+                {
+                    var converted = new FormatConvertedBitmap();
+                    converted.BeginInit();
+                    converted.Source = source;
+                    converted.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
+                    converted.EndInit();
+                    bgraSource = converted;
+                }
 
-                int width = converted.PixelWidth;
-                int height = converted.PixelHeight;
+                int width = bgraSource.PixelWidth;
+                int height = bgraSource.PixelHeight;
                 int stride = width * 4;
-                byte[] pixels = new byte[stride * height];
-                converted.CopyPixels(pixels, stride, 0);
+                int requiredBytes = stride * height;
+                if (requiredBytes <= 0) return source;
+
+                // 使用共享 ArrayPool 借用像素缓冲区，彻底消除大图进入 LOH 大对象堆
+                rentedPixels = System.Buffers.ArrayPool<byte>.Shared.Rent(requiredBytes);
+                bgraSource.CopyPixels(rentedPixels, stride, 0);
 
                 bool hasNonZeroAlpha = false;
-                for (int i = 3; i < pixels.Length; i += 4)
+                for (int i = 3; i < requiredBytes; i += 4)
                 {
-                    if (pixels[i] > 0)
+                    if (rentedPixels[i] > 0)
                     {
                         hasNonZeroAlpha = true;
                         break;
@@ -437,18 +497,25 @@ namespace ClipVault.Services
                 if (!hasNonZeroAlpha)
                 {
                     // 强制将所有像素的 Alpha 通道校准为 255 (完全不透明原图)
-                    for (int i = 3; i < pixels.Length; i += 4)
+                    for (int i = 3; i < requiredBytes; i += 4)
                     {
-                        pixels[i] = 255;
+                        rentedPixels[i] = 255;
                     }
 
-                    var fixedBmp = new WriteableBitmap(width, height, converted.DpiX, converted.DpiY, System.Windows.Media.PixelFormats.Bgra32, null);
-                    fixedBmp.WritePixels(new System.Windows.Int32Rect(0, 0, width, height), pixels, stride, 0);
+                    var fixedBmp = new WriteableBitmap(width, height, bgraSource.DpiX, bgraSource.DpiY, System.Windows.Media.PixelFormats.Bgra32, null);
+                    fixedBmp.WritePixels(new System.Windows.Int32Rect(0, 0, width, height), rentedPixels, stride, 0);
                     fixedBmp.Freeze();
                     return fixedBmp;
                 }
             }
             catch { }
+            finally
+            {
+                if (rentedPixels != null)
+                {
+                    System.Buffers.ArrayPool<byte>.Shared.Return(rentedPixels);
+                }
+            }
 
             return source;
         }

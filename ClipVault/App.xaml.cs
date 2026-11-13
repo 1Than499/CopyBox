@@ -123,8 +123,8 @@ namespace ClipVault
                 // 6. 启动后根据当前选择的模式唤起界面
                 ToggleActiveWindow();
 
-                // 7. 启动后执行内存整理与工作集轻量化收缩
-                ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
+                // 7. 启动后执行内存整理与工作集轻量化收缩（1.5s 后若无窗口唤醒则释放启动期冷页）
+                ClipVault.Helpers.MemoryHelper.ScheduleIdleTrim(1500);
             }
             catch (Exception ex)
             {

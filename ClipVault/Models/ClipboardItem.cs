@@ -240,6 +240,42 @@ namespace ClipVault.Models
             }
         }
 
+        /// <summary>
+        /// 卡片底栏左侧元信息：图片与文件保留尺寸/文件名摘要；文本与代码展示行数与字符数统计，不再重复显示正文
+        /// </summary>
+        public string CardFooterText
+        {
+            get
+            {
+                if (IsImage || ItemType == "File")
+                {
+                    return DisplaySummary;
+                }
+
+                bool isEn = ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US";
+                int len = CharCount > 0 ? CharCount : _content.Length;
+                int lines = 1;
+                if (!string.IsNullOrEmpty(_content))
+                {
+                    for (int i = 0; i < _content.Length; i++)
+                    {
+                        if (_content[i] == '\n') lines++;
+                    }
+                }
+
+                if (IsCode)
+                {
+                    return isEn
+                        ? (lines > 1 ? $"Code · {lines} lines · {len} chars" : $"Code · {len} chars")
+                        : (lines > 1 ? $"代码 · {lines} 行 · {len} 字符" : $"代码 · {len} 字符");
+                }
+
+                return isEn
+                    ? (lines > 1 ? $"{lines} lines · {len} chars" : $"{len} chars")
+                    : (lines > 1 ? $"{lines} 行 · {len} 字符" : $"{len} 字符");
+            }
+        }
+
         public string MaskToggleIcon => _isMaskRevealed ? "🙈" : "👁";
 
         public string MaskToggleTooltip => _isMaskRevealed
@@ -252,6 +288,7 @@ namespace ClipVault.Models
             OnPropertyChanged(nameof(SensitiveTypeTag));
             OnPropertyChanged(nameof(DisplayContent));
             OnPropertyChanged(nameof(DisplaySummary));
+            OnPropertyChanged(nameof(CardFooterText));
             OnPropertyChanged(nameof(MaskToggleIcon));
             OnPropertyChanged(nameof(MaskToggleTooltip));
         }
@@ -274,7 +311,8 @@ namespace ClipVault.Models
 
         public bool IsImage => ItemType == "Image";
         public bool IsCode => ItemType == "Code";
-        public bool IsText => ItemType == "Text";
+        public bool IsText => ItemType == "Text" || ItemType == "File";
+        public bool IsFile => ItemType == "File";
 
         public string MenuTooltip => ClipVault.Services.LocalizationService.Instance.Get("MenuTooltip");
 
@@ -354,17 +392,14 @@ namespace ClipVault.Models
 
                 try
                 {
-                    // 使用非排他 FileShare.ReadWrite 读取内存流，彻底杜绝文件锁死并提升加载性能
+                    // 直接通过非排他 FileStream + OnLoad 解码，省去整图二次拷贝 MemoryStream
                     using var fs = new FileStream(imgPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    var ms = new MemoryStream();
-                    fs.CopyTo(ms);
-                    ms.Position = 0;
 
                     var bmp = new System.Windows.Media.Imaging.BitmapImage();
                     bmp.BeginInit();
                     bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
                     bmp.DecodePixelWidth = 400; // 核心内存优化：卡片缩略图约束至 400px 解码，内存占用骤降 95%+
-                    bmp.StreamSource = ms;
+                    bmp.StreamSource = fs;
                     bmp.EndInit();
                     bmp.Freeze(); // 允许跨线程安全访问与极速渲染
 
@@ -392,7 +427,7 @@ namespace ClipVault.Models
 
                     if (_cachedImage != null)
                     {
-                        if (ThumbnailMemoryCache.Count > 36) ThumbnailMemoryCache.Clear();
+                        if (ThumbnailMemoryCache.Count >= 16) ThumbnailMemoryCache.Clear();
                         ThumbnailMemoryCache[imgPath] = _cachedImage;
                     }
                     return _cachedImage;
@@ -407,6 +442,11 @@ namespace ClipVault.Models
         public void ClearImageCache()
         {
             _cachedImage = null;
+        }
+
+        public static void ClearThumbnailCache()
+        {
+            ThumbnailMemoryCache.Clear();
         }
     }
 }

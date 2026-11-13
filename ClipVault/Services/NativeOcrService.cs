@@ -68,7 +68,19 @@ namespace ClipVault.Services
         }
 
         /// <summary>
-        /// 异步从本地图片文件路径提取离线 OCR 文字（异常安全，失败返回空字符串）
+        /// 释放闲置的 WinRT 离线 OCR 引擎 COM 引用，降低长期后台驻留内存（下次识别时按需秒级重建）
+        /// </summary>
+        public static void ReleaseIdleEngine()
+        {
+            lock (_initLock)
+            {
+                _cachedEngine = null;
+                _engineInitialized = false;
+            }
+        }
+
+        /// <summary>
+        /// 异步从本地图片文件路径提取离线 OCR 文字（直接流式解码，避免整图 byte[] 落入大对象堆 LOH）
         /// </summary>
         public static async Task<string> RecognizeImageFileAsync(string imagePath)
         {
@@ -79,8 +91,9 @@ namespace ClipVault.Services
 
             try
             {
-                byte[] bytes = await File.ReadAllBytesAsync(imagePath).ConfigureAwait(false);
-                return await RecognizeImageBytesAsync(bytes).ConfigureAwait(false);
+                using var fs = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, useAsync: true);
+                using IRandomAccessStream ras = fs.AsRandomAccessStream();
+                return await RecognizeStreamAsync(ras).ConfigureAwait(false);
             }
             catch
             {
@@ -95,15 +108,19 @@ namespace ClipVault.Services
         {
             if (imageBytes == null || imageBytes.Length == 0) return string.Empty;
 
+            using var ms = new MemoryStream(imageBytes, writable: false);
+            using IRandomAccessStream ras = ms.AsRandomAccessStream();
+            return await RecognizeStreamAsync(ras).ConfigureAwait(false);
+        }
+
+        private static async Task<string> RecognizeStreamAsync(IRandomAccessStream ras)
+        {
             var engine = GetOrCreateEngine();
             if (engine == null) return string.Empty;
 
             await _ocrConcurrencyGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                using var ms = new MemoryStream(imageBytes, writable: false);
-                using IRandomAccessStream ras = ms.AsRandomAccessStream();
-
                 var decoder = await BitmapDecoder.CreateAsync(ras);
                 uint width = decoder.PixelWidth;
                 uint height = decoder.PixelHeight;

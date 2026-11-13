@@ -35,26 +35,19 @@ namespace ClipVault.Services
         private readonly DispatcherTimer _pollTimer;
         private MMDeviceEnumerator? _audioEnumerator;
 
+        private bool _gsmtcInitialized;
+
         public MediaInfo CurrentMedia { get; private set; } = new();
         public event Action<MediaInfo>? MediaInfoChanged;
 
         public SystemMediaService()
         {
-            try
-            {
-                _audioEnumerator = new MMDeviceEnumerator();
-            }
-            catch { }
-
-            // 1 秒心跳轮询，按需监听后台播放器状态（仅在侧边栏显示时启动）
+            // 1 秒心跳轮询，仅在侧边栏显示时激活并懒加载 GSMTC / WASAPI COM 组件，彻底避免启动即常驻媒体引擎
             _pollTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(1000)
             };
             _pollTimer.Tick += async (s, e) => await RefreshMediaAsync();
-            // 默认暂停轮询，侧边栏滑出显示时激活，收起隐藏时休眠，彻底消除后台 COM/WASAPI 内存与 CPU 开销
-            
-            _ = InitializeGsmtcAsync();
         }
 
         public void PausePolling()
@@ -63,10 +56,26 @@ namespace ClipVault.Services
             {
                 _pollTimer.Stop();
             }
+
+            // 隐藏时主动释放正在持有的媒体封面大图、会话引用与 WASAPI 枚举器 COM 句柄
+            _currentSession = null;
+            CurrentMedia = new MediaInfo();
+            try
+            {
+                _audioEnumerator?.Dispose();
+            }
+            catch { }
+            _audioEnumerator = null;
         }
 
         public void ResumePolling()
         {
+            if (!_gsmtcInitialized)
+            {
+                _gsmtcInitialized = true;
+                _ = InitializeGsmtcAsync();
+            }
+
             if (!_pollTimer.IsEnabled)
             {
                 _pollTimer.Start();
@@ -161,6 +170,7 @@ namespace ClipVault.Services
                                         var bmp = new BitmapImage();
                                         bmp.BeginInit();
                                         bmp.CacheOption = BitmapCacheOption.OnLoad;
+                                        bmp.DecodePixelWidth = 96; // 限制专辑封面解码尺寸为 96px，防止大图占满内存
                                         bmp.StreamSource = netStream;
                                         bmp.EndInit();
                                         bmp.Freeze();
@@ -182,75 +192,89 @@ namespace ClipVault.Services
                 try
                 {
                     if (_audioEnumerator == null) _audioEnumerator = new MMDeviceEnumerator();
-                    var defaultDevice = _audioEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                    using var defaultDevice = _audioEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
                     if (defaultDevice != null)
                     {
                         var sessionManager = defaultDevice.AudioSessionManager;
                         if (sessionManager != null)
                         {
                             var sessions = sessionManager.Sessions;
-
-                            int bestIndex = -1;
-                            float maxPeak = -1f;
-                            int fallbackIndex = -1;
-
-                            for (int i = 0; i < sessions.Count; i++)
+                            try
                             {
-                                var s = sessions[i];
-                                uint pid = s.GetProcessID;
-                                if (pid == 0) continue;
+                                int bestIndex = -1;
+                                float maxPeak = -1f;
+                                int fallbackIndex = -1;
 
-                                float peak = 0;
-                                try { peak = s.AudioMeterInformation.MasterPeakValue; } catch { }
-                                bool isActive = (int)s.State == 1; // AudioSessionStateActive
-
-                                // 优先寻找正在发声 (peak > 0 或 Active) 的媒体
-                                if ((isActive || peak > 0.001f) && peak > maxPeak)
+                                for (int i = 0; i < sessions.Count; i++)
                                 {
-                                    maxPeak = peak;
-                                    bestIndex = i;
-                                }
-                                else if (fallbackIndex == -1 && IsKnownMediaProcess(pid))
-                                {
-                                    fallbackIndex = i;
-                                }
-                            }
+                                    var s = sessions[i];
+                                    uint pid = s.GetProcessID;
+                                    if (pid == 0) continue;
 
-                            // 优先选正在发声的，其次选已打开的媒体会话
-                            int targetIdx = bestIndex >= 0 ? bestIndex : fallbackIndex;
+                                    float peak = 0;
+                                    try { peak = s.AudioMeterInformation.MasterPeakValue; } catch { }
+                                    bool isActive = (int)s.State == 1; // AudioSessionStateActive
 
-                            if (targetIdx >= 0)
-                            {
-                                var s = sessions[targetIdx];
-                                uint pid = s.GetProcessID;
-                                try
-                                {
-                                    var proc = Process.GetProcessById((int)pid);
-                                    string pName = proc.ProcessName.ToLowerInvariant();
-
-                                    if (pName != "system" && pName != "audiodg" && pName != "explorer")
+                                    // 优先寻找正在发声 (peak > 0 或 Active) 的媒体
+                                    if ((isActive || peak > 0.001f) && peak > maxPeak)
                                     {
-                                        string friendly = GetFriendlyAppName(pName);
-                                        string wTitle = "";
-                                        try { wTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
+                                        maxPeak = peak;
+                                        bestIndex = i;
+                                    }
+                                    else if (fallbackIndex == -1 && IsKnownMediaProcess(pid))
+                                    {
+                                        fallbackIndex = i;
+                                    }
+                                }
 
-                                        newInfo.HasMedia = true;
-                                        newInfo.IsPlaying = bestIndex >= 0; // 有峰值或Active则为播放中
-                                        newInfo.SourceAppId = pName;
-                                        newInfo.Thumbnail = ExtractIconFromProcess((int)pid);
+                                // 优先选正在发声的，其次选已打开的媒体会话
+                                int targetIdx = bestIndex >= 0 ? bestIndex : fallbackIndex;
 
-                                        // 若窗口标题包含有价值的歌名信息 (例如 "周杰伦 - 晴天")
-                                        if (!string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) && !wTitle.Equals(pName, StringComparison.OrdinalIgnoreCase))
+                                if (targetIdx >= 0)
+                                {
+                                    var s = sessions[targetIdx];
+                                    uint pid = s.GetProcessID;
+                                    try
+                                    {
+                                        using var proc = Process.GetProcessById((int)pid);
+                                        string pName = proc.ProcessName.ToLowerInvariant();
+
+                                        if (pName != "system" && pName != "audiodg" && pName != "explorer")
                                         {
-                                            newInfo.Title = wTitle;
-                                            newInfo.Artist = friendly;
-                                        }
-                                        else
-                                        {
-                                            newInfo.Title = newInfo.IsPlaying ? "正在播放音频" : "音频已暂停";
-                                            newInfo.Artist = friendly;
+                                            string friendly = GetFriendlyAppName(pName);
+                                            string wTitle = "";
+                                            try { wTitle = proc.MainWindowTitle?.Trim() ?? ""; } catch { }
+
+                                            newInfo.HasMedia = true;
+                                            newInfo.IsPlaying = bestIndex >= 0; // 有峰值或Active则为播放中
+                                            newInfo.SourceAppId = pName;
+                                            newInfo.Thumbnail = ExtractIconFromProcess((int)pid);
+
+                                            // 若窗口标题包含有价值的歌名信息 (例如 "周杰伦 - 晴天")
+                                            if (!string.IsNullOrEmpty(wTitle) && !wTitle.Equals(friendly, StringComparison.OrdinalIgnoreCase) && !wTitle.Equals(pName, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                newInfo.Title = wTitle;
+                                                newInfo.Artist = friendly;
+                                            }
+                                            else
+                                            {
+                                                newInfo.Title = newInfo.IsPlaying ? "正在播放音频" : "音频已暂停";
+                                                newInfo.Artist = friendly;
+                                            }
                                         }
                                     }
+                                    catch { }
+                                }
+                            }
+                            finally
+                            {
+                                try
+                                {
+                                    for (int i = 0; i < sessions.Count; i++)
+                                    {
+                                        (sessions[i] as IDisposable)?.Dispose();
+                                    }
+                                    (sessions as IDisposable)?.Dispose();
                                 }
                                 catch { }
                             }
@@ -267,9 +291,10 @@ namespace ClipVault.Services
                 string[] knownMedia = { "cloudmusic", "qqmusic", "kugou", "kuwo", "spotify", "douyin" };
                 foreach (var km in knownMedia)
                 {
+                    Process[]? procs = null;
                     try
                     {
-                        var procs = Process.GetProcessesByName(km);
+                        procs = Process.GetProcessesByName(km);
                         if (procs.Length > 0)
                         {
                             var proc = procs[0];
@@ -287,6 +312,16 @@ namespace ClipVault.Services
                         }
                     }
                     catch { }
+                    finally
+                    {
+                        if (procs != null)
+                        {
+                            foreach (var pr in procs)
+                            {
+                                try { pr.Dispose(); } catch { }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -302,7 +337,7 @@ namespace ClipVault.Services
         {
             try
             {
-                var proc = Process.GetProcessById((int)pid);
+                using var proc = Process.GetProcessById((int)pid);
                 string pName = proc.ProcessName.ToLowerInvariant();
                 return pName.Contains("cloudmusic") || pName.Contains("qqmusic") ||
                        pName.Contains("kugou") || pName.Contains("kuwo") ||
@@ -381,7 +416,7 @@ namespace ClipVault.Services
         {
             try
             {
-                var proc = Process.GetProcessById(pid);
+                using var proc = Process.GetProcessById(pid);
                 string? exePath = proc.MainModule?.FileName;
                 if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
                 {

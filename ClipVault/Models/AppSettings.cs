@@ -5,7 +5,8 @@ namespace ClipVault.Models
 {
     public class AppSettings
     {
-        // 核心亮点：用户自定义本地存储目录
+        // 核心亮点：用户自定义本地存储目录，及是否锁定“与程序同目录”
+        public bool FollowAppDirectory { get; set; } = true;
         public string StorageDirectory { get; set; } = string.Empty;
 
         // 全局快捷键
@@ -137,5 +138,6 @@ namespace ClipVault.Models
         public string Name { get; set; } = string.Empty;
         public string Icon { get; set; } = string.Empty;
         public string CommandOrPath { get; set; } = string.Empty;
+        public bool ActivateExistingInstance { get; set; } = true;
     }
 }

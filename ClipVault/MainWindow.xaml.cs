@@ -52,7 +52,7 @@ namespace ClipVault
             if (TxtMainAppVersion != null)
             {
                 var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                TxtMainAppVersion.Text = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v3.0.0";
+                TxtMainAppVersion.Text = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v3.0.4";
             }
 
             // 加载应用图标
@@ -152,7 +152,8 @@ namespace ClipVault
                     {
                         it.ClearImageCache();
                     }
-                    ClipVault.Helpers.MemoryHelper.TrimWorkingSet();
+                    ClipboardItem.ClearThumbnailCache();
+                    ClipVault.Helpers.MemoryHelper.ScheduleIdleTrim();
                 }
             };
 
@@ -195,6 +196,8 @@ namespace ClipVault
             {
                 var s = _settingsService.CurrentSettings;
                 TxtSettingsStoragePath.Text = s.StorageDirectory;
+                if (ChkMainFollowAppDir != null) ChkMainFollowAppDir.IsChecked = s.FollowAppDirectory;
+                UpdateMainStorageLockUiState(s.FollowAppDirectory);
 
                 // 0. 语言选择加载
                 if (s.Language == "en-US")
@@ -392,7 +395,9 @@ namespace ClipVault
             foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
 
             if (TxtStoragePathTitle != null) TxtStoragePathTitle.Text = loc.Get("StoragePathTitle");
+            if (ChkMainFollowAppDir != null) ChkMainFollowAppDir.Content = loc.Get("FollowAppDirCheck");
             if (BtnBrowseStorage != null) BtnBrowseStorage.Content = loc.Get("BrowseButton");
+            UpdateMainStorageLockUiState(_settingsService?.CurrentSettings.FollowAppDirectory ?? true);
 
             if (TxtAppearanceTitle != null) TxtAppearanceTitle.Text = loc.Get("AppearanceTitle");
             if (RadioThemeDark != null) RadioThemeDark.Content = isEn ? "🌙 Dark Geek" : "🌙 暗夜极客";
@@ -523,6 +528,7 @@ namespace ClipVault
 
         public void ShowAndActivate()
         {
+            ClipVault.Helpers.MemoryHelper.CancelIdleTrim();
             // 记录当前活跃的工作窗口句柄，供选定后自动模拟粘贴
             _pasteSimulator.RecordTargetWindow();
 
@@ -752,6 +758,7 @@ namespace ClipVault
                             var bmp = new BitmapImage();
                             bmp.BeginInit();
                             bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.DecodePixelWidth = 960; // 约束居中窗口壁纸解码尺寸，大幅降低大图内存占用
                             bmp.UriSource = new Uri(customPath, UriKind.Absolute);
                             bmp.EndInit();
                             bmp.Freeze();
@@ -783,6 +790,9 @@ namespace ClipVault
             else
             {
                 if (MainBgImageContainer != null) MainBgImageContainer.Visibility = Visibility.Collapsed;
+                if (ImgMainCustomBg != null) ImgMainCustomBg.Source = null;
+                _cachedMainWallpaperBitmap = null;
+                _cachedMainWallpaperPath = null;
 
                 if (isLight)
                 {
@@ -2398,8 +2408,40 @@ namespace ClipVault
             menu.IsOpen = true;
         }
 
+        private void UpdateMainStorageLockUiState(bool followAppDir)
+        {
+            if (BtnBrowseStorage != null)
+            {
+                BtnBrowseStorage.IsEnabled = !followAppDir;
+                BtnBrowseStorage.Opacity = followAppDir ? 0.45 : 1.0;
+                BtnBrowseStorage.Cursor = followAppDir ? System.Windows.Input.Cursors.Arrow : System.Windows.Input.Cursors.Hand;
+                BtnBrowseStorage.ToolTip = followAppDir ? LocalizationService.Instance.Get("FollowAppDirLockedTip") : null;
+            }
+            if (BdMainStoragePath != null)
+            {
+                BdMainStoragePath.Opacity = followAppDir ? 0.72 : 1.0;
+            }
+        }
+
+        private void ChkMainFollowAppDir_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || ChkMainFollowAppDir == null) return;
+            bool follow = ChkMainFollowAppDir.IsChecked == true;
+            bool migrated = _settingsService.SetFollowAppDirectory(follow, true);
+            UpdateMainStorageLockUiState(follow);
+            TxtSettingsStoragePath.Text = _settingsService.CurrentSettings.StorageDirectory;
+            if (migrated)
+            {
+                RefreshCards();
+                UpdateStorageInfo();
+                var loc = LocalizationService.Instance;
+                MessageBox.Show(loc.Get("StorageMigratedMsg", _settingsService.CurrentSettings.StorageDirectory), loc.Get("StorageMigratedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void BtnBrowseStorage_Click(object sender, RoutedEventArgs e)
         {
+            if (_settingsService == null || _settingsService.CurrentSettings.FollowAppDirectory) return;
             var loc = LocalizationService.Instance;
             var dialog = new OpenFolderDialog
             {

@@ -75,25 +75,69 @@ namespace ClipVault.Services
                     {
                         settings.PortableMode = true;
                         string defaultRootPath = AppSettings.GetDefaultStoragePath();
+                        string originalDir = settings.StorageDirectory ?? string.Empty;
 
-                        // 如果存储目录为空，或者是从旧版 AppData 默认路径升级而来，自动将默认存储目录对齐到程序根目录并平滑迁移旧数据
-                        bool isLegacyDefaultPath = !string.IsNullOrWhiteSpace(settings.StorageDirectory) &&
-                            (settings.StorageDirectory.TrimEnd('\\', '/').Equals(LegacyDefaultDataDir1.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) ||
-                             settings.StorageDirectory.TrimEnd('\\', '/').Equals(LegacyDefaultDataDir2.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase));
-
-                        if (string.IsNullOrWhiteSpace(settings.StorageDirectory))
+                        bool hasFollowProp = false;
+                        try
                         {
+                            using var doc = JsonDocument.Parse(json);
+                            hasFollowProp = doc.RootElement.TryGetProperty("FollowAppDirectory", out _);
+                        }
+                        catch { }
+
+                        bool isLegacyDefaultPath = !string.IsNullOrWhiteSpace(originalDir) &&
+                            (NormalizePath(originalDir).Equals(NormalizePath(LegacyDefaultDataDir1), StringComparison.OrdinalIgnoreCase) ||
+                             NormalizePath(originalDir).Equals(NormalizePath(LegacyDefaultDataDir2), StringComparison.OrdinalIgnoreCase));
+
+                        // 旧版配置升级探测：若无 FollowAppDirectory 字段，智能判断用户此前是否在使用程序同目录
+                        if (!hasFollowProp)
+                        {
+                            bool isSameAsCurrentRoot = string.IsNullOrWhiteSpace(originalDir) ||
+                                NormalizePath(originalDir).Equals(NormalizePath(defaultRootPath), StringComparison.OrdinalIgnoreCase);
+
+                            bool originalDirHasDb = Directory.Exists(originalDir) &&
+                                (File.Exists(Path.Combine(originalDir, "clipboard.db")) ||
+                                 File.Exists(Path.Combine(originalDir, "clipvault.db")));
+
+                            bool looksLikeMovedPortableFolder = !string.IsNullOrWhiteSpace(originalDir) &&
+                                !isLegacyDefaultPath &&
+                                !originalDirHasDb &&
+                                (File.Exists(Path.Combine(AppRootDirectory, "clipboard.db")) ||
+                                 File.Exists(Path.Combine(AppRootDirectory, "clipvault.db")));
+
+                            settings.FollowAppDirectory = isSameAsCurrentRoot || isLegacyDefaultPath || looksLikeMovedPortableFolder;
+                        }
+
+                        if (settings.FollowAppDirectory)
+                        {
+                            if (loadedFromLegacyAppData && isLegacyDefaultPath)
+                            {
+                                TryMigrateDirectoryContents(originalDir, defaultRootPath);
+                            }
+
+                            // 勾选“与程序同目录”：始终实时绑定当前程序所在目录，绝不在原旧路径重建空文件夹
+                            settings.StorageDirectory = defaultRootPath;
+
+                            // 若自定义壁纸原本保存在便携目录下的 Wallpapers 子目录中，移动目录后自动同步自愈路径
+                            if (!string.IsNullOrWhiteSpace(settings.CustomBackgroundImagePath) &&
+                                !File.Exists(settings.CustomBackgroundImagePath))
+                            {
+                                string candidateBg = Path.Combine(defaultRootPath, "Wallpapers", Path.GetFileName(settings.CustomBackgroundImagePath));
+                                if (File.Exists(candidateBg))
+                                {
+                                    settings.CustomBackgroundImagePath = candidateBg;
+                                }
+                            }
+                        }
+                        else if (string.IsNullOrWhiteSpace(settings.StorageDirectory))
+                        {
+                            settings.FollowAppDirectory = true;
                             settings.StorageDirectory = defaultRootPath;
                         }
-                        else if (loadedFromLegacyAppData && isLegacyDefaultPath)
-                        {
-                            string oldDir = settings.StorageDirectory;
-                            settings.StorageDirectory = defaultRootPath;
-                            TryMigrateDirectoryContents(oldDir, defaultRootPath);
-                        }
 
-                        // 确保配置文件同步写入程序根目录
-                        if (loadedFromLegacyAppData)
+                        // 若配置文件来自迁移、缺少新字段或跟随目录发生了迁移，回写至当前程序根目录 settings.json
+                        bool pathUpdated = !NormalizePath(originalDir).Equals(NormalizePath(settings.StorageDirectory), StringComparison.OrdinalIgnoreCase);
+                        if (loadedFromLegacyAppData || !hasFollowProp || pathUpdated)
                         {
                             try
                             {
@@ -115,6 +159,7 @@ namespace ClipVault.Services
             var defaultSettings = new AppSettings
             {
                 PortableMode = true,
+                FollowAppDirectory = true,
                 StorageDirectory = AppSettings.GetDefaultStoragePath()
             };
 
@@ -213,9 +258,14 @@ namespace ClipVault.Services
             }
         }
 
+        private static string NormalizePath(string? path)
+        {
+            return (path ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
         public void EnsureStorageDirectoryReady()
         {
-            if (string.IsNullOrWhiteSpace(CurrentSettings.StorageDirectory))
+            if (CurrentSettings.FollowAppDirectory || string.IsNullOrWhiteSpace(CurrentSettings.StorageDirectory))
             {
                 CurrentSettings.StorageDirectory = AppSettings.GetDefaultStoragePath();
             }
@@ -237,6 +287,25 @@ namespace ClipVault.Services
         }
 
         /// <summary>
+        /// 切换是否锁定“与程序同目录”模式，开启后自动对齐当前运行目录并平滑迁移（如有需要）
+        /// </summary>
+        public bool SetFollowAppDirectory(bool followAppDir, bool migrateExistingData = true)
+        {
+            CurrentSettings.FollowAppDirectory = followAppDir;
+            if (followAppDir)
+            {
+                string appStoragePath = AppSettings.GetDefaultStoragePath();
+                if (!NormalizePath(appStoragePath).Equals(NormalizePath(CurrentSettings.StorageDirectory), StringComparison.OrdinalIgnoreCase))
+                {
+                    return UpdateStorageDirectory(appStoragePath, migrateExistingData);
+                }
+            }
+
+            SaveSettings();
+            return false;
+        }
+
+        /// <summary>
         /// 更改本地存储根路径，并支持平滑迁移数据与通知双端同步
         /// </summary>
         public bool UpdateStorageDirectory(string newPath, bool migrateExistingData)
@@ -246,8 +315,8 @@ namespace ClipVault.Services
                 return false;
             }
 
-            string normalizedNew = newPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedOld = (CurrentSettings.StorageDirectory ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedNew = NormalizePath(newPath);
+            string normalizedOld = NormalizePath(CurrentSettings.StorageDirectory);
 
             if (normalizedNew.Equals(normalizedOld, StringComparison.OrdinalIgnoreCase))
             {

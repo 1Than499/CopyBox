@@ -407,7 +407,7 @@
                             </Border>
                             <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtAppVersion" Text="v3.0.0" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
+                                <TextBlock x:Name="TxtAppVersion" Text="v3.0.4" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
 
@@ -866,7 +866,7 @@
                                             <Button Content="📋" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardCopy_Click" ToolTip="复制到剪贴板"/>
                                             <Button Content="🗑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardDelete_Click" ToolTip="删除记录"/>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding DisplaySummary}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" 
+                                        <TextBlock Text="{Binding CardFooterText}" FontSize="9.5" Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.82"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
                                     </DockPanel>
                                 </Grid>
@@ -1002,7 +1002,7 @@
                         <!-- 3. 自定义快捷动作网格 (用户可自行添加和管理) -->
                         <DockPanel Margin="2,0,2,6">
                             <TextBlock x:Name="TxtSectionCustomActions" Text="自定义快捷动作" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock x:Name="TxtTipRightClickDelete" Text="右键可删除" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtTipRightClickDelete" Text="右键可切换模式或删除" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center"/>
                         </DockPanel>
 
                         <!-- 动态自定义磁贴列表 + 常驻【➕ 添加】按钮 -->
@@ -1128,16 +1128,20 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 3. 本地数据存储目录 (含 SQLite 实时状态统计，与 1.0 完全对齐) -->
+                        <!-- 3. 本地数据存储目录 (含“与程序同目录”锁定与 SQLite 实时状态统计，与 1.0 完全对齐) -->
                         <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock x:Name="TxtSetStorageTitle" Text="本地数据存储路径：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="ChkFollowAppDir2"
+                                          Content="📁 与程序同目录 (随软件目录移动自动更新，勾选后路径锁定不可手动修改)"
+                                          Foreground="{DynamicResource TextPrimaryBrush}" FontSize="10.5" Margin="0,0,0,7"
+                                          Checked="ChkFollowAppDir_Changed" Unchecked="ChkFollowAppDir_Changed"/>
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,6,0" Padding="8,5">
+                                    <Border x:Name="BdSideStoragePath" Grid.Column="0" Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,6,0" Padding="8,5">
                                         <TextBlock x:Name="TxtSideStoragePath" Text="" FontSize="10.5" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                                     </Border>
                                     <Button x:Name="BtnBrowseStorage" Grid.Column="1" Content="浏览..." Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource AccentBlueBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" 
@@ -1295,7 +1299,7 @@
 
                 <!-- 【浮层：添加自定义快捷动作弹窗】 -->
                 <Grid x:Name="AddActionOverlay" Visibility="Collapsed" Background="#D0080B12">
-                    <Border Width="320" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
+                    <Border Width="340" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="1" CornerRadius="10" Padding="16" VerticalAlignment="Center">
                         <StackPanel>
                             <TextBlock Text="➕ 添加自定义快捷动作" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
                             
@@ -1316,7 +1320,7 @@
 
                             <!-- 图标预览与自定义 Emoji -->
                             <TextBlock Text="图标 (留空默认提取程序原生图标，输入 Emoji 可自定义)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <Grid Margin="0,0,0,12">
+                            <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -1330,6 +1334,12 @@
                                 </Border>
                                 <TextBox x:Name="TxtNewActionIcon" Grid.Column="1" Text="" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="12" VerticalContentAlignment="Center" TextChanged="TxtNewActionIcon_TextChanged" ToolTip="留空将自动使用程序自身图标；也可输入任意 Emoji（如 🚀、💬、🎮）覆盖"/>
                             </Grid>
+
+                            <!-- 已有运行实例检测选项 -->
+                            <CheckBox x:Name="ChkNewActionActivateExisting" IsChecked="True"
+                                      Content="🔄 若程序已运行，直接唤醒已有窗口 (避免重复多开)"
+                                      Foreground="{DynamicResource TextPrimaryBrush}" FontSize="10.5" Margin="0,0,0,12"
+                                      ToolTip="勾选后：点击时先检测对应程序是否已在运行，若已打开则直接还原并置顶前置；未运行再启动新实例。取消勾选则每次点击都直接新开"/>
 
                             <!-- 操作按钮 -->
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
