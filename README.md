@@ -107,8 +107,8 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.0.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.0/CopyBox-v3.0.0-Windows-x64-Portable.zip)  
-[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/raw/main/publish/CopyBox.exe)
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.0.4--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.4/CopyBox-v3.0.4-Windows-x64-Portable.zip)  
+[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe%20(v3.0.4)-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.4/CopyBox.exe)
 
 *(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
 
