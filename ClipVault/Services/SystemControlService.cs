@@ -403,6 +403,93 @@ namespace ClipVault.Services
             catch { }
         }
 
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam,
+            uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+
+        /// <summary>
+        /// 获取 Windows 当前应用是否为深色主题
+        /// </summary>
+        public static bool IsWindowsDarkTheme()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                object? val = key?.GetValue("AppsUseLightTheme");
+                if (val is int i) return i == 0;
+            }
+            catch { }
+            return true;
+        }
+
+        /// <summary>
+        /// 一键切换 Windows 系统应用与任务栏深/浅色模式
+        /// </summary>
+        public static bool ToggleWindowsAppTheme()
+        {
+            bool nextDark = !IsWindowsDarkTheme();
+            int regVal = nextDark ? 0 : 1;
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", writable: true);
+                key?.SetValue("AppsUseLightTheme", regVal, Microsoft.Win32.RegistryValueKind.DWord);
+                key?.SetValue("SystemUsesLightTheme", regVal, Microsoft.Win32.RegistryValueKind.DWord);
+                SendMessageTimeout(new IntPtr(0xFFFF), 0x001A, UIntPtr.Zero, "ImmersiveColorSet", 0x0002, 1000, out _);
+            }
+            catch { }
+            return nextDark;
+        }
+
+        /// <summary>
+        /// 查询默认录音输入设备（麦克风）当前是否静音
+        /// </summary>
+        public static bool GetIsMicrophoneMuted()
+        {
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                using var capture = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                return capture?.AudioEndpointVolume?.Mute ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 一键静音/取消静音默认麦克风
+        /// </summary>
+        public static bool ToggleMicrophoneMute()
+        {
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                using var capture = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                if (capture?.AudioEndpointVolume != null)
+                {
+                    bool nextMute = !capture.AudioEndpointVolume.Mute;
+                    capture.AudioEndpointVolume.Mute = nextMute;
+                    return nextMute;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// 清空 Windows 系统当前剪贴板数据
+        /// </summary>
+        public static void ClearSystemClipboard()
+        {
+            try
+            {
+                System.Windows.Clipboard.Clear();
+            }
+            catch { }
+        }
+
         #endregion
     }
 }

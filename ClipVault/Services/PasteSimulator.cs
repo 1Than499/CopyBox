@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ClipVault.Helpers;
 using ClipVault.Interop;
 using ClipVault.Models;
 
@@ -24,10 +27,40 @@ namespace ClipVault.Services
             LastTargetHwnd = NativeMethods.GetForegroundWindow();
         }
 
-        public async Task PasteItemAsync(ClipboardItem item, Action onHideWindow)
+        public static string NormalizePlainText(string? raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return string.Empty;
+            string s = raw.Replace("\r\n", "\n").Replace('\r', '\n');
+            s = Regex.Replace(s, @"[ \t]+\n", "\n");
+            s = Regex.Replace(s, @"\n{3,}", "\n\n");
+            return s.Trim();
+        }
+
+        public Task PasteItemAsync(ClipboardItem item, Action onHideWindow)
+        {
+            return PasteItemAsync(item, onHideWindow, plainTextOnly: false);
+        }
+
+        public async Task PasteItemAsync(ClipboardItem item, Action onHideWindow, bool plainTextOnly)
         {
             try
             {
+                // 若包含 {{input:...}} 交互变量，先在贴入前弹窗采集参数
+                Dictionary<string, string>? inputValues = null;
+                if (!item.IsImage && item.ItemType != "File")
+                {
+                    var prompts = TemplateMacroHelper.ExtractInputPrompts(item.Content);
+                    if (prompts.Count > 0)
+                    {
+                        inputValues = ClipVault.Views.TemplateInputDialog.PromptForInputs(prompts);
+                        if (inputValues == null)
+                        {
+                            // 用户取消填空，中止粘贴
+                            return;
+                        }
+                    }
+                }
+
                 // 1. 设置内部操作标记，避免监听到自己写回的数据
                 _monitorService.IsInternalOperation = true;
 
@@ -52,9 +85,8 @@ namespace ClipVault.Services
                 }
                 else
                 {
-                    // v3.0 智能模板变量：在覆盖系统剪贴板前先读取当前剪贴板文本供 {{clipboard}} 宏使用，再单遍安全展开所有变量
                     string? priorClip = null;
-                    if (ClipVault.Helpers.TemplateMacroHelper.ContainsMacro(item.Content))
+                    if (TemplateMacroHelper.ContainsMacro(item.Content))
                     {
                         try
                         {
@@ -65,7 +97,11 @@ namespace ClipVault.Services
                             priorClip = string.Empty;
                         }
                     }
-                    string finalContent = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content, priorClip);
+                    string finalContent = TemplateMacroHelper.ExpandMacros(item.Content, priorClip, inputValues);
+                    if (plainTextOnly)
+                    {
+                        finalContent = NormalizePlainText(finalContent);
+                    }
                     Clipboard.SetText(finalContent);
                 }
 
@@ -80,7 +116,7 @@ namespace ClipVault.Services
 
                 // 5. 毫秒级等待确保原窗口接管键盘事件，然后模拟按下 Ctrl + V
                 await Task.Delay(65);
-                ClipVault.Helpers.SoundEffectHelper.PlayPasteCue(_monitorService.CurrentSettings);
+                SoundEffectHelper.PlayPasteCue(_monitorService.CurrentSettings);
                 NativeMethods.SimulateCtrlV();
             }
             catch (Exception ex)

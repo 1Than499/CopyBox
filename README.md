@@ -1,19 +1,46 @@
 <div align="center">
 
-# CopyBox 📦 v3.0.4
+# CopyBox 📦 v3.1.5
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v3.0.4-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v3.1.5-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **⚡ v3.0.4 优化与修复说明** ](#-v304-版本更新说明-whats-new-in-v304) | [ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **📜 v2.2.2 更新内容** ](#-v222-版本更新说明-whats-new-in-v222) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **✨ v3.1.5 效率进化说明** ](#-v315-版本更新说明-whats-new-in-v315) | [ **⚡ v3.0.4 优化与修复说明** ](#-v304-版本更新说明-whats-new-in-v304) | [ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
+
+---
+
+## ✨ v3.1.5 版本更新说明 (What's New in v3.1.5)
+
+### 1. 🔄 重复复制自动合并置顶 + 历史保留上限 & 孤立图片清理
+- **自动去重顶置**：默认开启“重复复制相同内容时自动置顶合并”，按 `Sha256` 识别相同内容并将原记录（完整保留置顶与标签归类）刷新顶置到最前，避免列表被重复卡片刷屏；
+- **智能历史瘦身**：可在设置中自由设定未置顶历史上限（`200 / 500 / 1000 / 2000 / 不限制`），超出上限自动淘汰最旧的非置顶未归类记录，并联动删除磁盘 `images/` 中的孤立无引用截图文件。
+
+### 2. 🔑 隐私应用黑名单自由扩展
+- 界面开放密码管理器自动忽略开关与 **自定义隐私黑名单进程输入框**（逗号分隔，无需 `.exe`），命中黑名单窗口复制内容直接跳过，不留任何痕迹。
+
+### 3. 🎨 卡片智能微增强 & 📌 轻量屏幕贴图 (Pin Screen)
+- **色值预览与链接直达**：识别 `#HEX` / `RGB(A)` 色值时自动在卡片顶栏渲染圆角小色块；识别 HTTP(S) 单行链接时提供 `🌐` 默认浏览器一键直达；
+- **纯文本粘贴与 JSON 格式化**：支持 `Shift + Enter` 或右键「纯文本去格式贴入」去除多余空行与格式；JSON 卡片支持右键「✨ 格式化 JSON 并复制」；
+- **桌面悬浮屏幕贴图**：图片卡片点击 `📍` 或右键「钉在屏幕上」，弹出无边框置顶透明小窗（左键拖拽、滚轮缩放 `25%~350%`、`Ctrl + 滚轮` 调透明度、双击/`Esc` 关闭即彻底释放内存）。
+
+### 4. ⚡ 交互式填空模板变量 `{{input:字段名}}`
+- 模板宏扩展支持 `{{input:字段名}}` 与带默认值语法 `{{input:字段名=默认值}}`，粘贴或复制触发时自动弹出极简参数输入框，确认后单遍安全替换并精准贴回原目标窗口。
+
+### 5. ⌨️ 自定义快捷动作全局热键 + 看板一键系统开关
+- **快捷动作独立热键**：新建自定义快捷动作可录制独立全局组合键（如 `Ctrl+Alt+S`），随时按键触发唤醒；
+- **系统看板实用拓展**：新增 **Windows 深/浅色切换**、**默认麦克风静音/取消静音**、**清空系统剪贴板** 三个轻量原生矢量磁贴。
+
+### 6. 🔍 历史旧图批量离线 OCR 补全索引 + 标签/配置精选包导出导入
+- **批量旧图补索引**：设置页新增后台低并发「🔍 旧图离线 OCR 补全索引」（支持实时进度与随时取消），补齐历史旧图识别文本后立即支持以文搜图；
+- **精选配置跨机迁移**：支持一键导出 `.copybox.json` 精选包（含自定义标签分组、置顶与标签短语模板、自定义动作及核心偏好），并在新机器合并导入，无需搬运海量截图库。
 
 ---
 
@@ -107,8 +134,8 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.0.4--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.4/CopyBox-v3.0.4-Windows-x64-Portable.zip)  
-[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe%20(v3.0.4)-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.0.4/CopyBox.exe)
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.1.5--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.1.5/CopyBox-v3.1.5-Windows-x64-Portable.zip)  
+[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe%20(v3.1.5)-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.1.5/CopyBox.exe)
 
 *(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
 

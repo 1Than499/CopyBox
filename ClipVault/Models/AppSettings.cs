@@ -42,8 +42,10 @@ namespace ClipVault.Models
 
         // 隐私与过滤规则
         public bool IgnorePasswordManagers { get; set; } = true;
+        public string CustomPrivacyBlacklist { get; set; } = string.Empty; // 自定义不记录的隐私进程名 (逗号/分号分隔)
+        public bool DeduplicateOnCopy { get; set; } = true; // 复制相同内容时自动合并提升至顶部，不生成重复卡片
         public bool AutoConvertImageToWebP { get; set; } = false; // 是否自动压缩图片
-        public int MaxHistoryCount { get; set; } = 1000; // 本地最大历史保留数
+        public int MaxHistoryCount { get; set; } = 1000; // 本地最大历史保留数 (0 = 无限制)
         public bool StartWithWindows { get; set; } = false; // 开机自启
         public bool PortableMode { get; set; } = true; // 便携模式 (默认开启，数据与配置存储在程序根目录)
 
@@ -139,5 +141,6 @@ namespace ClipVault.Models
         public string Icon { get; set; } = string.Empty;
         public string CommandOrPath { get; set; } = string.Empty;
         public bool ActivateExistingInstance { get; set; } = true;
+        public string Hotkey { get; set; } = string.Empty;
     }
 }

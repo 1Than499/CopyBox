@@ -361,32 +361,12 @@ namespace ClipVault.Services
                     using var reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
-                        var it = new ClipboardItem
+                        var it = ReadItemFromReader(reader);
+                        if (it.IsImage && hasSearch && !string.IsNullOrWhiteSpace(it.OcrText) &&
+                            it.OcrText.Contains(trimmedSearch, StringComparison.OrdinalIgnoreCase))
                         {
-                            Id = reader.GetInt32(0),
-                            ItemType = reader.GetString(1),
-                            Content = reader.GetString(2),
-                            Summary = reader.GetString(3),
-                            SourceApp = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                            SourceProcess = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                            CreatedAt = DateTime.TryParse(reader.GetString(6), out var dt) ? dt : DateTime.Now,
-                            IsPinned = reader.GetInt32(7) == 1,
-                            CharCount = reader.GetInt32(8),
-                            Sha256 = reader.IsDBNull(9) ? "" : reader.GetString(9),
-                            CustomTag = reader.IsDBNull(10) ? "" : reader.GetString(10),
-                            OcrText = reader.IsDBNull(11) ? "" : reader.GetString(11)
-                        };
-
-                        if (it.IsImage)
-                        {
-                            it.FullImagePath = Path.Combine(_storageDir, it.Content);
-                            if (hasSearch && !string.IsNullOrWhiteSpace(it.OcrText) &&
-                                it.OcrText.Contains(trimmedSearch, StringComparison.OrdinalIgnoreCase))
-                            {
-                                it.IsOcrKeywordMatched = true;
-                            }
+                            it.IsOcrKeywordMatched = true;
                         }
-
                         list.Add(it);
                     }
                 }
@@ -396,6 +376,30 @@ namespace ClipVault.Services
                 }
             }
             return list;
+        }
+
+        private ClipboardItem ReadItemFromReader(SqliteDataReader reader)
+        {
+            var it = new ClipboardItem
+            {
+                Id = reader.GetInt32(0),
+                ItemType = reader.GetString(1),
+                Content = reader.GetString(2),
+                Summary = reader.GetString(3),
+                SourceApp = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                SourceProcess = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                CreatedAt = DateTime.TryParse(reader.GetString(6), out var dt) ? dt : DateTime.Now,
+                IsPinned = reader.GetInt32(7) == 1,
+                CharCount = reader.GetInt32(8),
+                Sha256 = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                CustomTag = reader.IsDBNull(10) ? "" : reader.GetString(10),
+                OcrText = reader.IsDBNull(11) ? "" : reader.GetString(11)
+            };
+            if (it.IsImage)
+            {
+                it.FullImagePath = Path.Combine(_storageDir, it.Content);
+            }
+            return it;
         }
 
         public string? GetLatestItemHash()
@@ -436,6 +440,59 @@ namespace ClipVault.Services
             }
         }
 
+        public ClipboardItem? PromoteDuplicateByHash(string sha256, string sourceApp, string sourceProcess)
+        {
+            if (string.IsNullOrWhiteSpace(sha256)) return null;
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    ClipboardItem? found = null;
+                    using (var findCmd = conn.CreateCommand())
+                    {
+                        findCmd.CommandText = @"
+                            SELECT Id, ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText
+                            FROM ClipboardItems
+                            WHERE Sha256 = $hash
+                            ORDER BY CreatedAt DESC, Id DESC
+                            LIMIT 1;";
+                        findCmd.Parameters.AddWithValue("$hash", sha256);
+                        using var reader = findCmd.ExecuteReader();
+                        if (reader.Read())
+                        {
+                            found = ReadItemFromReader(reader);
+                        }
+                    }
+
+                    if (found == null) return null;
+
+                    DateTime now = DateTime.Now;
+                    using (var updCmd = conn.CreateCommand())
+                    {
+                        updCmd.CommandText = @"
+                            UPDATE ClipboardItems
+                            SET CreatedAt = $now, SourceApp = $app, SourceProcess = $proc
+                            WHERE Id = $id;";
+                        updCmd.Parameters.AddWithValue("$now", now.ToString("o"));
+                        updCmd.Parameters.AddWithValue("$app", string.IsNullOrEmpty(sourceApp) ? found.SourceApp : sourceApp);
+                        updCmd.Parameters.AddWithValue("$proc", string.IsNullOrEmpty(sourceProcess) ? found.SourceProcess : sourceProcess);
+                        updCmd.Parameters.AddWithValue("$id", found.Id);
+                        updCmd.ExecuteNonQuery();
+                    }
+
+                    found.CreatedAt = now;
+                    if (!string.IsNullOrEmpty(sourceApp)) found.SourceApp = sourceApp;
+                    if (!string.IsNullOrEmpty(sourceProcess)) found.SourceProcess = sourceProcess;
+                    return found;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
         public void DeleteItem(int id)
         {
             lock (_lock)
@@ -452,6 +509,7 @@ namespace ClipVault.Services
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to delete item: {ex.Message}");
                 }
+                CleanupOrphanImagesLocked();
             }
         }
 
@@ -471,7 +529,213 @@ namespace ClipVault.Services
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to clear: {ex.Message}");
                 }
+                CleanupOrphanImagesLocked();
             }
+        }
+
+        /// <summary>
+        /// 历史上限自动淘汰 + 孤立图片磁盘自动清理（保护置顶项与已归入自定义标签的记录）
+        /// </summary>
+        public int PruneOldItemsAndOrphanImages(int maxNonProtectedCount)
+        {
+            lock (_lock)
+            {
+                int deleted = 0;
+                if (maxNonProtectedCount > 0)
+                {
+                    try
+                    {
+                        using var conn = CreateConnection();
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = @"
+                            DELETE FROM ClipboardItems
+                            WHERE Id IN (
+                                SELECT Id FROM ClipboardItems
+                                WHERE IsPinned = 0 AND (CustomTag IS NULL OR CustomTag = '')
+                                ORDER BY CreatedAt DESC, Id DESC
+                                LIMIT -1 OFFSET $keep
+                            );";
+                        cmd.Parameters.AddWithValue("$keep", maxNonProtectedCount);
+                        deleted = cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Prune error: {ex.Message}");
+                    }
+                }
+
+                CleanupOrphanImagesLocked();
+                return deleted;
+            }
+        }
+
+        private void CleanupOrphanImagesLocked()
+        {
+            try
+            {
+                string imagesDir = Path.Combine(_storageDir, "images");
+                if (!Directory.Exists(imagesDir)) return;
+
+                var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var conn = CreateConnection())
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT Content FROM ClipboardItems WHERE ItemType = 'Image';";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        string rel = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                        if (!string.IsNullOrWhiteSpace(rel))
+                        {
+                            referenced.Add(Path.GetFileName(rel));
+                        }
+                    }
+                }
+
+                DateTime safeCutoff = DateTime.UtcNow.AddSeconds(-15);
+                foreach (var file in Directory.GetFiles(imagesDir))
+                {
+                    string name = Path.GetFileName(file);
+                    if (referenced.Contains(name)) continue;
+                    try
+                    {
+                        if (File.GetLastWriteTimeUtc(file) < safeCutoff)
+                        {
+                            File.Delete(file);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        public int CountImagesMissingOcr()
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT COUNT(*) FROM ClipboardItems WHERE ItemType = 'Image' AND (OcrText IS NULL OR OcrText = '');";
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+        }
+
+        public List<ClipboardItem> GetImagesMissingOcr(int limit = 200)
+        {
+            var list = new List<ClipboardItem>();
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT Id, ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText
+                        FROM ClipboardItems
+                        WHERE ItemType = 'Image' AND (OcrText IS NULL OR OcrText = '')
+                        ORDER BY CreatedAt DESC, Id DESC
+                        LIMIT $limit;";
+                    cmd.Parameters.AddWithValue("$limit", limit);
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        list.Add(ReadItemFromReader(reader));
+                    }
+                }
+                catch { }
+            }
+            return list;
+        }
+
+        public List<ClipboardItem> GetPinnedAndTaggedTextItems()
+        {
+            var list = new List<ClipboardItem>();
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT Id, ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText
+                        FROM ClipboardItems
+                        WHERE ItemType != 'Image' AND (IsPinned = 1 OR (CustomTag IS NOT NULL AND CustomTag != ''))
+                        ORDER BY CreatedAt DESC, Id DESC;";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        list.Add(ReadItemFromReader(reader));
+                    }
+                }
+                catch { }
+            }
+            return list;
+        }
+
+        public int MergeBackupTagsAndItems(IEnumerable<CustomTagItem> tags, IEnumerable<ClipboardItem> snippets)
+        {
+            int added = 0;
+            lock (_lock)
+            {
+                try
+                {
+                    using var conn = CreateConnection();
+                    foreach (var t in tags)
+                    {
+                        if (string.IsNullOrWhiteSpace(t.TagName)) continue;
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = @"
+                            INSERT OR IGNORE INTO CustomTags (TagName, TagIcon, SortOrder, CreatedAt)
+                            VALUES ($name, $icon, $order, $created);";
+                        cmd.Parameters.AddWithValue("$name", t.TagName.Trim());
+                        cmd.Parameters.AddWithValue("$icon", string.IsNullOrWhiteSpace(t.TagIcon) ? "🏷️" : t.TagIcon);
+                        cmd.Parameters.AddWithValue("$order", t.SortOrder);
+                        cmd.Parameters.AddWithValue("$created", (t.CreatedAt == default ? DateTime.Now : t.CreatedAt).ToString("o"));
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    foreach (var s in snippets)
+                    {
+                        if (string.IsNullOrEmpty(s.Content) || s.IsImage) continue;
+                        if (!string.IsNullOrWhiteSpace(s.Sha256))
+                        {
+                            using var existsCmd = conn.CreateCommand();
+                            existsCmd.CommandText = "SELECT COUNT(*) FROM ClipboardItems WHERE Sha256 = $hash AND Content = $content;";
+                            existsCmd.Parameters.AddWithValue("$hash", s.Sha256);
+                            existsCmd.Parameters.AddWithValue("$content", s.Content);
+                            if (Convert.ToInt32(existsCmd.ExecuteScalar()) > 0) continue;
+                        }
+
+                        using var insCmd = conn.CreateCommand();
+                        insCmd.CommandText = @"
+                            INSERT INTO ClipboardItems (ItemType, Content, Summary, SourceApp, SourceProcess, CreatedAt, IsPinned, CharCount, Sha256, CustomTag, OcrText)
+                            VALUES ($type, $content, $summary, $app, $process, $created, $pinned, $chars, $hash, $tag, '');";
+                        insCmd.Parameters.AddWithValue("$type", string.IsNullOrWhiteSpace(s.ItemType) ? "Text" : s.ItemType);
+                        insCmd.Parameters.AddWithValue("$content", s.Content);
+                        insCmd.Parameters.AddWithValue("$summary", s.Summary ?? string.Empty);
+                        insCmd.Parameters.AddWithValue("$app", string.IsNullOrWhiteSpace(s.SourceApp) ? "BackupImport" : s.SourceApp);
+                        insCmd.Parameters.AddWithValue("$process", s.SourceProcess ?? string.Empty);
+                        insCmd.Parameters.AddWithValue("$created", (s.CreatedAt == default ? DateTime.Now : s.CreatedAt).ToString("o"));
+                        insCmd.Parameters.AddWithValue("$pinned", s.IsPinned ? 1 : 0);
+                        insCmd.Parameters.AddWithValue("$chars", s.CharCount > 0 ? s.CharCount : s.Content.Length);
+                        insCmd.Parameters.AddWithValue("$hash", s.Sha256 ?? string.Empty);
+                        insCmd.Parameters.AddWithValue("$tag", s.CustomTag ?? string.Empty);
+                        insCmd.ExecuteNonQuery();
+                        added++;
+                    }
+                }
+                catch { }
+            }
+            CustomTagsChanged?.Invoke();
+            return added;
         }
 
         // ==================== v3.0 自定义标签分组与离线 OCR 数据库接口 ====================

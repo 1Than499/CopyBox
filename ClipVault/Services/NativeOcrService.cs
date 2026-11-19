@@ -165,5 +165,48 @@ namespace ClipVault.Services
                 _ocrConcurrencyGate.Release();
             }
         }
+
+        /// <summary>
+        /// 低优先级后台批量补建历史旧图离线 OCR 文字索引（完成后自动释放引擎与工作集）
+        /// </summary>
+        public static async Task<int> BackfillMissingOcrAsync(
+            DatabaseService dbService,
+            Action<int, int, int>? onProgress,
+            CancellationToken ct)
+        {
+            var pending = dbService.GetImagesMissingOcr(200);
+            int total = pending.Count;
+            int processed = 0;
+            int indexed = 0;
+
+            try
+            {
+                foreach (var item in pending)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    processed++;
+
+                    if (!string.IsNullOrWhiteSpace(item.FullImagePath) && File.Exists(item.FullImagePath))
+                    {
+                        string text = await RecognizeImageFileAsync(item.FullImagePath).ConfigureAwait(false);
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            dbService.UpdateItemOcrText(item.Id, text);
+                            indexed++;
+                        }
+                    }
+
+                    onProgress?.Invoke(processed, total, indexed);
+                    await Task.Delay(35, ct).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
+            }
+
+            return indexed;
+        }
     }
 }

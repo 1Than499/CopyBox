@@ -346,7 +346,7 @@
                         </Border>
                         <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="12.5" Foreground="{DynamicResource TitleTextBrush}" VerticalAlignment="Center"/>
                         <Border Background="#1F0078D4" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtMainAppVersion" Text="v3.0.4" FontSize="9.5" Foreground="#38BDF8" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="TxtMainAppVersion" Text="v3.1.5" FontSize="9.5" Foreground="#38BDF8" FontWeight="SemiBold"/>
                         </Border>
                     </StackPanel>
                 </Grid>
@@ -566,6 +566,11 @@
                                         <TextBlock Text="❝" Foreground="{DynamicResource SubTextBrush}" FontSize="14" FontWeight="Bold" 
                                                    Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" 
                                                    Margin="0,-4,4,0"/>
+                                        <!-- v3.1.5 色值小色块预览 -->
+                                        <Border Width="11" Height="11" CornerRadius="3" Margin="0,0,5,0"
+                                                Background="{Binding ColorSwatchBrush}" BorderBrush="#66FFFFFF" BorderThickness="0.8"
+                                                Visibility="{Binding HasColorSwatch, Converter={StaticResource BoolToVis}}"
+                                                ToolTip="颜色色值预览" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <!-- 中间来源轻字提示 (低调融入) -->
@@ -595,6 +600,18 @@
                                                 Click="BtnMainExtractOcr_Click"
                                                 Background="#220EA5E9" Foreground="#38BDF8" BorderBrush="#550EA5E9" BorderThickness="1"
                                                 FontSize="9" FontWeight="SemiBold" Padding="4,1" Margin="0,0,4,0" Cursor="Hand"/>
+                                        <Button Content="📍"
+                                                ToolTip="钉在屏幕上 (悬浮置顶对比 · 滚轮缩放)"
+                                                Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}"
+                                                Click="BtnMainPinScreen_Click"
+                                                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubTextBrush}"
+                                                FontSize="10" Padding="3,0" Margin="0,0,4,0" Cursor="Hand"/>
+                                        <Button Content="🌐"
+                                                ToolTip="在默认浏览器中打开链接"
+                                                Visibility="{Binding IsUrl, Converter={StaticResource BoolToVis}}"
+                                                Click="BtnMainOpenUrl_Click"
+                                                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubTextBrush}"
+                                                FontSize="10" Padding="3,0" Margin="0,0,4,0" Cursor="Hand"/>
 
                                         <!-- 敏感隐私标签与明文/掩码切换按钮 -->
                                         <Border Background="#2DF59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center"
@@ -815,8 +832,17 @@
                                     <CheckBox x:Name="ChkMainAutoMaskSensitive"
                                               Content="🔒 敏感信息自动遮罩 (密码/密钥/银行卡/身份证/手机号)"
                                               Foreground="{DynamicResource CardTextBrush}"
-                                              FontSize="10.5"
+                                              FontSize="10.5" Margin="0,0,0,5"
                                               Click="ChkMainSmartGuard_Click"/>
+                                    <CheckBox x:Name="ChkMainIgnorePasswordManagers"
+                                              Content="🔑 自动忽略常见密码管理器复制内容 (1Password/Bitwarden/KeePass 等)"
+                                              Foreground="{DynamicResource CardTextBrush}"
+                                              FontSize="10.5" Margin="0,0,0,5"
+                                              Click="ChkMainSmartGuard_Click"/>
+                                    <TextBlock x:Name="TxtMainPrivacyBlacklistLabel" Text="自定义隐私黑名单进程 (逗号分隔，命中时不落盘)：" Foreground="{DynamicResource SubTextBrush}" FontSize="10" Margin="0,1,0,4"/>
+                                    <TextBox x:Name="TxtMainPrivacyBlacklist" Background="{DynamicResource CardBgBrush}" Foreground="{DynamicResource CardTextBrush}"
+                                             BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="7,4" FontSize="10.5"
+                                             LostFocus="TxtMainPrivacyBlacklist_LostFocus" ToolTip="输入进程名（无需 .exe），如 keepass, wechat"/>
                                 </StackPanel>
                             </Border>
 
@@ -841,13 +867,39 @@
                                         </Button>
                                     </Grid>
                                     <!-- 本地状态提示卡片 -->
-                                    <Border Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource InfoBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6">
+                                    <Border Background="{DynamicResource InfoBgBrush}" BorderBrush="{DynamicResource InfoBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,8">
                                         <TextBlock x:Name="TxtStorageStatusInfo" 
                                                    Text="ℹ 本地 SQLite 状态正常：已记录 0 条 (置顶 0)，图片 0 张，数据 100% 物理留存于本地磁盘。" 
                                                    Foreground="{DynamicResource InfoTextBrush}" 
                                                    FontSize="10.5" 
                                                    TextWrapping="Wrap"/>
                                     </Border>
+
+                                    <!-- v3.1.5 去重合并、历史上限瘦身、旧图补索引与配置备份 -->
+                                    <CheckBox x:Name="ChkMainDeduplicateOnCopy" Content="🔄 重复复制相同内容时自动置顶合并 (避免生成重复卡片)" IsChecked="True"
+                                              Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Margin="0,0,0,6"
+                                              Click="ChkMainDeduplicateOnCopy_Click"/>
+                                    <TextBlock x:Name="TxtMainMaxHistoryLabel" Text="未置顶历史上限 (超出自动瘦身并清理孤立图片)：" Foreground="{DynamicResource SubTextBrush}" FontSize="10" Margin="0,0,0,4"/>
+                                    <WrapPanel Margin="0,0,0,7">
+                                        <RadioButton x:Name="RadioMainMaxHist200" Content="200" Tag="200" GroupName="MainMaxHist" Margin="0,0,10,2" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Checked="MainMaxHistoryRadio_Changed"/>
+                                        <RadioButton x:Name="RadioMainMaxHist500" Content="500" Tag="500" GroupName="MainMaxHist" Margin="0,0,10,2" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Checked="MainMaxHistoryRadio_Changed"/>
+                                        <RadioButton x:Name="RadioMainMaxHist1000" Content="1000" Tag="1000" GroupName="MainMaxHist" Margin="0,0,10,2" IsChecked="True" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Checked="MainMaxHistoryRadio_Changed"/>
+                                        <RadioButton x:Name="RadioMainMaxHist2000" Content="2000" Tag="2000" GroupName="MainMaxHist" Margin="0,0,10,2" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Checked="MainMaxHistoryRadio_Changed"/>
+                                        <RadioButton x:Name="RadioMainMaxHist0" Content="不限制" Tag="0" GroupName="MainMaxHist" Margin="0,0,0,2" Foreground="{DynamicResource CardTextBrush}" FontSize="10.5" Checked="MainMaxHistoryRadio_Changed"/>
+                                    </WrapPanel>
+                                    <Button x:Name="BtnMainBackfillOcr" Content="🔍 旧图离线 OCR 补全索引" Click="BtnMainBackfillOcr_Click" Background="#263142" Foreground="#38BDF8"
+                                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,5" FontSize="10.5" Cursor="Hand" Margin="0,0,0,6"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="6"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="BtnMainExportBackup" Grid.Column="0" Content="📤 导出配置/标签" Click="BtnMainExportBackup_Click" Background="#263142" Foreground="White"
+                                                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="6,5" FontSize="10.5" Cursor="Hand"/>
+                                        <Button x:Name="BtnMainImportBackup" Grid.Column="2" Content="📥 导入精选备份" Click="BtnMainImportBackup_Click" Background="#263142" Foreground="White"
+                                                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="6,5" FontSize="10.5" Cursor="Hand"/>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -1014,6 +1066,7 @@
                             <Button Content="{}{{weekday}}" Tag="{}{{weekday}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="当前星期几"/>
                             <Button Content="{}{{clipboard}}" Tag="{}{{clipboard}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="粘贴前系统剪贴板中的文本"/>
                             <Button Content="{}{{guid}}" Tag="{}{{guid}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#228B5CF6" Foreground="#A78BFA" BorderBrush="#448B5CF6" BorderThickness="1" Cursor="Hand" ToolTip="随机生成唯一 UUID"/>
+                            <Button Content="{}{{input:名称}}" Tag="{}{{input:名称}}" Click="BtnMainInsertMacroToken_Click" FontSize="10" Padding="5,1" Margin="0,0,4,4" Background="#22F59E0B" Foreground="#FBBF24" BorderBrush="#44F59E0B" BorderThickness="1" Cursor="Hand" ToolTip="粘贴时弹出输入框收集动态参数（支持 =默认值）"/>
                         </WrapPanel>
 
                         <Grid>

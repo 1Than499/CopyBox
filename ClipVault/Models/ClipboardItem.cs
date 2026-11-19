@@ -119,8 +119,134 @@ namespace ClipVault.Models
         public bool HasTemplateMacro => !IsImage && ItemType != "File" && TemplateMacroHelper.ContainsMacro(_content);
         public string TemplateMacroBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "⚡ Macro" : "⚡ 动态模板";
         public string TemplateMacroTooltip => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
-            ? "Contains dynamic template placeholders ({{date}}, {{time}}, {{clipboard}}, etc.) that auto-expand on paste"
-            : "包含动态模板变量（如 {{date}}、{{time}}、{{clipboard}}），粘贴时自动实时替换";
+            ? "Contains dynamic template placeholders ({{date}}, {{clipboard}}, {{input:Field}}, etc.) that expand on paste"
+            : "包含动态模板变量（如 {{date}}、{{clipboard}}、{{input:字段名}}），粘贴时自动实时替换";
+
+        // ==================== v3.1.5 卡片智能微增强 (色块预览 / URL 直达 / JSON 识别) ====================
+        private static readonly System.Text.RegularExpressions.Regex HexColorRegex = new(
+            @"^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex RgbColorRegex = new(
+            @"^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([01]?(?:\.\d+)?))?\s*\)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private bool _smartPropsEvaluated;
+        private System.Windows.Media.Brush? _colorSwatchBrush;
+        private string _extractedUrl = string.Empty;
+        private bool _isJsonContent;
+
+        private void EnsureSmartPropsEvaluated()
+        {
+            if (_smartPropsEvaluated) return;
+            _smartPropsEvaluated = true;
+
+            _colorSwatchBrush = null;
+            _extractedUrl = string.Empty;
+            _isJsonContent = false;
+
+            if (IsImage || ItemType == "File" || string.IsNullOrWhiteSpace(_content)) return;
+            string trimmed = _content.Trim();
+
+            // 1. 色值识别 (#RGB / #RRGGBB / #AARRGGBB / rgb / rgba)
+            if (trimmed.Length <= 36)
+            {
+                if (HexColorRegex.IsMatch(trimmed))
+                {
+                    try
+                    {
+                        var col = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(trimmed);
+                        var brush = new System.Windows.Media.SolidColorBrush(col);
+                        brush.Freeze();
+                        _colorSwatchBrush = brush;
+                    }
+                    catch { }
+                }
+                else
+                {
+                    var m = RgbColorRegex.Match(trimmed);
+                    if (m.Success &&
+                        int.TryParse(m.Groups[1].Value, out int r) && r <= 255 &&
+                        int.TryParse(m.Groups[2].Value, out int g) && g <= 255 &&
+                        int.TryParse(m.Groups[3].Value, out int b) && b <= 255)
+                    {
+                        byte a = 255;
+                        if (m.Groups[4].Success && double.TryParse(m.Groups[4].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double alpha))
+                        {
+                            a = (byte)Math.Clamp((int)Math.Round(alpha * 255), 0, 255);
+                        }
+                        var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(a, (byte)r, (byte)g, (byte)b));
+                        brush.Freeze();
+                        _colorSwatchBrush = brush;
+                    }
+                }
+            }
+
+            // 2. 单行 HTTP/HTTPS URL 识别
+            if (trimmed.Length <= 1024 &&
+                !trimmed.Contains('\n') && !trimmed.Contains('\r') && !trimmed.Contains(' ') &&
+                Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                _extractedUrl = uri.AbsoluteUri;
+            }
+
+            // 3. 轻量 JSON 合法性检测
+            if ((trimmed.StartsWith("{") && trimmed.EndsWith("}")) || (trimmed.StartsWith("[") && trimmed.EndsWith("]")))
+            {
+                if (trimmed.Length <= 200_000)
+                {
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(trimmed);
+                        _isJsonContent = true;
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        public bool HasColorSwatch
+        {
+            get { EnsureSmartPropsEvaluated(); return _colorSwatchBrush != null; }
+        }
+
+        public System.Windows.Media.Brush? ColorSwatchBrush
+        {
+            get { EnsureSmartPropsEvaluated(); return _colorSwatchBrush; }
+        }
+
+        public bool IsUrl
+        {
+            get { EnsureSmartPropsEvaluated(); return !string.IsNullOrEmpty(_extractedUrl); }
+        }
+
+        public string ExtractedUrl
+        {
+            get { EnsureSmartPropsEvaluated(); return _extractedUrl; }
+        }
+
+        public bool IsJsonContent
+        {
+            get { EnsureSmartPropsEvaluated(); return _isJsonContent; }
+        }
+
+        public string? TryFormatJson()
+        {
+            if (string.IsNullOrWhiteSpace(_content)) return null;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(_content.Trim());
+                return System.Text.Json.JsonSerializer.Serialize(doc.RootElement, new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                });
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         // ==================== v2.2.1 敏感信息自动遮罩属性 (v3.0 升级为按需惰性求值 + O(1) 内存缓存) ====================
         private bool _sensitiveEvaluated;

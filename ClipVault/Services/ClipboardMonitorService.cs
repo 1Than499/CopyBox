@@ -164,14 +164,12 @@ namespace ClipVault.Services
             }
             catch { }
 
-            // 密码管理器隐私黑名单校验
-            if (_settingsService.CurrentSettings.IgnorePasswordManagers)
+            // 密码管理器与自定义隐私应用黑名单校验
+            if ((_settingsService.CurrentSettings.IgnorePasswordManagers && PasswordManagerProcesses.Contains(sourceProcess)) ||
+                IsProcessInCustomBlacklist(sourceProcess))
             {
-                if (PasswordManagerProcesses.Contains(sourceProcess))
-                {
-                    Debug.WriteLine($"[Privacy] Ignored copy from password manager: {sourceProcess}");
-                    return;
-                }
+                Debug.WriteLine($"[Privacy] Ignored copy from blacklisted process: {sourceProcess}");
+                return;
             }
 
             // 读取剪贴板内容（带重试机制，防止被其他软件独占锁住）
@@ -191,46 +189,95 @@ namespace ClipVault.Services
 
             if (capturedItem == null) return;
 
-            // 重复项快速过滤
+            // 重复项快速过滤（若为紧邻最新一条则直接忽略）
             string? latestHash = _dbService.GetLatestItemHash();
             if (!string.IsNullOrEmpty(latestHash) && latestHash == capturedItem.Sha256)
             {
                 return;
             }
 
-            // 写入本地数据库并触发事件
+            // v3.1.5 重复复制智能合并提升至顶部
+            if (_settingsService.CurrentSettings.DeduplicateOnCopy)
+            {
+                var promoted = _dbService.PromoteDuplicateByHash(capturedItem.Sha256, capturedItem.SourceApp, capturedItem.SourceProcess);
+                if (promoted != null)
+                {
+                    ItemCaptured?.Invoke(promoted);
+                    ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService.CurrentSettings);
+                    if (promoted.IsImage && string.IsNullOrWhiteSpace(promoted.OcrText) &&
+                        promoted.Id > 0 && !string.IsNullOrWhiteSpace(promoted.FullImagePath))
+                    {
+                        QueueBackgroundOcr(promoted);
+                    }
+                    return;
+                }
+            }
+
+            // 写入本地数据库、按配置清理超限旧历史与孤立图片并触发事件
             _dbService.InsertItem(capturedItem);
+            int maxHistory = _settingsService.CurrentSettings.MaxHistoryCount;
+            if (maxHistory > 0)
+            {
+                _dbService.PruneOldItemsAndOrphanImages(maxHistory);
+            }
             ItemCaptured?.Invoke(capturedItem);
             ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService.CurrentSettings);
 
             // v3.0：若为图片/截图，后台低优先级异步执行 Windows 原生离线 OCR 文字提取并回写数据库
             if (capturedItem.IsImage && capturedItem.Id > 0 && !string.IsNullOrWhiteSpace(capturedItem.FullImagePath))
             {
-                int capturedId = capturedItem.Id;
-                string imgPath = capturedItem.FullImagePath;
-                _ = System.Threading.Tasks.Task.Run(async () =>
-                {
-                    try
-                    {
-                        string ocrText = await NativeOcrService.RecognizeImageFileAsync(imgPath).ConfigureAwait(false);
-                        if (!string.IsNullOrWhiteSpace(ocrText))
-                        {
-                            capturedItem.OcrText = ocrText;
-                            _dbService.UpdateItemOcrText(capturedId, ocrText);
-                            ItemOcrCompleted?.Invoke(capturedId, ocrText);
-                        }
-                    }
-                    catch { }
-                    finally
-                    {
-                        ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
-                    }
-                });
+                QueueBackgroundOcr(capturedItem);
             }
             else if (capturedItem.IsImage)
             {
                 ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
             }
+        }
+
+        private bool IsProcessInCustomBlacklist(string sourceProcess)
+        {
+            string raw = _settingsService.CurrentSettings.CustomPrivacyBlacklist;
+            if (string.IsNullOrWhiteSpace(raw) || string.IsNullOrWhiteSpace(sourceProcess)) return false;
+
+            string[] tokens = raw.Split(new[] { ',', ';', '，', '；', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var token in tokens)
+            {
+                string candidate = token.Trim();
+                if (candidate.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    candidate = candidate.Substring(0, candidate.Length - 4);
+                }
+                if (!string.IsNullOrEmpty(candidate) &&
+                    string.Equals(candidate, sourceProcess, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void QueueBackgroundOcr(ClipboardItem capturedItem)
+        {
+            int capturedId = capturedItem.Id;
+            string imgPath = capturedItem.FullImagePath;
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    string ocrText = await NativeOcrService.RecognizeImageFileAsync(imgPath).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(ocrText))
+                    {
+                        capturedItem.OcrText = ocrText;
+                        _dbService.UpdateItemOcrText(capturedId, ocrText);
+                        ItemOcrCompleted?.Invoke(capturedId, ocrText);
+                    }
+                }
+                catch { }
+                finally
+                {
+                    ClipVault.Helpers.MemoryHelper.NotifyBackgroundMemoryPressure();
+                }
+            });
         }
 
         private ClipboardItem? ExtractClipboardData(string sourceApp, string sourceProcess)

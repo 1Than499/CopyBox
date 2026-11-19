@@ -106,15 +106,23 @@ namespace ClipVault
                         {
                             _trayMenuDnd.Checked = _settingsService.CurrentSettings.IsManualDndMode;
                         }
+                        _hotkeyService?.RegisterCustomActionHotkeys(_settingsService.CurrentSettings.CustomActions);
                         _mainWindow?.SyncSettingsFromService(refreshCards: false);
                         _sidebarWindow?.SyncSettingsFromService(refreshCards: false);
                     });
                 };
 
-                // 4. 绑定统一全局热键 (Alt + V)，根据当前设置呼出对应模式 (1.0 居中 或 2.0 侧边栏)
+                // 4. 绑定统一全局热键 (Alt + V) 与自定义快捷动作独立热键
                 _hotkeyService.HotkeyPressed += () =>
                 {
                     ToggleActiveWindow();
+                };
+                _hotkeyService.CustomActionHotkeyPressed += action =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        try { ClipVault.Helpers.AppLauncherHelper.ExecuteCustomAction(action); } catch { }
+                    });
                 };
 
                 // 5. 初始化 Windows 任务栏系统托盘 (100% 官方原生稳定常驻)

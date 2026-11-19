@@ -407,7 +407,7 @@
                             </Border>
                             <TextBlock Text="CopyBox" FontWeight="Bold" FontSize="13.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                             <Border Margin="7,0,0,0" Padding="5,1.5" CornerRadius="4" Background="#1E0078D7" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtAppVersion" Text="v3.0.4" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
+                                <TextBlock x:Name="TxtAppVersion" Text="v3.1.5" FontSize="9.5" Foreground="#60A5FA" FontWeight="Bold"/>
                             </Border>
                         </StackPanel>
 
@@ -766,6 +766,11 @@
                                             <!-- 文本专属双引号 -->
                                             <TextBlock Text="❝" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" FontWeight="Bold" 
                                                        Visibility="{Binding IsText, Converter={StaticResource BoolToVis}}" Margin="0,-2,4,0" VerticalAlignment="Center"/>
+                                            <!-- v3.1.5 色值小色块预览 -->
+                                            <Border Width="11" Height="11" CornerRadius="3" Margin="0,0,5,0"
+                                                    Background="{Binding ColorSwatchBrush}" BorderBrush="#66FFFFFF" BorderThickness="0.8"
+                                                    Visibility="{Binding HasColorSwatch, Converter={StaticResource BoolToVis}}"
+                                                    ToolTip="颜色色值预览" VerticalAlignment="Center"/>
                                             <!-- v2.2.1 敏感信息自动遮罩徽标与单条显隐小眼睛按钮 -->
                                             <Border Background="#26F59E0B" BorderBrush="#66F59E0B" BorderThickness="0.8" CornerRadius="4" Padding="5,1" Margin="1,0,3,0"
                                                     Visibility="{Binding ShowSensitiveBadge, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center">
@@ -860,6 +865,12 @@
                                                     </ControlTemplate>
                                                 </Button.Template>
                                             </Button>
+                                            <Button Content="🌐" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10"
+                                                    Visibility="{Binding IsUrl, Converter={StaticResource BoolToVis}}"
+                                                    Click="BtnCardOpenUrl_Click" ToolTip="在默认浏览器中打开链接"/>
+                                            <Button Content="📍" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10"
+                                                    Visibility="{Binding IsImage, Converter={StaticResource BoolToVis}}"
+                                                    Click="BtnCardPinScreen_Click" ToolTip="钉在屏幕上 (悬浮置顶对比 · 滚轮缩放)"/>
                                             <Button Content="🏷" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardTag_Click" ToolTip="归入自定义标签分组 (归入后免受清空历史影响)"/>
                                             <Button Content="📌" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardPin_Click" ToolTip="切换置顶"/>
                                             <Button Content="⮑" Style="{StaticResource SidebarTopIconBtn}" Width="22" Height="20" FontSize="10" Click="BtnCardEnqueue_Click" ToolTip="加入连续粘贴队列"/>
@@ -999,6 +1010,28 @@
                             </Button>
                         </UniformGrid>
 
+                        <!-- 2.5 v3.1.5 实用一键切换快捷行 (Windows 深浅切换 / 麦克风静音 / 清空系统剪贴板) -->
+                        <UniformGrid Columns="3" Margin="0,-6,0,12">
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Height="50" Margin="3" Click="TileWinTheme_Click" ToolTip="一键切换 Windows 系统应用与任务栏深/浅色模式">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE793;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="15" Foreground="#A78BFA" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtTileWinTheme" Text="Win 深/浅色" FontSize="10" FontWeight="SemiBold" Margin="0,2,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Height="50" Margin="3" Click="TileMicMute_Click" ToolTip="一键静音 / 取消静音默认麦克风">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtTileMicIcon" Text="&#xE720;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="15" Foreground="#34D399" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtTileMicMute" Text="麦克风静音" FontSize="10" FontWeight="SemiBold" Margin="0,2,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ActionCenterTileStyle}" Height="50" Margin="3" Click="TileClearClipboard_Click" ToolTip="立即清空 Windows 系统当前剪贴板">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets, Segoe UI Symbol" FontSize="15" Foreground="#F87171" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtTileClearClip" Text="清空剪贴板" FontSize="10" FontWeight="SemiBold" Margin="0,2,0,0" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+
                         <!-- 3. 自定义快捷动作网格 (用户可自行添加和管理) -->
                         <DockPanel Margin="2,0,2,6">
                             <TextBlock x:Name="TxtSectionCustomActions" Text="自定义快捷动作" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -1109,7 +1142,12 @@
                                 <TextBlock x:Name="TxtSetSmartGuardTitle" Text="🛡️ 游戏免打扰与敏感隐私遮罩：" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                                 <CheckBox x:Name="ChkFullscreenDnd2" Content="🎮 全屏防误触与游戏“免打扰模式” (全屏游戏/视频时自动禁用贴边弹出)" IsChecked="True" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
                                 <CheckBox x:Name="ChkManualDnd2" Content="🌙 强制开启免打扰模式 (暂停鼠标移至屏幕边缘自动唤醒)" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
-                                <CheckBox x:Name="ChkAutoMaskSensitive2" Content="🔒 敏感信息自动遮罩 (自动打码 API Key、密码、银行卡、身份证、手机号)" IsChecked="True" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <CheckBox x:Name="ChkAutoMaskSensitive2" Content="🔒 敏感信息自动遮罩 (自动打码 API Key、密码、银行卡、身份证、手机号)" IsChecked="True" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <CheckBox x:Name="ChkIgnorePasswordManagers2" Content="🔑 自动忽略常见密码管理器复制内容 (1Password/Bitwarden/KeePass 等)" IsChecked="True" Margin="0,0,0,6" Checked="ChkSmartGuard_Changed" Unchecked="ChkSmartGuard_Changed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11"/>
+                                <TextBlock x:Name="TxtSetPrivacyBlacklistLabel" Text="自定义隐私黑名单进程 (逗号分隔，命中时不落盘)：" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,4"/>
+                                <TextBox x:Name="TxtPrivacyBlacklist2" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="7,4" FontSize="10.5"
+                                         LostFocus="TxtPrivacyBlacklist_LostFocus" ToolTip="输入进程名（无需 .exe），如 keepass, wechat"/>
                             </StackPanel>
                         </Border>
 
@@ -1148,13 +1186,40 @@
                                             Padding="10,5" FontSize="11" Cursor="Hand" Click="BtnBrowseStorage_Click"/>
                                 </Grid>
                                 <!-- 本地 SQLite 状态提示卡片 -->
-                                <Border Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6">
+                                <Border Background="{DynamicResource TabContainerBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,8">
                                     <TextBlock x:Name="TxtSideStorageStatusInfo" 
                                                Text="ℹ 本地 SQLite 状态正常：已记录 0 条 (置顶 0)，图片 0 张，数据 100% 物理留存于本地磁盘。" 
                                                Foreground="{DynamicResource AccentBlueBrush}" 
                                                FontSize="10.5" 
                                                TextWrapping="Wrap"/>
                                 </Border>
+
+                                <!-- v3.1.5 去重合并、历史上限瘦身、旧图补索引与配置备份 -->
+                                <CheckBox x:Name="ChkDeduplicateOnCopy2" Content="🔄 重复复制相同内容时自动置顶合并 (避免生成重复卡片)" IsChecked="True"
+                                          Foreground="{DynamicResource TextPrimaryBrush}" FontSize="10.5" Margin="0,0,0,6"
+                                          Checked="ChkDeduplicateOnCopy_Changed" Unchecked="ChkDeduplicateOnCopy_Changed"/>
+                                <TextBlock x:Name="TxtSetMaxHistoryLabel" Text="未置顶历史上限 (超出自动瘦身并清理孤立图片)：" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <RadioButton x:Name="RadioMaxHist200" Content="200" Tag="200" GroupName="SideMaxHist" Style="{StaticResource FilterPillStyle}" Checked="MaxHistoryRadio_Checked"/>
+                                    <RadioButton x:Name="RadioMaxHist500" Content="500" Tag="500" GroupName="SideMaxHist" Style="{StaticResource FilterPillStyle}" Checked="MaxHistoryRadio_Checked"/>
+                                    <RadioButton x:Name="RadioMaxHist1000" Content="1000" Tag="1000" GroupName="SideMaxHist" IsChecked="True" Style="{StaticResource FilterPillStyle}" Checked="MaxHistoryRadio_Checked"/>
+                                    <RadioButton x:Name="RadioMaxHist2000" Content="2000" Tag="2000" GroupName="SideMaxHist" Style="{StaticResource FilterPillStyle}" Checked="MaxHistoryRadio_Checked"/>
+                                    <RadioButton x:Name="RadioMaxHist0" Content="不限制" Tag="0" GroupName="SideMaxHist" Style="{StaticResource FilterPillStyle}" Checked="MaxHistoryRadio_Checked"/>
+                                </WrapPanel>
+                                <Button x:Name="BtnBackfillOcr2" Content="🔍 旧图离线 OCR 补全索引" Background="{DynamicResource TileBgBrush}" Foreground="#38BDF8"
+                                        BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="8,5" FontSize="10.5" Cursor="Hand"
+                                        Margin="0,0,0,6" Click="BtnBackfillOcr_Click"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="BtnExportBackup2" Grid.Column="0" Content="📤 导出配置/标签" Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="6,5" FontSize="10.5" Cursor="Hand" Click="BtnExportBackup_Click"/>
+                                    <Button x:Name="BtnImportBackup2" Grid.Column="2" Content="📥 导入精选备份" Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="6,5" FontSize="10.5" Cursor="Hand" Click="BtnImportBackup_Click"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -1335,6 +1400,20 @@
                                 <TextBox x:Name="TxtNewActionIcon" Grid.Column="1" Text="" Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}" Padding="6,4" FontSize="12" VerticalContentAlignment="Center" TextChanged="TxtNewActionIcon_TextChanged" ToolTip="留空将自动使用程序自身图标；也可输入任意 Emoji（如 🚀、💬、🎮）覆盖"/>
                             </Grid>
 
+                            <!-- 全局热键绑定 (可选) -->
+                            <TextBlock Text="独立全局热键 (可选，如 Ctrl+Alt+S，留空则不绑定)" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtNewActionHotkey" Grid.Column="0" Text="" IsReadOnly="True"
+                                         Background="{DynamicResource TabContainerBgBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
+                                         Padding="6,4" FontSize="11" PreviewKeyDown="TxtNewActionHotkey_PreviewKeyDown"
+                                         ToolTip="点击此框后直接按下组合键（需含 Ctrl/Alt/Shift/Win 之一，如 Ctrl+Alt+S）"/>
+                                <Button Grid.Column="1" Content="清除" Background="{DynamicResource TileBgBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" Cursor="Hand" Click="BtnClearNewActionHotkey_Click"/>
+                            </Grid>
+
                             <!-- 已有运行实例检测选项 -->
                             <CheckBox x:Name="ChkNewActionActivateExisting" IsChecked="True"
                                       Content="🔄 若程序已运行，直接唤醒已有窗口 (避免重复多开)"
@@ -1402,6 +1481,8 @@
                                         Background="#2210B981" Foreground="#34D399" BorderThickness="0" Padding="6,2" Margin="0,0,4,4" FontSize="10" Cursor="Hand"/>
                                 <Button Content="{}{{guid}}" Tag="{}{{guid}}" ToolTip="随机生成全新标准 UUID/GUID" Click="BtnInsertMacroToken_Click"
                                         Background="#220EA5E9" Foreground="#38BDF8" BorderThickness="0" Padding="6,2" Margin="0,0,4,4" FontSize="10" Cursor="Hand"/>
+                                <Button Content="{}{{input:名称}}" Tag="{}{{input:名称}}" ToolTip="粘贴时弹出输入框手动填写该变量（支持 =默认值）" Click="BtnInsertMacroToken_Click"
+                                        Background="#22F59E0B" Foreground="#FBBF24" BorderThickness="0" Padding="6,2" Margin="0,0,4,4" FontSize="10" Cursor="Hand"/>
                             </WrapPanel>
 
                             <!-- 操作按钮 -->

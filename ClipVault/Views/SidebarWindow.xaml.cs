@@ -37,6 +37,7 @@ namespace ClipVault.Views
         private string _currentCategory = "all";
         private bool _isPinned = true;
         private bool _isBluetoothActive = true;
+        private System.Threading.CancellationTokenSource? _backfillCts;
         private Point _cardDragStartPoint;
         private bool _isDraggingCard = false;
         private ClipboardItem? _draggedItem;
@@ -411,7 +412,7 @@ namespace ClipVault.Views
             // 监听失焦自动收起 (图钉锁定状态下常驻，未锁定状态下失焦自动收起)
             this.Deactivated += (s, e) =>
             {
-                if (!_isPinned && this.IsVisible && !_isHiding && !_isModalOrMenuOpen && !IsAnyOverlayOpen)
+                if (!_isPinned && this.IsVisible && !_isHiding && !_isModalOrMenuOpen && !IsAnyOverlayOpen && !TemplateInputDialog.IsAnyDialogOpen)
                 {
                     SlideOutAndHide();
                 }
@@ -1183,6 +1184,18 @@ namespace ClipVault.Views
             }
             if (BtnClearHistory != null) BtnClearHistory.Content = "🗑️ " + loc.Get("TrayClear");
             if (BtnExitApp != null) BtnExitApp.Content = loc.Get("BtnExitApp");
+            if (ChkIgnorePasswordManagers2 != null) ChkIgnorePasswordManagers2.Content = loc.Get("ChkIgnorePasswordManagers");
+            if (TxtSetPrivacyBlacklistLabel != null) TxtSetPrivacyBlacklistLabel.Text = loc.Get("PrivacyBlacklistLabel");
+            if (TxtPrivacyBlacklist2 != null) TxtPrivacyBlacklist2.ToolTip = loc.Get("PrivacyBlacklistTip");
+            if (ChkDeduplicateOnCopy2 != null) ChkDeduplicateOnCopy2.Content = loc.Get("ChkDeduplicateOnCopy");
+            if (TxtSetMaxHistoryLabel != null) TxtSetMaxHistoryLabel.Text = loc.Get("MaxHistoryLabel");
+            if (RadioMaxHist0 != null) RadioMaxHist0.Content = loc.Get("MaxHistoryUnlimited");
+            if (BtnBackfillOcr2 != null && _backfillCts == null) BtnBackfillOcr2.Content = loc.Get("BtnBackfillOcr");
+            if (BtnExportBackup2 != null) BtnExportBackup2.Content = loc.Get("BtnExportBackup");
+            if (BtnImportBackup2 != null) BtnImportBackup2.Content = loc.Get("BtnImportBackup");
+            if (TxtTileWinTheme != null) TxtTileWinTheme.Text = loc.Get("TileWinTheme");
+            if (TxtTileMicMute != null) TxtTileMicMute.Text = loc.Get("TileMicMute");
+            if (TxtTileClearClip != null) TxtTileClearClip.Text = loc.Get("TileClearClip");
 
             // 底部提示与状态
             if (TxtStatusRightTip != null) TxtStatusRightTip.Text = loc.Get("SidebarAltVTip");
@@ -1674,6 +1687,7 @@ namespace ClipVault.Views
                     var incoming = allItems[i];
                     if (existing.Id == incoming.Id &&
                         existing.IsPinned == incoming.IsPinned &&
+                        existing.CreatedAt == incoming.CreatedAt &&
                         existing.CustomTag == incoming.CustomTag)
                     {
                         existing.DisplayBadge = incoming.DisplayBadge;
@@ -2018,10 +2032,11 @@ namespace ClipVault.Views
             }
             else if (e.Key == Key.Enter && CardsListBox.SelectedItem is ClipboardItem selected)
             {
+                bool plainText = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
                 await _pasteSimulator.PasteItemAsync(selected, () =>
                 {
                     if (!_isPinned) SlideOutAndHide();
-                });
+                }, plainTextOnly: plainText);
                 e.Handled = true;
             }
             else if (e.Key == Key.Escape)
@@ -2181,8 +2196,47 @@ namespace ClipVault.Views
             menu.Items.Add(queueItem);
             menu.Items.Add(copyItem);
 
+            if (!item.IsImage && item.ItemType != "File")
+            {
+                var plainItem = new MenuItem { Header = "📝 " + loc.Get("MenuPastePlainText") };
+                if (itemStyle != null) plainItem.Style = itemStyle;
+                plainItem.Click += async (s, args) =>
+                {
+                    await _pasteSimulator.PasteItemAsync(item, () =>
+                    {
+                        if (!_isPinned) SlideOutAndHide();
+                    }, plainTextOnly: true);
+                };
+                menu.Items.Add(plainItem);
+
+                if (item.IsUrl)
+                {
+                    var urlItem = new MenuItem { Header = "🌐 " + loc.Get("MenuOpenUrl") };
+                    if (itemStyle != null) urlItem.Style = itemStyle;
+                    urlItem.Click += (s, args) =>
+                    {
+                        SystemControlService.OpenUri(item.ExtractedUrl);
+                        ShowSidebarToast(loc.Get("ToastUrlOpened"));
+                    };
+                    menu.Items.Add(urlItem);
+                }
+
+                if (item.IsJsonContent)
+                {
+                    var jsonItem = new MenuItem { Header = "✨ " + loc.Get("MenuFormatJson") };
+                    if (itemStyle != null) jsonItem.Style = itemStyle;
+                    jsonItem.Click += (s, args) => FormatAndCopyJson(item);
+                    menu.Items.Add(jsonItem);
+                }
+            }
+
             if (item.IsImage)
             {
+                var pinScreenItem = new MenuItem { Header = "📍 " + loc.Get("MenuPinScreen") };
+                if (itemStyle != null) pinScreenItem.Style = itemStyle;
+                pinScreenItem.Click += (s, args) => OpenPinImageWindow(item);
+                menu.Items.Add(pinScreenItem);
+
                 var ocrIcon = new TextBlock
                 {
                     Text = "📝",
@@ -2280,6 +2334,54 @@ namespace ClipVault.Views
             {
                 _dbService.TogglePin(item.Id);
                 RefreshCards();
+            }
+        }
+
+        private void BtnCardOpenUrl_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item && item.IsUrl)
+            {
+                SystemControlService.OpenUri(item.ExtractedUrl);
+                ShowSidebarToast(LocalizationService.Instance.Get("ToastUrlOpened"));
+            }
+        }
+
+        private void BtnCardPinScreen_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement elem && elem.DataContext is ClipboardItem item)
+            {
+                OpenPinImageWindow(item);
+            }
+        }
+
+        private void OpenPinImageWindow(ClipboardItem item)
+        {
+            if (item == null || !item.IsImage || string.IsNullOrWhiteSpace(item.ResolvedImagePath) || !File.Exists(item.ResolvedImagePath)) return;
+            var pinWin = new PinImageWindow(item.ResolvedImagePath, _monitorService);
+            pinWin.Show();
+            ShowSidebarToast(LocalizationService.Instance.Get("ToastPinOpened"));
+        }
+
+        private void FormatAndCopyJson(ClipboardItem item)
+        {
+            string? formatted = item.TryFormatJson();
+            if (string.IsNullOrEmpty(formatted)) return;
+            try
+            {
+                if (_monitorService != null) _monitorService.IsInternalOperation = true;
+                Clipboard.SetText(formatted);
+                ShowSidebarToast(LocalizationService.Instance.Get("ToastJsonFormatted"));
+                ClipVault.Helpers.SoundEffectHelper.PlayCopyCue(_settingsService?.CurrentSettings);
+            }
+            catch { }
+            finally
+            {
+                if (_monitorService != null)
+                {
+                    _ = Task.Delay(500).ContinueWith(_ => _monitorService.IsInternalOperation = false);
+                }
             }
         }
 
@@ -2565,9 +2667,25 @@ namespace ClipVault.Views
                 }
                 else
                 {
+                    var prompts = ClipVault.Helpers.TemplateMacroHelper.ExtractInputPrompts(item.Content);
+                    System.Collections.Generic.Dictionary<string, string>? inputValues = null;
+                    if (prompts.Count > 0)
+                    {
+                        _isModalOrMenuOpen = true;
+                        try
+                        {
+                            inputValues = TemplateInputDialog.PromptForInputs(prompts);
+                        }
+                        finally
+                        {
+                            _isModalOrMenuOpen = false;
+                        }
+                        if (inputValues == null) return;
+                    }
+
                     string priorClip = string.Empty;
                     try { if (Clipboard.ContainsText()) priorClip = Clipboard.GetText(); } catch { }
-                    string textToCopy = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content ?? string.Empty, priorClip);
+                    string textToCopy = ClipVault.Helpers.TemplateMacroHelper.ExpandMacros(item.Content ?? string.Empty, priorClip, inputValues);
                     Clipboard.SetText(textToCopy);
                 }
 
@@ -2782,6 +2900,30 @@ namespace ClipVault.Views
         private void TileScreenClip_Click(object sender, RoutedEventArgs e)
         {
             SystemControlService.OpenUri("ms-screenclip:");
+        }
+
+        private void TileWinTheme_Click(object sender, RoutedEventArgs e)
+        {
+            bool isDark = SystemControlService.ToggleWindowsAppTheme();
+            ShowSidebarToast(LocalizationService.Instance.Get(isDark ? "ToastThemeToggledDark" : "ToastThemeToggledLight"));
+        }
+
+        private void TileMicMute_Click(object sender, RoutedEventArgs e)
+        {
+            bool muted = SystemControlService.ToggleMicrophoneMute();
+            if (TxtTileMicIcon != null)
+            {
+                TxtTileMicIcon.Foreground = muted
+                    ? new SolidColorBrush(Color.FromRgb(248, 113, 113))
+                    : new SolidColorBrush(Color.FromRgb(52, 211, 153));
+            }
+            ShowSidebarToast(LocalizationService.Instance.Get(muted ? "ToastMicMuted" : "ToastMicUnmuted"));
+        }
+
+        private void TileClearClipboard_Click(object sender, RoutedEventArgs e)
+        {
+            SystemControlService.ClearSystemClipboard();
+            ShowSidebarToast(LocalizationService.Instance.Get("ToastClipboardCleared"));
         }
 
         // 统一系统级屏幕真实亮度调节 (两边实时保持一致)
@@ -2999,13 +3141,14 @@ namespace ClipVault.Views
             string modeLabel = action.ActivateExistingInstance
                 ? "模式：优先唤醒已运行程序（防重复多开）"
                 : "模式：每次点击新开实例";
+            string hkLabel = string.IsNullOrWhiteSpace(action.Hotkey) ? "未绑定热键" : $"全局热键：{action.Hotkey}";
             var btn = new Button
             {
                 Width = 80,
                 Height = 58,
                 Margin = new Thickness(3),
                 Cursor = Cursors.Hand,
-                ToolTip = $"{action.Name}\n{action.CommandOrPath}\n{modeLabel}\n(右键可切换模式或删除)",
+                ToolTip = $"{action.Name}\n{action.CommandOrPath}\n{modeLabel}\n{hkLabel}\n(右键可切换模式或删除)",
                 Tag = index
             };
 
@@ -3198,10 +3341,31 @@ namespace ClipVault.Views
             TxtNewActionName.Text = "";
             TxtNewActionIcon.Text = ""; // 默认留空以自动拉取目标程序图标，用户也可自行输入 Emoji
             TxtNewActionCommand.Text = "";
+            if (TxtNewActionHotkey != null) TxtNewActionHotkey.Text = "";
             if (ChkNewActionActivateExisting != null) ChkNewActionActivateExisting.IsChecked = true;
             UpdateNewActionIconPreview();
             AddActionOverlay.Visibility = Visibility.Visible;
             TxtNewActionCommand.Focus();
+        }
+
+        private void TxtNewActionHotkey_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            e.Handled = true;
+            if (e.Key == Key.Back || e.Key == Key.Delete)
+            {
+                if (TxtNewActionHotkey != null) TxtNewActionHotkey.Text = string.Empty;
+                return;
+            }
+            string? formatted = HotkeyService.FormatKeyGesture(e);
+            if (!string.IsNullOrEmpty(formatted) && TxtNewActionHotkey != null)
+            {
+                TxtNewActionHotkey.Text = formatted;
+            }
+        }
+
+        private void BtnClearNewActionHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            if (TxtNewActionHotkey != null) TxtNewActionHotkey.Text = string.Empty;
         }
 
         private void BtnCancelAddAction_Click(object sender, RoutedEventArgs e)
@@ -3262,7 +3426,8 @@ namespace ClipVault.Views
                 Name = name,
                 CommandOrPath = cmd,
                 Icon = icon,
-                ActivateExistingInstance = ChkNewActionActivateExisting?.IsChecked ?? true
+                ActivateExistingInstance = ChkNewActionActivateExisting?.IsChecked ?? true,
+                Hotkey = TxtNewActionHotkey?.Text?.Trim() ?? string.Empty
             });
             _settingsService.SaveSettings();
 
@@ -3331,6 +3496,18 @@ namespace ClipVault.Views
                 if (ChkFullscreenDnd2 != null) ChkFullscreenDnd2.IsChecked = s.EnableFullscreenDnd;
                 if (ChkManualDnd2 != null) ChkManualDnd2.IsChecked = s.IsManualDndMode;
                 if (ChkAutoMaskSensitive2 != null) ChkAutoMaskSensitive2.IsChecked = s.AutoMaskSensitiveData;
+                if (ChkIgnorePasswordManagers2 != null) ChkIgnorePasswordManagers2.IsChecked = s.IgnorePasswordManagers;
+                if (TxtPrivacyBlacklist2 != null) TxtPrivacyBlacklist2.Text = s.CustomPrivacyBlacklist ?? string.Empty;
+                if (ChkDeduplicateOnCopy2 != null) ChkDeduplicateOnCopy2.IsChecked = s.DeduplicateOnCopy;
+
+                switch (s.MaxHistoryCount)
+                {
+                    case 200: if (RadioMaxHist200 != null) RadioMaxHist200.IsChecked = true; break;
+                    case 500: if (RadioMaxHist500 != null) RadioMaxHist500.IsChecked = true; break;
+                    case 2000: if (RadioMaxHist2000 != null) RadioMaxHist2000.IsChecked = true; break;
+                    case 0: if (RadioMaxHist0 != null) RadioMaxHist0.IsChecked = true; break;
+                    default: if (RadioMaxHist1000 != null) RadioMaxHist1000.IsChecked = true; break;
+                }
 
                 ClipboardItem.GlobalAutoMaskEnabled = s.AutoMaskSensitiveData;
                 foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
@@ -3498,10 +3675,151 @@ namespace ClipVault.Views
                 foreach (var c in DisplayCards) c.NotifyMaskStateChanged();
                 changed = true;
             }
+            if (ChkIgnorePasswordManagers2 != null && s.IgnorePasswordManagers != (ChkIgnorePasswordManagers2.IsChecked == true))
+            {
+                s.IgnorePasswordManagers = ChkIgnorePasswordManagers2.IsChecked == true;
+                changed = true;
+            }
 
             if (changed)
             {
                 _settingsService.SaveSettings();
+            }
+        }
+
+        private void TxtPrivacyBlacklist_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || TxtPrivacyBlacklist2 == null) return;
+            string next = TxtPrivacyBlacklist2.Text?.Trim() ?? string.Empty;
+            if (!string.Equals(_settingsService.CurrentSettings.CustomPrivacyBlacklist, next, StringComparison.Ordinal))
+            {
+                _settingsService.CurrentSettings.CustomPrivacyBlacklist = next;
+                _settingsService.SaveSettings();
+            }
+        }
+
+        private void ChkDeduplicateOnCopy_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null || ChkDeduplicateOnCopy2 == null) return;
+            _settingsService.CurrentSettings.DeduplicateOnCopy = ChkDeduplicateOnCopy2.IsChecked == true;
+            _settingsService.SaveSettings();
+        }
+
+        private void MaxHistoryRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isInternalSettingUpdate || _settingsService == null) return;
+            if (sender is RadioButton rb && rb.IsChecked == true && rb.Tag is string raw && int.TryParse(raw, out int limit))
+            {
+                if (_settingsService.CurrentSettings.MaxHistoryCount != limit)
+                {
+                    _settingsService.CurrentSettings.MaxHistoryCount = limit;
+                    _settingsService.SaveSettings();
+                    if (limit > 0)
+                    {
+                        _dbService.PruneOldItemsAndOrphanImages(limit);
+                        RefreshCards();
+                        UpdateSideStorageInfo();
+                    }
+                }
+            }
+        }
+
+        private async void BtnBackfillOcr_Click(object sender, RoutedEventArgs e)
+        {
+            var loc = LocalizationService.Instance;
+            if (_backfillCts != null)
+            {
+                _backfillCts.Cancel();
+                return;
+            }
+
+            int pendingCount = _dbService.CountImagesMissingOcr();
+            if (pendingCount <= 0)
+            {
+                ShowSidebarToast(loc.Get("BackfillOcrNone"));
+                return;
+            }
+
+            _backfillCts = new System.Threading.CancellationTokenSource();
+            var token = _backfillCts.Token;
+            try
+            {
+                int indexed = await NativeOcrService.BackfillMissingOcrAsync(_dbService, (done, total, _) =>
+                {
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (BtnBackfillOcr2 != null) BtnBackfillOcr2.Content = loc.Get("BtnBackfillOcrWorking", done, total);
+                    });
+                }, token);
+
+                RefreshCards();
+                ShowSidebarToast(loc.Get("BackfillOcrDone", indexed));
+            }
+            catch { }
+            finally
+            {
+                _backfillCts?.Dispose();
+                _backfillCts = null;
+                if (BtnBackfillOcr2 != null) BtnBackfillOcr2.Content = loc.Get("BtnBackfillOcr");
+            }
+        }
+
+        private void BtnExportBackup_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            _isModalOrMenuOpen = true;
+            try
+            {
+                var dlg = new SaveFileDialog
+                {
+                    Title = LocalizationService.Instance.Get("BtnExportBackup"),
+                    Filter = "CopyBox Backup (*.copybox.json)|*.copybox.json|JSON (*.json)|*.json",
+                    FileName = $"CopyBox-Backup-{DateTime.Now:yyyyMMdd}.copybox.json"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    var (tags, snippets, actions) = ProfileBackupService.ExportPackage(dlg.FileName, _settingsService, _dbService);
+                    ShowSidebarToast(LocalizationService.Instance.Get("BackupExportDone", tags, snippets, actions));
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Export Backup", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
+            }
+        }
+
+        private void BtnImportBackup_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settingsService == null) return;
+            _isModalOrMenuOpen = true;
+            try
+            {
+                var dlg = new OpenFileDialog
+                {
+                    Title = LocalizationService.Instance.Get("BtnImportBackup"),
+                    Filter = "CopyBox Backup (*.copybox.json;*.json)|*.copybox.json;*.json|All Files (*.*)|*.*"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    var (tags, addedSnippets, mergedActions) = ProfileBackupService.ImportPackage(dlg.FileName, _settingsService, _dbService);
+                    RefreshCustomTagPills();
+                    RefreshCustomActions();
+                    RefreshCards();
+                    UpdateSideStorageInfo();
+                    ShowSidebarToast(LocalizationService.Instance.Get("BackupImportDone", tags, addedSnippets, mergedActions));
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Import Backup", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _isModalOrMenuOpen = false;
             }
         }
 
