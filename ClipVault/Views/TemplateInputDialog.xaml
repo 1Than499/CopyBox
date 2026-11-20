@@ -1,8 +1,8 @@
 <Window x:Class="ClipVault.Views.TemplateInputDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="填写模板变量"
-        Width="370"
+        Title="CopyBox"
+        Width="350"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -11,28 +11,31 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"
         KeyDown="Window_KeyDown">
     <Border Margin="10"
-            CornerRadius="12"
-            Background="#F5141926"
-            BorderBrush="#38BDF8"
-            BorderThickness="1.2"
+            CornerRadius="10"
+            Background="#FA18181C"
+            BorderBrush="#2E2E36"
+            BorderThickness="1"
             Padding="16">
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="18" ShadowDepth="3" Opacity="0.5"/>
+            <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="4" Opacity="0.45"/>
         </Border.Effect>
         <StackPanel>
-            <DockPanel Margin="0,0,0,10">
-                <TextBlock x:Name="TxtDialogTitle" Text="⚡ 填写动态模板参数" FontSize="13.5" FontWeight="Bold" Foreground="#F8FAFC"/>
-                <Button DockPanel.Dock="Right" Content="✕" Click="BtnCancel_Click" Background="Transparent" Foreground="#94A3B8" BorderThickness="0" FontSize="12" Cursor="Hand" HorizontalAlignment="Right"/>
+            <DockPanel Margin="0,0,0,12">
+                <Button DockPanel.Dock="Right" Click="BtnCancel_Click" Background="Transparent" BorderThickness="0" Padding="4" Cursor="Hand" VerticalAlignment="Center">
+                    <Path Data="{StaticResource IconClose}" Stroke="#8E8E96" StrokeThickness="1.4" Stretch="Uniform" Width="10" Height="10"/>
+                </Button>
+                <TextBlock x:Name="TxtDialogTitle" Text="模板参数" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" VerticalAlignment="Center"/>
             </DockPanel>
-            <TextBlock x:Name="TxtDialogSub" Text="填入下方参数后按 Enter 立即替换并粘贴到目标窗口：" FontSize="10.5" Foreground="#94A3B8" Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <TextBlock x:Name="TxtDialogSub" Visibility="Collapsed"/>
 
             <StackPanel x:Name="InputsHost"/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                <Button x:Name="BtnCancel" Content="取消 (Esc)" Click="BtnCancel_Click" Background="Transparent" Foreground="#94A3B8" BorderThickness="0" Padding="12,5" Margin="0,0,6,0" FontSize="11.5" Cursor="Hand"/>
-                <Button x:Name="BtnConfirm" Content="确认贴入 (Enter)" IsDefault="True" Click="BtnConfirm_Click" Background="#0078D7" Foreground="White" BorderThickness="0" Padding="14,5" FontSize="11.5" FontWeight="SemiBold" Cursor="Hand">
+                <Button x:Name="BtnCancel" Content="取消" Click="BtnCancel_Click" Background="Transparent" Foreground="#8E8E96" BorderThickness="0" Padding="10,5" Margin="0,0,6,0" FontSize="11.5" Cursor="Hand"/>
+                <Button x:Name="BtnConfirm" Content="确认" IsDefault="True" Click="BtnConfirm_Click" Background="#3B82F6" Foreground="White" BorderThickness="0" Padding="14,5" FontSize="11.5" FontWeight="SemiBold" Cursor="Hand">
                     <Button.Resources>
                         <Style TargetType="Border">
                             <Setter Property="CornerRadius" Value="6"/>

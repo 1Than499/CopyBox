@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using ClipVault.Helpers;
 using ClipVault.Models;
 using ClipVault.Services;
 using Microsoft.Win32;
@@ -53,7 +54,7 @@ namespace ClipVault
             if (TxtMainAppVersion != null)
             {
                 var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                TxtMainAppVersion.Text = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v3.1.5";
+                TxtMainAppVersion.Text = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v3.9.0";
             }
 
             // 加载应用图标
@@ -74,6 +75,7 @@ namespace ClipVault
             UpdateAllLocalizedTexts();
             RefreshMainCustomTagPills();
             RefreshCards();
+            MemoryHelper.BindLiveMemoryMonitor(this, TxtMainMemoryUsage);
 
             _dbService.CustomTagsChanged += () =>
             {
@@ -91,8 +93,8 @@ namespace ClipVault
                     RefreshCards();
                     UpdateStorageInfo();
                     ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
-                        ? "📱 Received item from Phone LAN Drop"
-                        : "📱 已收到手机局域网快传内容");
+                        ? "Received from LAN Drop"
+                        : "已收到局域网快传内容");
                 });
             };
 
@@ -193,6 +195,7 @@ namespace ClipVault
 
         private void LoadSettingsToUI()
         {
+            bool prev = _isInternalSettingUpdate;
             _isInternalSettingUpdate = true;
             try
             {
@@ -297,10 +300,11 @@ namespace ClipVault
                     TxtMainBgOverlayValue.Text = $"{(int)(Math.Clamp(s.BackgroundOverlayOpacity, 0.10, 0.90) * 100)}%";
                 }
 
-                double clampedOpacity = Math.Clamp(s.WindowOpacity, 0.15, 1.00);
-                double transparencyPct = Math.Round((1.0 - clampedOpacity) * 100.0);
-                SliderOpacity.Value = Math.Clamp(transparencyPct, 0, 85);
-                TxtOpacityValue.Text = $"{(int)SliderOpacity.Value}%";
+                double clampedOpacity = ThemePalette.NormalizeWindowOpacity(s.WindowOpacity);
+                s.WindowOpacity = clampedOpacity;
+                int transparencyPct = Math.Clamp((int)Math.Round((1.0 - clampedOpacity) * 100.0), 0, 85);
+                SliderOpacity.Value = transparencyPct;
+                TxtOpacityValue.Text = $"{transparencyPct}%";
 
                 string backdrop = s.BackdropMaterial ?? "Default";
                 if (string.Equals(backdrop, "Mica", StringComparison.OrdinalIgnoreCase))
@@ -324,7 +328,7 @@ namespace ClipVault
             }
             finally
             {
-                _isInternalSettingUpdate = false;
+                _isInternalSettingUpdate = prev;
             }
         }
 
@@ -362,13 +366,13 @@ namespace ClipVault
             UpdateCloseButtonToolTip();
 
             // 自定义标签与局域网快传浮层国际化
-            if (TxtMainAddTagDialogTitle != null) TxtMainAddTagDialogTitle.Text = loc.Get("TagAddDialogTitle");
-            if (TxtMainAddTagDialogSub != null) TxtMainAddTagDialogSub.Text = loc.Get("TagAddDialogSub");
-            if (TxtMainAddTagIconLabel != null) TxtMainAddTagIconLabel.Text = loc.Get("TagIconLabel");
-            if (TxtMainAddTagNameLabel != null) TxtMainAddTagNameLabel.Text = loc.Get("TagNameLabel");
-            if (TxtMainAddTagTemplateLabel != null) TxtMainAddTagTemplateLabel.Text = loc.Get("TagTemplateLabel");
+            if (TxtMainAddTagDialogTitle != null) TxtMainAddTagDialogTitle.Text = loc.Get("AddTagDialogTitle");
+            if (TxtMainAddTagDialogSub != null) TxtMainAddTagDialogSub.Text = string.Empty;
+            if (TxtMainAddTagIconLabel != null) TxtMainAddTagIconLabel.Text = loc.Get("AddTagIconLabel");
+            if (TxtMainAddTagNameLabel != null) TxtMainAddTagNameLabel.Text = loc.Get("AddTagNameLabel");
+            if (TxtMainAddTagTemplateLabel != null) TxtMainAddTagTemplateLabel.Text = loc.Get("AddTagTemplateLabel");
             if (BtnMainCancelAddTag != null) BtnMainCancelAddTag.Content = loc.Get("BtnCancel");
-            if (BtnMainConfirmAddTag != null) BtnMainConfirmAddTag.Content = loc.Get("BtnCreate");
+            if (BtnMainConfirmAddTag != null) BtnMainConfirmAddTag.Content = loc.Get("BtnSaveTag");
 
             if (TxtMainLanSyncTitle != null) TxtMainLanSyncTitle.Text = loc.Get("LanSyncTitle");
             if (TxtMainLanSyncSubTitle != null) TxtMainLanSyncSubTitle.Text = loc.Get("LanSyncSubTitle");
@@ -414,16 +418,16 @@ namespace ClipVault
             UpdateMainStorageLockUiState(_settingsService?.CurrentSettings.FollowAppDirectory ?? true);
 
             if (TxtAppearanceTitle != null) TxtAppearanceTitle.Text = loc.Get("AppearanceTitle");
-            if (RadioThemeDark != null) RadioThemeDark.Content = isEn ? "🌙 Dark Geek" : "🌙 暗夜极客";
-            if (RadioThemeLight != null) RadioThemeLight.Content = isEn ? "☀️ Pure Light" : "☀️ 纯净白天";
-            if (RadioThemeAurora != null) RadioThemeAurora.Content = isEn ? "🌌 Aurora" : "🌌 极光紫霓";
-            if (RadioThemeSunset != null) RadioThemeSunset.Content = isEn ? "🌅 Sunset" : "🌅 落日熔金";
-            if (RadioThemeOcean != null) RadioThemeOcean.Content = isEn ? "🌊 Cyber Ocean" : "🌊 深海赛博";
-            if (RadioThemeCustom != null) RadioThemeCustom.Content = isEn ? "🖼️ Custom Pic" : "🖼️ 自定义图";
+            if (RadioThemeDark != null) RadioThemeDark.Content = loc.Get("ThemeDarkShort");
+            if (RadioThemeLight != null) RadioThemeLight.Content = loc.Get("ThemeLightShort");
+            if (RadioThemeAurora != null) RadioThemeAurora.Content = loc.Get("ThemeAuroraShort");
+            if (RadioThemeSunset != null) RadioThemeSunset.Content = loc.Get("ThemeSunsetShort");
+            if (RadioThemeOcean != null) RadioThemeOcean.Content = loc.Get("ThemeOceanShort");
+            if (RadioThemeCustom != null) RadioThemeCustom.Content = loc.Get("ThemeCustomShort");
 
-            if (BtnMainUploadBg != null) BtnMainUploadBg.Content = isEn ? "Upload" : "上传壁纸";
+            if (BtnMainUploadBg != null) BtnMainUploadBg.Content = isEn ? "Upload" : "选择图片";
             if (BtnMainResetBg != null) BtnMainResetBg.Content = isEn ? "Reset" : "重置";
-            if (TxtMainBgOverlayLabel != null) TxtMainBgOverlayLabel.Text = isEn ? "Dim Overlay:" : "壁纸暗化遮罩:";
+            if (TxtMainBgOverlayLabel != null) TxtMainBgOverlayLabel.Text = isEn ? "Overlay" : "遮罩";
             if (TxtOpacityLabel != null) TxtOpacityLabel.Text = loc.Get("OpacityLabel");
             if (TxtMainBackdropAndAudioTitle != null) TxtMainBackdropAndAudioTitle.Text = loc.Get("BackdropAndAudioTitle");
             if (TxtMainBackdropLabel != null) TxtMainBackdropLabel.Text = loc.Get("BackdropLabel");
@@ -446,7 +450,7 @@ namespace ClipVault
                 ChkHideOnDeactivate.ToolTip = loc.Get("DeactivateTooltip");
             }
 
-            if (BtnMainClearHistory != null) BtnMainClearHistory.Content = isEn ? "🗑️ Clear History" : "🗑️ 清空历史";
+            if (BtnMainClearHistory != null) BtnMainClearHistory.Content = loc.Get("TrayClear");
             if (BtnDirectExit != null) BtnDirectExit.Content = loc.Get("BtnExitApp");
             if (BtnCloseSettingsOverlay != null) BtnCloseSettingsOverlay.Content = loc.Get("BtnDone");
             if (ChkMainIgnorePasswordManagers != null) ChkMainIgnorePasswordManagers.Content = loc.Get("ChkIgnorePasswordManagers");
@@ -461,6 +465,7 @@ namespace ClipVault
 
             // 底部快捷键指南
             if (TxtBottomTips != null) TxtBottomTips.Text = loc.Get("BottomTips");
+            if (TxtMainMemoryUsage != null) TxtMainMemoryUsage.ToolTip = loc.Get("MemoryUsageTip");
         }
 
         private void LangRadio_Changed(object sender, RoutedEventArgs e)
@@ -853,10 +858,7 @@ namespace ClipVault
         private void ApplyTheme(string themeMode)
         {
             string mode = string.IsNullOrWhiteSpace(themeMode) ? "Dark" : themeMode;
-            bool isLight = mode.Equals("Light", StringComparison.OrdinalIgnoreCase);
-            bool isAurora = mode.Equals("Aurora", StringComparison.OrdinalIgnoreCase);
-            bool isSunset = mode.Equals("Sunset", StringComparison.OrdinalIgnoreCase);
-            bool isOcean = mode.Equals("Ocean", StringComparison.OrdinalIgnoreCase);
+            bool isLight = ThemePalette.IsLightTheme(mode);
             bool isCustom = mode.Equals("CustomImage", StringComparison.OrdinalIgnoreCase);
             bool isDark = !isLight;
 
@@ -865,7 +867,7 @@ namespace ClipVault
 
             if (BtnQuickTheme != null)
             {
-                BtnQuickTheme.Content = isLight ? "🌙" : "☀️";
+                BtnQuickTheme.Content = isLight ? "\uE708" : "\uE706";
                 BtnQuickTheme.ToolTip = isLight ? loc.Get("ToolTipThemeDark") : loc.Get("ToolTipThemeLight");
             }
 
@@ -874,19 +876,10 @@ namespace ClipVault
                 BdMainCustomImageSettings.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            double opacity = Math.Clamp(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92, 0.15, 1.00);
+            double opacity = ThemePalette.NormalizeWindowOpacity(_settingsService?.CurrentSettings.WindowOpacity ?? 0.92);
             string backdropMode = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
-            double effectiveOpacity = opacity;
-            if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveOpacity = Math.Min(opacity, 0.78);
-            }
-            else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
-            {
-                effectiveOpacity = Math.Min(opacity, 0.65);
-            }
-            byte bgAlpha = (byte)Math.Clamp(effectiveOpacity * 255, 38, 255);
-            byte cardAlpha = (byte)Math.Clamp((0.35 + opacity * 0.65) * 255, 95, 255);
+
+            MainBorder.Background = ThemePalette.Apply(this, mode, opacity, backdropMode);
 
             if (isCustom)
             {
@@ -894,7 +887,7 @@ namespace ClipVault
                 if (string.IsNullOrWhiteSpace(customPath) || !File.Exists(customPath))
                 {
                     customPath = EnsureDefaultMainWallpaperExists();
-                    if (TxtMainCustomBgPath != null) TxtMainCustomBgPath.Text = isEn ? "Default Built-in Wallpaper" : "默认内置极光壁纸";
+                    if (TxtMainCustomBgPath != null) TxtMainCustomBgPath.Text = isEn ? "Built-in wallpaper" : "内置壁纸";
                 }
                 else
                 {
@@ -910,7 +903,7 @@ namespace ClipVault
                             var bmp = new BitmapImage();
                             bmp.BeginInit();
                             bmp.CacheOption = BitmapCacheOption.OnLoad;
-                            bmp.DecodePixelWidth = 960; // 约束居中窗口壁纸解码尺寸，大幅降低大图内存占用
+                            bmp.DecodePixelWidth = 960;
                             bmp.UriSource = new Uri(customPath, UriKind.Absolute);
                             bmp.EndInit();
                             bmp.Freeze();
@@ -931,13 +924,8 @@ namespace ClipVault
                 byte ovAlpha = (byte)(overlayAlphaRatio * 255);
                 if (BdMainCustomBgOverlay != null)
                 {
-                    BdMainCustomBgOverlay.Background = new SolidColorBrush(Color.FromArgb(ovAlpha, 10, 14, 23));
+                    BdMainCustomBgOverlay.Background = new SolidColorBrush(Color.FromArgb(ovAlpha, 0x0E, 0x0E, 0x12));
                 }
-
-                MainBorder.Background = new SolidColorBrush(Color.FromArgb(40, 13, 17, 26));
-                this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.78, 80, 210), 22, 29, 42));
-                this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromArgb(95, 255, 255, 255));
-                this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(236, 72, 153));
             }
             else
             {
@@ -945,167 +933,7 @@ namespace ClipVault
                 if (ImgMainCustomBg != null) ImgMainCustomBg.Source = null;
                 _cachedMainWallpaperBitmap = null;
                 _cachedMainWallpaperPath = null;
-
-                if (isLight)
-                {
-                    MainBorder.Background = new SolidColorBrush(Color.FromArgb(bgAlpha, 248, 250, 252));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 255, 255, 255));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(226, 232, 240));
-                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(203, 213, 225));
-                }
-                else if (isAurora)
-                {
-                    var auroraGrad = new LinearGradientBrush(
-                        Color.FromArgb(bgAlpha, 20, 15, 45),
-                        Color.FromArgb(bgAlpha, 12, 29, 54),
-                        new Point(0, 0), new Point(1, 1));
-                    auroraGrad.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 38, 20, 71), 0.5));
-                    MainBorder.Background = auroraGrad;
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 34, 27, 68));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(91, 68, 150));
-                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(139, 92, 246));
-                }
-                else if (isSunset)
-                {
-                    var sunsetGrad = new LinearGradientBrush(
-                        Color.FromArgb(bgAlpha, 43, 16, 29),
-                        Color.FromArgb(bgAlpha, 33, 21, 16),
-                        new Point(0, 0), new Point(1, 1));
-                    sunsetGrad.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 58, 24, 34), 0.5));
-                    MainBorder.Background = sunsetGrad;
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 56, 27, 36));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(133, 61, 69));
-                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(249, 115, 22));
-                }
-                else if (isOcean)
-                {
-                    var oceanGrad = new LinearGradientBrush(
-                        Color.FromArgb(bgAlpha, 7, 25, 43),
-                        Color.FromArgb(bgAlpha, 6, 38, 48),
-                        new Point(0, 0), new Point(1, 1));
-                    MainBorder.Background = oceanGrad;
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(cardAlpha * 0.85, 90, 230), 13, 39, 61));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(28, 93, 125));
-                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(6, 182, 212));
-                }
-                else
-                {
-                    MainBorder.Background = new SolidColorBrush(Color.FromArgb(bgAlpha, 22, 25, 34));
-                    this.Resources["CardBgBrush"] = new SolidColorBrush(Color.FromArgb(cardAlpha, 24, 28, 37));
-                    this.Resources["CardBorderBrush"] = new SolidColorBrush(Color.FromRgb(40, 50, 66));
-                    this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(51, 64, 80));
-                }
-
-                // Windows 11 原生云母 (Mica) / 亚克力 (Acrylic) 圆角材质渐变覆写 (100% 裁剪于 MainBorder CornerRadius="16" 内，彻底消除窗口四周白边)
-                if (string.Equals(backdropMode, "Mica", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (isLight)
-                    {
-                        var micaLight = new LinearGradientBrush(
-                            Color.FromArgb(bgAlpha, 238, 244, 252),
-                            Color.FromArgb(bgAlpha, 245, 241, 251),
-                            new Point(0, 0), new Point(1, 1));
-                        micaLight.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 241, 247, 253), 0.5));
-                        MainBorder.Background = micaLight;
-                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(186, 214, 247));
-                    }
-                    else
-                    {
-                        var micaDark = new LinearGradientBrush(
-                            Color.FromArgb(bgAlpha, 19, 25, 38),
-                            Color.FromArgb(bgAlpha, 26, 22, 39),
-                            new Point(0, 0), new Point(1, 1));
-                        micaDark.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 22, 29, 44), 0.5));
-                        MainBorder.Background = micaDark;
-                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(59, 82, 116));
-                    }
-                }
-                else if (string.Equals(backdropMode, "Acrylic", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (isLight)
-                    {
-                        var acrylicLight = new LinearGradientBrush(
-                            Color.FromArgb(bgAlpha, 232, 243, 254),
-                            Color.FromArgb(bgAlpha, 238, 249, 255),
-                            new Point(0, 0), new Point(1, 1));
-                        acrylicLight.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 248, 252, 255), 0.45));
-                        MainBorder.Background = acrylicLight;
-                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(125, 211, 252));
-                    }
-                    else
-                    {
-                        var acrylicDark = new LinearGradientBrush(
-                            Color.FromArgb(bgAlpha, 14, 24, 40),
-                            Color.FromArgb(bgAlpha, 18, 33, 52),
-                            new Point(0, 0), new Point(1, 1));
-                        acrylicDark.GradientStops.Add(new GradientStop(Color.FromArgb(bgAlpha, 23, 39, 60), 0.45));
-                        MainBorder.Background = acrylicDark;
-                        this.Resources["WindowBorderBrush"] = new SolidColorBrush(Color.FromRgb(56, 189, 248));
-                    }
-                }
             }
-
-            this.Resources["CardTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) : new SolidColorBrush(Color.FromRgb(15, 23, 42));
-            this.Resources["CodeBgBrush"] = isDark ? new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 120, 255), 17, 20, 27)) : new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 160, 255), 241, 245, 249));
-            this.Resources["CodeTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(52, 211, 153)) : new SolidColorBrush(Color.FromRgb(5, 150, 105));
-            this.Resources["SubTextBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(148, 163, 184)) : new SolidColorBrush(Color.FromRgb(100, 116, 139));
-            this.Resources["TitleTextBrush"] = isDark ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42));
-            this.Resources["SearchBgBrush"] = isDark ? new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 130, 255), 19, 22, 31)) : new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)cardAlpha, 180, 255), 255, 255, 255));
-            this.Resources["SearchBorderBrush"] = isDark ? new SolidColorBrush(Color.FromRgb(40, 50, 66)) : new SolidColorBrush(Color.FromRgb(203, 213, 225));
-            this.Resources["HoverBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)) 
-                : new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
-            this.Resources["PressedBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromArgb(48, 255, 255, 255)) 
-                : new SolidColorBrush(Color.FromArgb(35, 0, 0, 0));
-            this.Resources["InfoBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(22, 34, 52)) 
-                : new SolidColorBrush(Color.FromRgb(239, 246, 255));
-            this.Resources["InfoBorderBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(30, 58, 138)) 
-                : new SolidColorBrush(Color.FromRgb(191, 219, 254));
-            this.Resources["InfoTextBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(96, 165, 250)) 
-                : new SolidColorBrush(Color.FromRgb(29, 78, 216));
-
-            // 顶栏控制岛高对比防透资源
-            this.Resources["TopPillBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromArgb(235, 30, 37, 50)) 
-                : new SolidColorBrush(Color.FromArgb(245, 241, 245, 249));
-            this.Resources["TopPillBorderBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(64, 78, 99)) 
-                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
-            this.Resources["TopButtonFgBrush"] = isDark 
-                ? Brushes.White 
-                : new SolidColorBrush(Color.FromRgb(15, 23, 42));
-
-            // 分类胶囊防透实体底色与边框
-            this.Resources["TabPillBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(30, 37, 50)) 
-                : new SolidColorBrush(Color.FromRgb(241, 245, 249));
-            this.Resources["TabPillBorderBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(58, 70, 89)) 
-                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
-            this.Resources["TabPillFgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(226, 232, 240)) 
-                : new SolidColorBrush(Color.FromRgb(30, 41, 59));
-
-            // 选中卡片自适应柔和光晕
-            this.Resources["SelectedBorderBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(56, 189, 248)) 
-                : new SolidColorBrush(Color.FromRgb(0, 120, 212));
-
-            this.Resources["SelectedCardEffect"] = isDark 
-                ? new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, ShadowDepth = 0, Color = Color.FromRgb(0, 120, 212), Opacity = 0.38 }
-                : new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 1.5, Direction = 270, Color = Color.FromRgb(0, 120, 212), Opacity = 0.18 };
-
-            // 悬浮微质感菜单资源
-            this.Resources["MenuBgBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(30, 36, 48)) 
-                : new SolidColorBrush(Color.FromRgb(255, 255, 255));
-            this.Resources["MenuBorderBrush"] = isDark 
-                ? new SolidColorBrush(Color.FromRgb(55, 68, 88)) 
-                : new SolidColorBrush(Color.FromRgb(203, 213, 225));
 
             UpdateCloseButtonToolTip();
             UpdateCategoryTabsAppearance();
@@ -1142,44 +970,50 @@ namespace ClipVault
 
         private void UpdateMainBackgroundOpacityLive(double opacity)
         {
-            double clamped = Math.Clamp(opacity, 0.15, 1.00);
-            byte bgAlpha = (byte)Math.Clamp(clamped * 255, 38, 255);
-            byte cardAlpha = (byte)Math.Clamp((0.35 + clamped * 0.65) * 255, 95, 255);
-
+            double clamped = ThemePalette.NormalizeWindowOpacity(opacity);
             string mode = _settingsService?.CurrentSettings.ThemeMode ?? "Dark";
-            bool isLight = mode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            string backdrop = _settingsService?.CurrentSettings.BackdropMaterial ?? "Default";
             bool isCustom = mode.Equals("CustomImage", StringComparison.OrdinalIgnoreCase);
-            bool isSpecialGrad = mode.Equals("Aurora", StringComparison.OrdinalIgnoreCase) ||
-                                 mode.Equals("Sunset", StringComparison.OrdinalIgnoreCase) ||
-                                 mode.Equals("Ocean", StringComparison.OrdinalIgnoreCase);
 
             if (isCustom)
             {
                 if (MainBgImageContainer != null) MainBgImageContainer.Opacity = clamped;
-                SetMainBrushAlphaInPlace("CardBgBrush", (byte)Math.Clamp(cardAlpha * 0.78, 80, 210));
+                return;
             }
-            else
+
+            var (bgAlpha, _, cardAlpha) = ThemePalette.ComputeAlphas(clamped, backdrop, isCustom: false);
+
+            if (MainBorder.Background is SolidColorBrush sb && !sb.IsFrozen)
             {
-                if (MainBorder.Background is SolidColorBrush sb && !sb.IsFrozen)
-                {
-                    var c = sb.Color;
-                    sb.Color = Color.FromArgb(bgAlpha, c.R, c.G, c.B);
-                }
-                else if (MainBorder.Background is LinearGradientBrush lgb && !lgb.IsFrozen)
-                {
-                    foreach (var stop in lgb.GradientStops)
-                    {
-                        var c = stop.Color;
-                        stop.Color = Color.FromArgb(bgAlpha, c.R, c.G, c.B);
-                    }
-                }
-
-                byte targetCardAlpha = isSpecialGrad ? (byte)Math.Clamp(cardAlpha * 0.85, 90, 230) : cardAlpha;
-                SetMainBrushAlphaInPlace("CardBgBrush", targetCardAlpha);
+                var c = sb.Color;
+                sb.Color = Color.FromArgb(bgAlpha, c.R, c.G, c.B);
             }
 
-            SetMainBrushAlphaInPlace("CodeBgBrush", (byte)Math.Clamp((int)cardAlpha, isLight ? 160 : 120, 255));
-            SetMainBrushAlphaInPlace("SearchBgBrush", (byte)Math.Clamp((int)cardAlpha, isLight ? 180 : 130, 255));
+            SetMainBrushAlphaInPlace("CardBgBrush", cardAlpha);
+            SetMainBrushAlphaInPlace("SearchBgBrush", cardAlpha);
+        }
+
+        private void SaveOwnSettingsSafely()
+        {
+            if (_settingsService == null) return;
+            _isSavingOwnSettings = true;
+            try
+            {
+                _settingsService.SaveSettings();
+            }
+            finally
+            {
+                _isSavingOwnSettings = false;
+            }
+        }
+
+        private void FlushPendingSettingsSave()
+        {
+            if (_saveSettingsDebounceTimer != null && _saveSettingsDebounceTimer.IsEnabled)
+            {
+                _saveSettingsDebounceTimer.Stop();
+                SaveOwnSettingsSafely();
+            }
         }
 
         private void ScheduleDebouncedMainSaveSettings()
@@ -1193,16 +1027,7 @@ namespace ClipVault
                 _saveSettingsDebounceTimer.Tick += (s, e) =>
                 {
                     _saveSettingsDebounceTimer.Stop();
-                    if (_settingsService == null) return;
-                    _isSavingOwnSettings = true;
-                    try
-                    {
-                        _settingsService.SaveSettings();
-                    }
-                    finally
-                    {
-                        _isSavingOwnSettings = false;
-                    }
+                    SaveOwnSettingsSafely();
                 };
             }
             _saveSettingsDebounceTimer.Stop();
@@ -1211,12 +1036,12 @@ namespace ClipVault
 
         private void ApplyOpacity(double transparencyPct, bool save = true)
         {
-            double clampedPct = Math.Clamp(transparencyPct, 0, 85);
-            double opacity = Math.Clamp(1.0 - (clampedPct / 100.0), 0.15, 1.00);
+            int pct = Math.Clamp((int)Math.Round(transparencyPct), 0, 85);
+            double opacity = Math.Clamp(1.0 - (pct / 100.0), 0.15, 1.00);
 
             if (TxtOpacityValue != null)
             {
-                TxtOpacityValue.Text = $"{(int)Math.Round(clampedPct)}%";
+                TxtOpacityValue.Text = $"{pct}%";
             }
 
             if (_settingsService != null)
@@ -1251,7 +1076,7 @@ namespace ClipVault
             }
 
             _settingsService.CurrentSettings.ThemeMode = newTheme;
-            _settingsService.SaveSettings();
+            SaveOwnSettingsSafely();
             ApplyTheme(newTheme);
         }
 
@@ -1269,7 +1094,7 @@ namespace ClipVault
             if (_settingsService.CurrentSettings.ThemeMode != newTheme)
             {
                 _settingsService.CurrentSettings.ThemeMode = newTheme;
-                _settingsService.SaveSettings();
+                SaveOwnSettingsSafely();
             }
             ApplyTheme(newTheme);
         }
@@ -1352,7 +1177,7 @@ namespace ClipVault
             {
                 _settingsService.CurrentSettings.BackdropMaterial = mode;
                 ApplyTheme(_settingsService.CurrentSettings.ThemeMode);
-                _settingsService.SaveSettings();
+                SaveOwnSettingsSafely();
             }
         }
 
@@ -1433,7 +1258,7 @@ namespace ClipVault
                 RefreshCards();
                 UpdateStorageInfo();
                 _settingsService.SaveSettings();
-                ShowToast(isEn ? "✓ Unpinned history cleared" : "✓ 已清空未置顶历史");
+                ShowToast(isEn ? "History cleared" : "已清空未置顶历史");
             }
         }
 
@@ -1463,6 +1288,7 @@ namespace ClipVault
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
+            FlushPendingSettingsSave();
             if (_settingsService?.CurrentSettings?.CloseAction == "ExitApp")
             {
                 ExitApplication();
@@ -1507,6 +1333,7 @@ namespace ClipVault
 
         public void OpenSettings()
         {
+            FlushPendingSettingsSave();
             LoadSettingsToUI();
             if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Visible;
             EnsureSettingsInBounds();
@@ -1517,10 +1344,12 @@ namespace ClipVault
             if (SettingsOverlayHost == null) return;
             if (SettingsOverlayHost.Visibility == Visibility.Visible)
             {
+                FlushPendingSettingsSave();
                 SettingsOverlayHost.Visibility = Visibility.Collapsed;
             }
             else
             {
+                FlushPendingSettingsSave();
                 LoadSettingsToUI();
                 SettingsOverlayHost.Visibility = Visibility.Visible;
                 EnsureSettingsInBounds();
@@ -1529,6 +1358,7 @@ namespace ClipVault
 
         private void BtnCloseSettingsOverlay_Click(object sender, RoutedEventArgs e)
         {
+            FlushPendingSettingsSave();
             if (SettingsOverlayHost != null) SettingsOverlayHost.Visibility = Visibility.Collapsed;
         }
 
@@ -1641,14 +1471,14 @@ namespace ClipVault
                     {
                         Content = tagItem.DisplayLabel,
                         Tag = tagItem.FilterKey,
-                        Margin = new Thickness(0, 0, 8, 0),
-                        Padding = new Thickness(12, 5, 12, 5),
+                        Margin = new Thickness(0, 0, 4, 0),
+                        Padding = new Thickness(9, 4, 9, 4),
                         FontSize = 11.5,
                         Cursor = Cursors.Hand,
                         ToolTip = loc.Get("TagRightClickTip")
                     };
                     var borderStyle = new Style(typeof(Border));
-                    borderStyle.Setters.Add(new Setter(Border.CornerRadiusProperty, new CornerRadius(14)));
+                    borderStyle.Setters.Add(new Setter(Border.CornerRadiusProperty, new CornerRadius(6)));
                     btn.Resources.Add(typeof(Border), borderStyle);
 
                     btn.Click += TabCategory_Click;
@@ -1658,7 +1488,11 @@ namespace ClipVault
                         var menu = new ContextMenu();
                         if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
                         Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
-                        var delMi = new MenuItem { Header = loc.Get("TagDeleteMenu", tagItem.TagName) };
+                        var delMi = new MenuItem
+                        {
+                            Icon = ThemePalette.CreateMenuGlyph("\uE74D", new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))),
+                            Header = loc.Get("TagDeleteMenu", tagItem.TagName)
+                        };
                         if (itemStyle != null) delMi.Style = itemStyle;
                         delMi.Click += (_, _) =>
                         {
@@ -1670,6 +1504,7 @@ namespace ClipVault
                         };
                         menu.Items.Add(delMi);
                         menu.PlacementTarget = btn;
+                        menu.Resources = this.Resources;
                         menu.IsOpen = true;
                     };
 
@@ -1683,10 +1518,10 @@ namespace ClipVault
         private void UpdateCategoryTabsAppearance()
         {
             if (TabAll == null) return;
-            var activeBg = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-            var inactiveBg = (Brush)this.Resources["TabPillBgBrush"];
-            var activeFg = Brushes.White;
-            var inactiveFg = (Brush)this.Resources["TabPillFgBrush"];
+            var activeBg = TryFindResource("CardHoverBgBrush") as Brush ?? Brushes.Gray;
+            var inactiveBg = Brushes.Transparent;
+            var activeFg = TryFindResource("TitleTextBrush") as Brush ?? Brushes.White;
+            var inactiveFg = TryFindResource("SubTextBrush") as Brush ?? Brushes.Gray;
 
             UpdateButtonTab(TabAll, _currentCategory == "all", activeBg, inactiveBg, activeFg, inactiveFg);
             UpdateButtonTab(TabText, _currentCategory == "Text", activeBg, inactiveBg, activeFg, inactiveFg);
@@ -1712,9 +1547,9 @@ namespace ClipVault
             if (btn == null) return;
             btn.Background = isActive ? activeBg : inactiveBg;
             btn.Foreground = isActive ? activeFg : inactiveFg;
-            btn.BorderBrush = isActive ? activeBg : (Brush)this.Resources["TabPillBorderBrush"];
+            btn.BorderBrush = isActive ? (TryFindResource("CardBorderBrush") as Brush ?? Brushes.Transparent) : Brushes.Transparent;
             btn.BorderThickness = new Thickness(1);
-            btn.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+            btn.FontWeight = isActive ? FontWeights.Medium : FontWeights.Normal;
         }
 
         private System.Windows.Threading.DispatcherTimer? _mainSearchDebounceTimer;
@@ -2080,7 +1915,7 @@ namespace ClipVault
                 string text = item.OcrText ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrEmpty(item.FullImagePath) && File.Exists(item.FullImagePath))
                 {
-                    ShowToast(isEn ? "🔍 Recognizing text from image..." : "🔍 正在离线提取图片文字...");
+                    ShowToast(isEn ? "Recognizing text..." : "正在提取图片文字...");
                     text = await NativeOcrService.RecognizeImageFileAsync(item.FullImagePath);
                     if (!string.IsNullOrWhiteSpace(text))
                     {
@@ -2105,7 +1940,7 @@ namespace ClipVault
                 }
                 else
                 {
-                    ShowToast(isEn ? "ℹ️ No recognizable text found in this image" : "ℹ️ 未在图片中识别到有效文字");
+                    ShowToast(isEn ? "No text detected" : "未识别到文字");
                 }
             }
             catch (Exception ex)
@@ -2144,8 +1979,8 @@ namespace ClipVault
             if (TxtMainLanSyncLiveStatus != null)
             {
                 TxtMainLanSyncLiveStatus.Text = isEn
-                    ? $"🟢 LAN Quick Drop active on port {_lanSyncService.ActivePort} (Waiting for phone...)"
-                    : $"🟢 局域网快传已在端口 {_lanSyncService.ActivePort} 就绪，手机扫码即连";
+                    ? $"Ready · Port {_lanSyncService.ActivePort}"
+                    : $"已就绪 · 端口 {_lanSyncService.ActivePort}";
             }
 
             UpdateMainLanSyncBtnHighlight();
@@ -2160,8 +1995,8 @@ namespace ClipVault
                 _monitorService.Pause();
                 Clipboard.SetText(_lanSyncService.PairingUrl);
                 ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
-                    ? "✓ LAN Quick Drop URL copied"
-                    : "✓ 局域网快传链接已复制");
+                    ? "URL copied"
+                    : "已复制链接");
             }
             catch { }
             finally
@@ -2182,8 +2017,8 @@ namespace ClipVault
             if (MainLanSyncOverlay != null) MainLanSyncOverlay.Visibility = Visibility.Collapsed;
             UpdateMainLanSyncBtnHighlight();
             ShowToast(LocalizationService.Instance.CurrentLanguage == "en-US"
-                ? "🛑 LAN Quick Drop stopped"
-                : "🛑 局域网快传服务已关闭");
+                ? "LAN Drop stopped"
+                : "已停止局域网快传");
         }
 
         private void UpdateMainLanSyncBtnHighlight()
@@ -2208,7 +2043,7 @@ namespace ClipVault
         {
             if (MainAddTagOverlay == null || TxtMainNewTagName == null || TxtMainNewTagIcon == null) return;
             _pendingTagAssignItemId = assignToItemId;
-            TxtMainNewTagIcon.Text = "🔖";
+            TxtMainNewTagIcon.Text = "#";
             TxtMainNewTagName.Text = string.Empty;
             if (TxtMainNewTagTemplateContent != null) TxtMainNewTagTemplateContent.Text = string.Empty;
             MainAddTagOverlay.Visibility = Visibility.Visible;
@@ -2258,7 +2093,7 @@ namespace ClipVault
         {
             if (TxtMainNewTagName == null || TxtMainNewTagIcon == null) return;
             string name = TxtMainNewTagName.Text.Trim();
-            string icon = string.IsNullOrWhiteSpace(TxtMainNewTagIcon.Text) ? "🔖" : TxtMainNewTagIcon.Text.Trim();
+            string icon = string.IsNullOrWhiteSpace(TxtMainNewTagIcon.Text) ? "#" : TxtMainNewTagIcon.Text.Trim();
             string templateText = TxtMainNewTagTemplateContent?.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -2315,13 +2150,17 @@ namespace ClipVault
             var menu = new ContextMenu();
             if (TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
             Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
+            Style? sepStyle = TryFindResource("ModernMenuSeparatorStyle") as Style;
+            var secBrush = TryFindResource("TextSecondaryBrush") as Brush;
 
             var tags = _dbService.GetCustomTags();
             foreach (var tag in tags)
             {
+                bool isCurrent = string.Equals(item.CustomTag, tag.TagName, StringComparison.OrdinalIgnoreCase);
                 var mi = new MenuItem
                 {
-                    Header = $"{tag.DisplayLabel}" + (string.Equals(item.CustomTag, tag.TagName, StringComparison.OrdinalIgnoreCase) ? "  ✓" : "")
+                    Icon = ThemePalette.CreateMenuGlyph(isCurrent ? "\uE73E" : "\uE8EC", secBrush),
+                    Header = tag.TagName
                 };
                 if (itemStyle != null) mi.Style = itemStyle;
                 mi.Click += (_, _) =>
@@ -2335,8 +2174,17 @@ namespace ClipVault
 
             if (item.HasCustomTag)
             {
-                if (menu.Items.Count > 0) menu.Items.Add(new Separator());
-                var rmMi = new MenuItem { Header = loc.Get("TagRemoveItem", item.CustomTag) };
+                if (menu.Items.Count > 0)
+                {
+                    var s1 = new Separator();
+                    if (sepStyle != null) s1.Style = sepStyle;
+                    menu.Items.Add(s1);
+                }
+                var rmMi = new MenuItem
+                {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE711", secBrush),
+                    Header = loc.Get("TagRemoveItem", item.CustomTag)
+                };
                 if (itemStyle != null) rmMi.Style = itemStyle;
                 rmMi.Click += (_, _) =>
                 {
@@ -2347,8 +2195,17 @@ namespace ClipVault
                 menu.Items.Add(rmMi);
             }
 
-            if (menu.Items.Count > 0) menu.Items.Add(new Separator());
-            var createMi = new MenuItem { Header = "＋ " + loc.Get("TagAddBtnTip") };
+            if (menu.Items.Count > 0)
+            {
+                var s2 = new Separator();
+                if (sepStyle != null) s2.Style = sepStyle;
+                menu.Items.Add(s2);
+            }
+            var createMi = new MenuItem
+            {
+                Icon = ThemePalette.CreateMenuGlyph("\uE710", secBrush),
+                Header = loc.Get("TagCreateNewMenu")
+            };
             if (itemStyle != null) createMi.Style = itemStyle;
             createMi.Click += (_, _) =>
             {
@@ -2356,6 +2213,7 @@ namespace ClipVault
             };
             menu.Items.Add(createMi);
 
+            menu.Resources = this.Resources;
             menu.PlacementTarget = elem;
             menu.IsOpen = true;
         }
@@ -2447,20 +2305,14 @@ namespace ClipVault
 
             Style? itemStyle = TryFindResource("ModernMenuItemStyle") as Style;
 
-            // 1. 置顶 / 取消置顶 (高雅暖金实心星号 ★)
-            var pinIcon = new TextBlock 
-            { 
-                Text = "★", 
-                Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11)), 
-                FontSize = 13, 
-                FontWeight = FontWeights.Bold, 
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            var pinItem = new MenuItem 
-            { 
-                Icon = pinIcon,
-                Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin") 
+            var secBrush = TryFindResource("TextSecondaryBrush") as Brush;
+            var dangerBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44));
+            Style? sepStyle = TryFindResource("ModernMenuSeparatorStyle") as Style;
+
+            var pinItem = new MenuItem
+            {
+                Icon = ThemePalette.CreateMenuGlyph(item.IsPinned ? "\uE77A" : "\uE718", secBrush),
+                Header = item.IsPinned ? loc.Get("MenuUnpin") : loc.Get("MenuPin")
             };
             if (itemStyle != null) pinItem.Style = itemStyle;
             pinItem.Click += (s, args) =>
@@ -2470,20 +2322,10 @@ namespace ClipVault
                 UpdateStorageInfo();
             };
 
-            // 2. 复制到剪贴板 (现代天蓝双矩形符号 ❐)
-            var copyIcon = new TextBlock 
-            { 
-                Text = "❐", 
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 212)), 
-                FontSize = 13, 
-                FontWeight = FontWeights.Bold, 
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            var copyItem = new MenuItem 
-            { 
-                Icon = copyIcon,
-                Header = loc.Get("MenuCopy") 
+            var copyItem = new MenuItem
+            {
+                Icon = ThemePalette.CreateMenuGlyph("\uE8C8", secBrush),
+                Header = loc.Get("MenuCopy")
             };
             if (itemStyle != null) copyItem.Style = itemStyle;
             copyItem.Click += (s, args) =>
@@ -2491,20 +2333,10 @@ namespace ClipVault
                 CopyItemToClipboard(item);
             };
 
-            // 3. 删除此条记录 (警示珊瑚红删除符号 ✕)
-            var delIcon = new TextBlock 
-            { 
-                Text = "✕", 
-                Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68)), 
-                FontSize = 13, 
-                FontWeight = FontWeights.Bold, 
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            var delItem = new MenuItem 
-            { 
-                Icon = delIcon,
-                Header = loc.Get("MenuDelete") 
+            var delItem = new MenuItem
+            {
+                Icon = ThemePalette.CreateMenuGlyph("\uE74D", dangerBrush),
+                Header = loc.Get("MenuDelete")
             };
             if (itemStyle != null) delItem.Style = itemStyle;
             delItem.Click += (s, args) =>
@@ -2519,14 +2351,22 @@ namespace ClipVault
 
             if (!item.IsImage && item.ItemType != "File")
             {
-                var plainMi = new MenuItem { Header = "📝 " + loc.Get("MenuPastePlainText") };
+                var plainMi = new MenuItem
+                {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE8D2", secBrush),
+                    Header = loc.Get("MenuPastePlainText")
+                };
                 if (itemStyle != null) plainMi.Style = itemStyle;
                 plainMi.Click += (s, args) => TriggerPaste(item, plainTextOnly: true);
                 menu.Items.Add(plainMi);
 
                 if (item.IsUrl)
                 {
-                    var urlMi = new MenuItem { Header = "🌐 " + loc.Get("MenuOpenUrl") };
+                    var urlMi = new MenuItem
+                    {
+                        Icon = ThemePalette.CreateMenuGlyph("\uE8A7", secBrush),
+                        Header = loc.Get("MenuOpenUrl")
+                    };
                     if (itemStyle != null) urlMi.Style = itemStyle;
                     urlMi.Click += (s, args) =>
                     {
@@ -2538,7 +2378,11 @@ namespace ClipVault
 
                 if (item.IsJsonContent)
                 {
-                    var jsonMi = new MenuItem { Header = "✨ " + loc.Get("MenuFormatJson") };
+                    var jsonMi = new MenuItem
+                    {
+                        Icon = ThemePalette.CreateMenuGlyph("\uE943", secBrush),
+                        Header = loc.Get("MenuFormatJson")
+                    };
                     if (itemStyle != null) jsonMi.Style = itemStyle;
                     jsonMi.Click += (s, args) => FormatAndCopyMainJson(item);
                     menu.Items.Add(jsonMi);
@@ -2547,12 +2391,20 @@ namespace ClipVault
 
             if (item.IsImage)
             {
-                var pinScreenMi = new MenuItem { Header = "📍 " + loc.Get("MenuPinScreen") };
+                var pinScreenMi = new MenuItem
+                {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE840", secBrush),
+                    Header = loc.Get("MenuPinScreen")
+                };
                 if (itemStyle != null) pinScreenMi.Style = itemStyle;
                 pinScreenMi.Click += (s, args) => OpenMainPinImage(item);
                 menu.Items.Add(pinScreenMi);
 
-                var ocrMi = new MenuItem { Header = loc.Get("OcrExtractBtn") };
+                var ocrMi = new MenuItem
+                {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE8FE", secBrush),
+                    Header = loc.Get("OcrExtractBtn")
+                };
                 if (itemStyle != null) ocrMi.Style = itemStyle;
                 ocrMi.Click += (s, args) =>
                 {
@@ -2565,6 +2417,7 @@ namespace ClipVault
             {
                 var tagMi = new MenuItem
                 {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE8EC", secBrush),
                     Header = loc.Get("TagAssignTo", tag.TagName)
                 };
                 if (itemStyle != null) tagMi.Style = itemStyle;
@@ -2581,6 +2434,7 @@ namespace ClipVault
             {
                 var rmTagMi = new MenuItem
                 {
+                    Icon = ThemePalette.CreateMenuGlyph("\uE711", secBrush),
                     Header = loc.Get("TagRemoveItem", item.CustomTag)
                 };
                 if (itemStyle != null) rmTagMi.Style = itemStyle;
@@ -2595,7 +2449,8 @@ namespace ClipVault
 
             var newTagMi = new MenuItem
             {
-                Header = "＋ " + loc.Get("TagAddBtnTip")
+                Icon = ThemePalette.CreateMenuGlyph("\uE710", secBrush),
+                Header = loc.Get("TagCreateNewMenu")
             };
             if (itemStyle != null) newTagMi.Style = itemStyle;
             newTagMi.Click += (s, args) =>
@@ -2606,17 +2461,9 @@ namespace ClipVault
 
             if (item.IsSensitive && ClipboardItem.GlobalAutoMaskEnabled)
             {
-                var maskIcon = new TextBlock
-                {
-                    Text = item.IsMaskRevealed ? "🙈" : "👁",
-                    Foreground = new SolidColorBrush(Color.FromRgb(251, 191, 36)),
-                    FontSize = 13,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                };
                 var maskItem = new MenuItem
                 {
-                    Icon = maskIcon,
+                    Icon = ThemePalette.CreateMenuGlyph(item.IsMaskRevealed ? "\uED1A" : "\uE7B3", secBrush),
                     Header = item.IsMaskRevealed ? loc.Get("MenuToggleMaskHide") : loc.Get("MenuToggleMaskShow")
                 };
                 if (itemStyle != null) maskItem.Style = itemStyle;
@@ -2627,8 +2474,11 @@ namespace ClipVault
                 menu.Items.Add(maskItem);
             }
 
-            menu.Items.Add(new Separator());
+            var sep = new Separator();
+            if (sepStyle != null) sep.Style = sepStyle;
+            menu.Items.Add(sep);
             menu.Items.Add(delItem);
+            menu.Resources = this.Resources;
 
             if (isFromRightClick)
             {

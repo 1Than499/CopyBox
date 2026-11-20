@@ -73,7 +73,7 @@ namespace ClipVault.Models
         }
 
         public bool HasCustomTag => !string.IsNullOrWhiteSpace(_customTag);
-        public string CustomTagBadgeText => HasCustomTag ? $"🏷 {_customTag}" : string.Empty;
+        public string CustomTagBadgeText => HasCustomTag ? _customTag : string.Empty;
 
         private string _ocrText = string.Empty;
         public string OcrText
@@ -92,11 +92,9 @@ namespace ClipVault.Models
         }
 
         public bool HasOcrText => IsImage && !string.IsNullOrWhiteSpace(_ocrText);
-        public string OcrExtractBtnText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "📝 OCR" : "📝 提取文字";
+        public string OcrExtractBtnText => "OCR";
         public string OcrExtractTooltip => HasOcrText
-            ? (ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
-                ? $"Click to copy extracted image text:\n{(_ocrText.Length > 120 ? _ocrText.Substring(0, 120) + "..." : _ocrText)}"
-                : $"点击一键复制图中识别文字：\n{(_ocrText.Length > 120 ? _ocrText.Substring(0, 120) + "..." : _ocrText)}")
+            ? (_ocrText.Length > 120 ? _ocrText.Substring(0, 120) + "..." : _ocrText)
             : string.Empty;
 
         private bool _isOcrKeywordMatched;
@@ -112,15 +110,11 @@ namespace ClipVault.Models
             }
         }
 
-        public string OcrMatchedBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
-            ? "🔍 Matched Image Text"
-            : "🔍 命中图中文字";
+        public string OcrMatchedBadgeText => "OCR";
 
         public bool HasTemplateMacro => !IsImage && ItemType != "File" && TemplateMacroHelper.ContainsMacro(_content);
-        public string TemplateMacroBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "⚡ Macro" : "⚡ 动态模板";
-        public string TemplateMacroTooltip => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US"
-            ? "Contains dynamic template placeholders ({{date}}, {{clipboard}}, {{input:Field}}, etc.) that expand on paste"
-            : "包含动态模板变量（如 {{date}}、{{clipboard}}、{{input:字段名}}），粘贴时自动实时替换";
+        public string TemplateMacroBadgeText => ClipVault.Services.LocalizationService.Instance.CurrentLanguage == "en-US" ? "Template" : "模板";
+        public string TemplateMacroTooltip => string.Empty;
 
         // ==================== v3.1.5 卡片智能微增强 (色块预览 / URL 直达 / JSON 识别) ====================
         private static readonly System.Text.RegularExpressions.Regex HexColorRegex = new(
@@ -402,7 +396,7 @@ namespace ClipVault.Models
             }
         }
 
-        public string MaskToggleIcon => _isMaskRevealed ? "🙈" : "👁";
+        public string MaskToggleIcon => _isMaskRevealed ? "\uED1A" : "\uE7B3";
 
         public string MaskToggleTooltip => _isMaskRevealed
             ? ClipVault.Services.LocalizationService.Instance.Get("MaskHideTip")

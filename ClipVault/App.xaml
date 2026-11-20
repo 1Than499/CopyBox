@@ -4,9 +4,11 @@
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
-            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles/DesignSystem.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-            <!-- 全局现代 Fluent 单选框默认样式 (100% 原生矢量渲染，彻底摆脱第三方字体包依赖与首次加载崩溃) -->
+            <!-- 全局现代 Fluent 单选框默认样式 (100% 原生矢量渲染) -->
             <Style TargetType="{x:Type RadioButton}">
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                 <Setter Property="Cursor" Value="Hand"/>
@@ -19,22 +21,22 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Grid Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0">
-                                    <Ellipse x:Name="OuterCircle" Width="16" Height="16" Stroke="#64748B" StrokeThickness="1.5" Fill="Transparent"/>
-                                    <Ellipse x:Name="InnerDot" Width="8" Height="8" Fill="#0078D4" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Grid Grid.Column="0" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,7,0">
+                                    <Ellipse x:Name="OuterCircle" Width="15" Height="15" Stroke="#52525B" StrokeThickness="1.4" Fill="Transparent"/>
+                                    <Ellipse x:Name="InnerDot" Width="7" Height="7" Fill="#3B82F6" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
                                 <ContentPresenter Grid.Column="1" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" RecognizesAccessKey="True"/>
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="OuterCircle" Property="Stroke" Value="#38BDF8"/>
+                                    <Setter TargetName="OuterCircle" Property="Stroke" Value="#71717A"/>
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="OuterCircle" Property="Stroke" Value="#0078D4"/>
+                                    <Setter TargetName="OuterCircle" Property="Stroke" Value="#3B82F6"/>
                                     <Setter TargetName="InnerDot" Property="Visibility" Value="Visible"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Opacity" Value="0.5"/>
+                                    <Setter Property="Opacity" Value="0.45"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -42,7 +44,7 @@
                 </Setter>
             </Style>
 
-            <!-- 全局现代 Fluent 复选框默认样式 (100% 原生矢量渲染，零外部字体依赖) -->
+            <!-- 全局现代 Fluent 复选框默认样式 (100% 原生矢量渲染) -->
             <Style TargetType="{x:Type CheckBox}">
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                 <Setter Property="Cursor" Value="Hand"/>
@@ -55,12 +57,12 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border x:Name="CheckBorder" Grid.Column="0" Width="16" Height="16" CornerRadius="4"
-                                        BorderBrush="#64748B" BorderThickness="1.5" Background="Transparent"
+                                <Border x:Name="CheckBorder" Grid.Column="0" Width="15" Height="15" CornerRadius="4"
+                                        BorderBrush="#52525B" BorderThickness="1.4" Background="Transparent"
                                         VerticalAlignment="Center" Margin="0,0,7,0">
                                     <Path x:Name="CheckMark"
-                                          Data="M 2.5,7.5 L 6,11 L 12.5,3.5"
-                                          Stroke="White" StrokeThickness="1.8"
+                                          Data="M 2.5,7 L 5.8,10.2 L 11.8,3.4"
+                                          Stroke="White" StrokeThickness="1.7"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                                           Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -68,15 +70,15 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#38BDF8"/>
+                                    <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#71717A"/>
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="CheckBorder" Property="Background" Value="#0078D4"/>
-                                    <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#0078D4"/>
+                                    <Setter TargetName="CheckBorder" Property="Background" Value="#3B82F6"/>
+                                    <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#3B82F6"/>
                                     <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Opacity" Value="0.5"/>
+                                    <Setter Property="Opacity" Value="0.45"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

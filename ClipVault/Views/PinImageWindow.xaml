@@ -1,7 +1,7 @@
 <Window x:Class="ClipVault.Views.PinImageWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CopyBox 屏幕贴图"
+        Title="CopyBox"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -17,21 +17,18 @@
     <Grid Margin="6">
         <Border x:Name="FrameBorder"
                 CornerRadius="8"
-                BorderBrush="#6638BDF8"
-                BorderThickness="1.5"
+                BorderBrush="#40FFFFFF"
+                BorderThickness="1"
                 Background="#01000000"
                 MouseLeftButtonDown="FrameBorder_MouseLeftButtonDown">
             <Border.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="2" Opacity="0.45"/>
+                <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="2" Opacity="0.4"/>
             </Border.Effect>
             <Grid>
                 <Border CornerRadius="7" ClipToBounds="True">
-                    <Image x:Name="PinImage"
-                           Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Image x:Name="PinImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                 </Border>
 
-                <!-- 悬停顶部极简浮层控制条 -->
                 <Border x:Name="HoverBar"
                         Visibility="Collapsed"
                         VerticalAlignment="Top"
@@ -39,13 +36,17 @@
                         Margin="6"
                         Padding="6,3"
                         CornerRadius="6"
-                        Background="#CC0F172A"
-                        BorderBrush="#5538BDF8"
+                        Background="#E0141418"
+                        BorderBrush="#33FFFFFF"
                         BorderThickness="1">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtScaleBadge" Text="100%" FontSize="10" Foreground="#E2E8F0" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <Button Content="📋" ToolTip="复制图片到剪贴板" Click="BtnCopy_Click" Background="Transparent" Foreground="#E2E8F0" BorderThickness="0" FontSize="11" Padding="3,0" Margin="0,0,4,0" Cursor="Hand"/>
-                        <Button Content="✕" ToolTip="关闭贴图 (双击图片 / Esc)" Click="BtnClose_Click" Background="Transparent" Foreground="#F87171" BorderThickness="0" FontSize="11" FontWeight="Bold" Padding="3,0" Cursor="Hand"/>
+                        <TextBlock x:Name="TxtScaleBadge" Text="100%" FontSize="10" FontFamily="Cascadia Mono, Consolas" Foreground="#D4D4D8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <Button ToolTip="复制" Click="BtnCopy_Click" Background="Transparent" BorderThickness="0" Padding="3,1" Margin="0,0,3,0" Cursor="Hand">
+                            <Path Data="{StaticResource IconCopy}" Stroke="#E4E4E7" StrokeThickness="1.4" Stretch="Uniform" Width="11" Height="11"/>
+                        </Button>
+                        <Button ToolTip="关闭" Click="BtnClose_Click" Background="Transparent" BorderThickness="0" Padding="3,1" Cursor="Hand">
+                            <Path Data="{StaticResource IconClose}" Stroke="#F87171" StrokeThickness="1.5" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
                     </StackPanel>
                 </Border>
             </Grid>

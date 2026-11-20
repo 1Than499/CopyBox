@@ -14,26 +14,6 @@ namespace ClipVault.Helpers
             @"(?<Key>""[^""\r\n]+""\s*:)|(?<String>""[^""\r\n]*"")|(?<Brace>[{}[\],:])|(?<Number>\b\d+(\.\d+)?\b)|(?<Keyword>\b(true|false|null|const|let|var|function|return|if|else|import|export)\b)|(?<Other>[^""{}[\],:\d\s]+|\s+)",
             RegexOptions.Compiled);
 
-        private static readonly SolidColorBrush KeyBrush;
-        private static readonly SolidColorBrush StrBrush;
-        private static readonly SolidColorBrush BraceBrush;
-        private static readonly SolidColorBrush NumBrush;
-        private static readonly SolidColorBrush DefBrush;
-
-        static CodeHighlighter()
-        {
-            KeyBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));   // #38BDF8 天蓝键名
-            StrBrush = new SolidColorBrush(Color.FromRgb(251, 146, 60));   // #FB923C 浅橙字符串
-            BraceBrush = new SolidColorBrush(Color.FromRgb(251, 191, 36)); // #FBBF24 金黄括号
-            NumBrush = new SolidColorBrush(Color.FromRgb(167, 139, 250));  // #A78BFA 淡紫数字/布尔
-            DefBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225));  // #CBD5E1 浅灰标点
-            KeyBrush.Freeze();
-            StrBrush.Freeze();
-            BraceBrush.Freeze();
-            NumBrush.Freeze();
-            DefBrush.Freeze();
-        }
-
         public static readonly DependencyProperty HighlightCodeProperty =
             DependencyProperty.RegisterAttached(
                 "HighlightCode",
@@ -43,6 +23,14 @@ namespace ClipVault.Helpers
 
         public static string GetHighlightCode(DependencyObject obj) => (string)obj.GetValue(HighlightCodeProperty);
         public static void SetHighlightCode(DependencyObject obj, string value) => obj.SetValue(HighlightCodeProperty, value);
+
+        private static Run MakeRun(string text, string brushKey, bool bold = false)
+        {
+            var run = new Run(text);
+            run.SetResourceReference(TextElement.ForegroundProperty, brushKey);
+            if (bold) run.FontWeight = FontWeights.SemiBold;
+            return run;
+        }
 
         private static void OnHighlightCodeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -68,29 +56,29 @@ namespace ClipVault.Helpers
                     int colonIdx = kVal.LastIndexOf(':');
                     if (colonIdx > 0)
                     {
-                        runs.Add(new Run(kVal.Substring(0, colonIdx)) { Foreground = KeyBrush });
-                        runs.Add(new Run(":") { Foreground = DefBrush });
+                        runs.Add(MakeRun(kVal.Substring(0, colonIdx), "CodeKeyBrush"));
+                        runs.Add(MakeRun(":", "TextSecondaryBrush"));
                     }
                     else
                     {
-                        runs.Add(new Run(kVal) { Foreground = KeyBrush });
+                        runs.Add(MakeRun(kVal, "CodeKeyBrush"));
                     }
                 }
                 else if (m.Groups["String"].Success)
                 {
-                    runs.Add(new Run(m.Value) { Foreground = StrBrush });
+                    runs.Add(MakeRun(m.Value, "CodeStrBrush"));
                 }
                 else if (m.Groups["Brace"].Success)
                 {
-                    runs.Add(new Run(m.Value) { Foreground = BraceBrush, FontWeight = FontWeights.SemiBold });
+                    runs.Add(MakeRun(m.Value, "CodeBraceBrush", bold: true));
                 }
                 else if (m.Groups["Number"].Success || m.Groups["Keyword"].Success)
                 {
-                    runs.Add(new Run(m.Value) { Foreground = NumBrush });
+                    runs.Add(MakeRun(m.Value, "CodeNumBrush"));
                 }
                 else
                 {
-                    runs.Add(new Run(m.Value) { Foreground = DefBrush });
+                    runs.Add(MakeRun(m.Value, "TextPrimaryBrush"));
                 }
             }
 

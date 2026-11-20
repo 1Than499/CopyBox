@@ -23,10 +23,10 @@ namespace ClipVault.Views
             bool isEn = LocalizationService.Instance.CurrentLanguage == "en-US";
             if (isEn)
             {
-                TxtDialogTitle.Text = "⚡ Fill Template Variables";
-                TxtDialogSub.Text = "Enter values below and press Enter to expand & paste:";
-                BtnCancel.Content = "Cancel (Esc)";
-                BtnConfirm.Content = "Confirm & Paste (Enter)";
+                TxtDialogTitle.Text = "Template Variables";
+                TxtDialogSub.Text = string.Empty;
+                BtnCancel.Content = "Cancel";
+                BtnConfirm.Content = "Confirm";
             }
 
             foreach (var p in prompts)
@@ -35,20 +35,20 @@ namespace ClipVault.Views
                 {
                     Text = p.Label,
                     FontSize = 11,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1)),
+                    FontWeight = FontWeights.Medium,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x8E, 0x8E, 0x96)),
                     Margin = new Thickness(0, 0, 0, 4)
                 };
                 var box = new TextBox
                 {
                     Text = p.DefaultValue ?? string.Empty,
                     FontSize = 12,
-                    Padding = new Thickness(8, 5, 8, 5),
+                    Padding = new Thickness(8, 6, 8, 6),
                     Margin = new Thickness(0, 0, 0, 10),
-                    Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x29, 0x3B)),
-                    Foreground = Brushes.White,
-                    CaretBrush = new SolidColorBrush(Color.FromRgb(0x38, 0xBD, 0xF8)),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x47, 0x55, 0x69)),
+                    Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x18)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xF4, 0xF4, 0xF5)),
+                    CaretBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x27, 0x27, 0x2E)),
                     BorderThickness = new Thickness(1)
                 };
                 InputsHost.Children.Add(label);

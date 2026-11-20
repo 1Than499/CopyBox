@@ -1,19 +1,35 @@
 <div align="center">
 
-# CopyBox 📦 v3.1.5
+# CopyBox 📦 v3.9.0
 
 **面向 Windows 10 / 11 的现代化贴边毛玻璃效率抽屉 & 100% 纯本地离线隐私剪贴板管理器。**  
 *A blazingly fast, privacy-first, 100% local clipboard manager & productivity drawer for Windows 10/11 built with .NET 8 & modern Fluent Design.*
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![Release](https://img.shields.io/badge/Release-v3.1.5-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
+[![Release](https://img.shields.io/badge/Release-v3.9.0-success?logo=github&logoColor=white)](https://github.com/1Than499/CopyBox/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/Privacy-100%25%20Offline-success.svg)](#)
 
-[ **✨ v3.1.5 效率进化说明** ](#-v315-版本更新说明-whats-new-in-v315) | [ **⚡ v3.0.4 优化与修复说明** ](#-v304-版本更新说明-whats-new-in-v304) | [ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
+[ **✨ v3.9.0 极简重构与体验升级** ](#-v390-版本更新说明-whats-new-in-v390) | [ **⚡ v3.1.5 效率进化说明** ](#-v315-版本更新说明-whats-new-in-v315) | [ **🚀 v3.0.4 优化与修复说明** ](#-v304-版本更新说明-whats-new-in-v304) | [ **🔥 v3.0.0 旗舰大版本更新** ](#-v300-版本更新说明-whats-new-in-v300) | [ **🇨🇳 简体中文** ](#-简体中文) | [ **🇺🇸 English** ](#-english)
 
 </div>
+
+---
+
+## ✨ v3.9.0 版本更新说明 (What's New in v3.9.0)
+
+### 1. 🎨 全新极简界面与统一设计系统重构
+- **Linear × Apple Notes 极简视觉**：重塑侧边栏与居中双形态界面，移除标语、冗余提示语和次要视觉噪声，用清晰的留白、1px 细线分组与克制的单色矢量图标承托信息层级；
+- **单一设计系统与主题引擎**：抽取统一 `Styles/DesignSystem.xaml` 矢量图标与原生控件库，统一 `Helpers/ThemePalette.cs` 驱动 6 大主题与深/浅色模式，并重做代码卡片语法高亮以保证浅色模式下同样清晰易读。
+
+### 2. 📊 底栏实时内存占用监控与一键整理
+- **原生低开销实时读数**：侧边栏与居中双形态底栏新增实时内存占用显示（采用 Win32 原生专用工作集口径，与 Windows 任务管理器「内存」列一致，仅窗口可见时每 2 秒刷新，隐藏即彻底停表零唤醒）；
+- **点击即时瘦身**：轻点底栏内存读数即可异步触发一次深度整理（释放闲置 OCR 引擎、紧缩堆并归还冷物理页）并即时刷新数值。
+
+### 3. 🛠️ 交互细节打磨与问题修复
+- **居中形态透明度精准持久化**：修复居中形态将透明度调为 `0%` 后重开设置自动跳回 `85%` 的问题，统一亚克力 / 云母 / 经典模式的透明通道计算与滑块点选精度；
+- **顶部导航整半区热区**：侧边栏「剪贴板 / 快捷」切换按钮支持点击整个半区直接跳转，不再局限于点击文字区域，随手记便签标题行同样扩展为整行可点击折叠。
 
 ---
 
@@ -134,8 +150,8 @@
 ### 📥 绿色便携免安装版下载 (小白与普通用户推荐)
 无需安装 Git，也不需要复杂的开发环境，解压即用，数据默认随程序根目录便携存储，不写系统注册表：
 
-[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.1.5--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.1.5/CopyBox-v3.1.5-Windows-x64-Portable.zip)  
-[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe%20(v3.1.5)-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.1.5/CopyBox.exe)
+[![Download Portable Zip](https://img.shields.io/badge/下载便携压缩包-CopyBox--v3.9.0--Portable.zip-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.9.0/CopyBox-v3.9.0-Windows-x64-Portable.zip)  
+[![Direct EXE](https://img.shields.io/badge/直接下载单文件-CopyBox.exe%20(v3.9.0)-10B981?style=for-the-badge&logo=powershell&logoColor=white)](https://github.com/1Than499/CopyBox/releases/download/v3.9.0/CopyBox.exe)
 
 *(历史版本可通过顶部 **Branches** 切换查看对应分支，或查阅右侧 [📦 GitHub Releases 发行版列表](https://github.com/1Than499/CopyBox/releases))*
 

@@ -73,6 +73,10 @@ namespace ClipVault.Services
                     var settings = JsonSerializer.Deserialize<AppSettings>(json);
                     if (settings != null)
                     {
+                        if (double.IsNaN(settings.WindowOpacity) || double.IsInfinity(settings.WindowOpacity) || settings.WindowOpacity <= 0.001)
+                        {
+                            settings.WindowOpacity = 1.0;
+                        }
                         settings.PortableMode = true;
                         string defaultRootPath = AppSettings.GetDefaultStoragePath();
                         string originalDir = settings.StorageDirectory ?? string.Empty;

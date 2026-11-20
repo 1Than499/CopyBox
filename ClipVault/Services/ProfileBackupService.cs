@@ -8,7 +8,7 @@ namespace ClipVault.Services
 {
     public sealed class ProfileBackupPackage
     {
-        public string Version { get; set; } = "3.1.5";
+        public string Version { get; set; } = "3.9.0";
         public DateTime ExportedAt { get; set; } = DateTime.UtcNow;
         public List<CustomTagItem> CustomTags { get; set; } = new();
         public List<ClipboardItem> PinnedAndTaggedSnippets { get; set; } = new();
@@ -45,7 +45,7 @@ namespace ClipVault.Services
 
             var pkg = new ProfileBackupPackage
             {
-                Version = "3.1.5",
+                Version = "3.9.0",
                 ExportedAt = DateTime.UtcNow,
                 CustomTags = tags,
                 PinnedAndTaggedSnippets = snippets,

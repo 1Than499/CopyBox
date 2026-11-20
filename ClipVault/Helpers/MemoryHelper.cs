@@ -1,9 +1,13 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace ClipVault.Helpers
 {
@@ -17,6 +21,134 @@ namespace ClipVault.Helpers
     {
         [DllImport("psapi.dll", SetLastError = true)]
         private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool GetProcessMemoryInfo(IntPtr hProcess, out PROCESS_MEMORY_COUNTERS_EX2 counters, uint cb);
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, out VM_COUNTERS_EX2 processInformation, int processInformationLength, out int returnLength);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_MEMORY_COUNTERS_EX2
+        {
+            public uint cb;
+            public uint PageFaultCount;
+            public UIntPtr PeakWorkingSetSize;
+            public UIntPtr WorkingSetSize;
+            public UIntPtr QuotaPeakPagedPoolUsage;
+            public UIntPtr QuotaPagedPoolUsage;
+            public UIntPtr QuotaPeakNonPagedPoolUsage;
+            public UIntPtr QuotaNonPagedPoolUsage;
+            public UIntPtr PagefileUsage;
+            public UIntPtr PeakPagefileUsage;
+            public UIntPtr PrivateUsage;
+            public UIntPtr PrivateWorkingSetSize;
+            public ulong SharedCommitUsage;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct VM_COUNTERS_EX2
+        {
+            public UIntPtr PeakVirtualSize;
+            public UIntPtr VirtualSize;
+            public uint PageFaultCount;
+            public UIntPtr PeakWorkingSetSize;
+            public UIntPtr WorkingSetSize;
+            public UIntPtr QuotaPeakPagedPoolUsage;
+            public UIntPtr QuotaPagedPoolUsage;
+            public UIntPtr QuotaPeakNonPagedPoolUsage;
+            public UIntPtr QuotaNonPagedPoolUsage;
+            public UIntPtr PagefileUsage;
+            public UIntPtr PeakPagefileUsage;
+            public UIntPtr PrivateUsage;
+            public UIntPtr PrivateWorkingSetSize;
+            public ulong SharedCommitUsage;
+        }
+
+        /// <summary>
+        /// 零分配读取与 Windows 任务管理器「内存」列完全一致的专用工作集 (Private Working Set) 字节数。
+        /// </summary>
+        public static long GetPrivateWorkingSetBytes()
+        {
+            try
+            {
+                IntPtr hProc = GetCurrentProcess();
+                uint ex2Size = (uint)Marshal.SizeOf<PROCESS_MEMORY_COUNTERS_EX2>();
+                if (GetProcessMemoryInfo(hProc, out var pmc, ex2Size) && pmc.PrivateWorkingSetSize != UIntPtr.Zero)
+                {
+                    return (long)pmc.PrivateWorkingSetSize.ToUInt64();
+                }
+
+                int vmSize = Marshal.SizeOf<VM_COUNTERS_EX2>();
+                if (NtQueryInformationProcess(hProc, 3 /* ProcessVmCounters */, out var vm, vmSize, out _) == 0 && vm.PrivateWorkingSetSize != UIntPtr.Zero)
+                {
+                    return (long)vm.PrivateWorkingSetSize.ToUInt64();
+                }
+            }
+            catch { }
+
+            return Environment.WorkingSet;
+        }
+
+        public static string GetFormattedMemoryUsage()
+        {
+            double mb = GetPrivateWorkingSetBytes() / (1024.0 * 1024.0);
+            return mb.ToString("F1", CultureInfo.InvariantCulture) + " MB";
+        }
+
+        /// <summary>
+        /// 为窗口底栏绑定极轻量的实时内存读数（仅在窗口可见时每 2 秒刷新，隐藏时彻底停表零唤醒；点击读数可手动整理内存）。
+        /// </summary>
+        public static void BindLiveMemoryMonitor(Window window, TextBlock? target)
+        {
+            if (window == null || target == null) return;
+
+            void RefreshText()
+            {
+                target.Text = GetFormattedMemoryUsage();
+            }
+
+            var timer = new DispatcherTimer(DispatcherPriority.Background, window.Dispatcher)
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            timer.Tick += (_, _) =>
+            {
+                if (window.IsVisible) RefreshText();
+                else timer.Stop();
+            };
+
+            window.IsVisibleChanged += (_, _) =>
+            {
+                if (window.IsVisible)
+                {
+                    RefreshText();
+                    timer.Start();
+                }
+                else
+                {
+                    timer.Stop();
+                }
+            };
+
+            window.Closed += (_, _) => timer.Stop();
+
+            target.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                _ = Task.Run(() =>
+                {
+                    ExecuteDeepTrimCore();
+                    window.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(RefreshText));
+                });
+            };
+
+            RefreshText();
+            if (window.IsVisible) timer.Start();
+        }
 
         private static readonly object _syncLock = new();
         private static CancellationTokenSource? _idleTrimCts;

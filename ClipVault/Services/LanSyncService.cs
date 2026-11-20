@@ -623,7 +623,7 @@ namespace ClipVault.Services
 <head>
 <meta charset=""utf-8"">
 <meta name=""viewport"" content=""width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"">
-<title>CopyBox v3.0 局域网双向快传</title>
+<title>CopyBox v3.9.0 局域网双向快传</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:#0f172a;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:16px;max-width:560px;margin:0 auto;}
@@ -648,7 +648,7 @@ textarea:focus{border-color:#38bdf8;}
 </head>
 <body>
 <div class=""hdr"">
-  <div class=""brand"">📋 CopyBox 局域网快传 <span class=""badge"">v3.0 离线直连</span></div>
+  <div class=""brand"">📋 CopyBox 局域网快传 <span class=""badge"">v3.9.0 离线直连</span></div>
   <button class=""copy-btn"" onclick=""loadItems()"">🔄 刷新</button>
 </div>
 

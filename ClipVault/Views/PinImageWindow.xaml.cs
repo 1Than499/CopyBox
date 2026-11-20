@@ -78,31 +78,45 @@ namespace ClipVault.Views
         private void BuildContextMenu()
         {
             var menu = new ContextMenu();
+            if (Application.Current?.TryFindResource("ModernContextMenuStyle") is Style ctxStyle) menu.Style = ctxStyle;
+            Style? itemStyle = Application.Current?.TryFindResource("ModernMenuItemStyle") as Style;
+            Style? sepStyle = Application.Current?.TryFindResource("ModernMenuSeparatorStyle") as Style;
             bool isEn = LocalizationService.Instance.CurrentLanguage == "en-US";
 
-            var copyItem = new MenuItem { Header = isEn ? "Copy Image" : "📋 复制原图" };
+            var copyItem = new MenuItem { Icon = ThemePalette.CreateMenuGlyph("\uE8C8"), Header = isEn ? "Copy Image" : "复制原图" };
+            if (itemStyle != null) copyItem.Style = itemStyle;
             copyItem.Click += (_, _) => CopyPinnedImage();
 
-            var resetItem = new MenuItem { Header = isEn ? "Reset Size (100%)" : "🔍 恢复初始大小" };
+            var resetItem = new MenuItem { Icon = ThemePalette.CreateMenuGlyph("\uE72C"), Header = isEn ? "Reset Size (100%)" : "恢复初始大小" };
+            if (itemStyle != null) resetItem.Style = itemStyle;
             resetItem.Click += (_, _) =>
             {
                 this.Opacity = 1.0;
                 ApplyScale(1.0);
             };
 
-            var halfAlphaItem = new MenuItem { Header = isEn ? "Toggle 55% Opacity" : "💧 切换半透明对照" };
+            var halfAlphaItem = new MenuItem { Icon = ThemePalette.CreateMenuGlyph("\uE793"), Header = isEn ? "Toggle 55% Opacity" : "半透明对照" };
+            if (itemStyle != null) halfAlphaItem.Style = itemStyle;
             halfAlphaItem.Click += (_, _) =>
             {
                 this.Opacity = this.Opacity < 0.85 ? 1.0 : 0.55;
             };
 
-            var closeItem = new MenuItem { Header = isEn ? "Close Pin (Esc)" : "✕ 关闭贴图 (Esc)" };
+            var closeItem = new MenuItem
+            {
+                Icon = ThemePalette.CreateMenuGlyph("\uE711", new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44))),
+                Header = isEn ? "Close" : "关闭贴图"
+            };
+            if (itemStyle != null) closeItem.Style = itemStyle;
             closeItem.Click += (_, _) => Close();
+
+            var sep = new Separator();
+            if (sepStyle != null) sep.Style = sepStyle;
 
             menu.Items.Add(copyItem);
             menu.Items.Add(resetItem);
             menu.Items.Add(halfAlphaItem);
-            menu.Items.Add(new Separator());
+            menu.Items.Add(sep);
             menu.Items.Add(closeItem);
             this.ContextMenu = menu;
         }
@@ -157,13 +171,13 @@ namespace ClipVault.Views
         private void Window_MouseEnter(object sender, MouseEventArgs e)
         {
             HoverBar.Visibility = Visibility.Visible;
-            FrameBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(56, 189, 248));
+            FrameBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0x52, 0x52, 0x5B));
         }
 
         private void Window_MouseLeave(object sender, MouseEventArgs e)
         {
             HoverBar.Visibility = Visibility.Collapsed;
-            FrameBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0x38, 0xBD, 0xF8));
+            FrameBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(0x27, 0x27, 0x2E));
         }
 
         private void BtnCopy_Click(object sender, RoutedEventArgs e)
